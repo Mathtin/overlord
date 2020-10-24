@@ -97,6 +97,15 @@ class SQLiteSession(object):
             row = model(**new_values)
             self.add(row)
 
+    def update_or_add(self, model: BaseModel, pk: str, value: dict):
+        row = self.query(model).filter_by(**{pk:value[pk]}).first()
+        if row is None:
+            self.add(model(**value))
+        else:
+            for col in value:
+                if getattr(row, col) != value[col]:
+                    setattr(row, col, value[col])
+
     def close(self):
         try:
             self._session.close()

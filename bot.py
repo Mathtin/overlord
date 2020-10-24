@@ -46,6 +46,7 @@ class Overlord(discord.Client):
         self.guild = None
         self.control_channel = None
         self.error_channel = None
+        self.role_map = None
 
     def run(self):
         super().run(self.token)
@@ -107,14 +108,24 @@ class Overlord(discord.Client):
                 check_coroutine(hook)
                 self.commands[cmd] = hook
 
-            # Sync roles
-            roles = []
-            for i in range(len(self.guild.roles)):
-                r = role_to_row(self.guild.roles[i])
-                r['position'] = i
-                roles.append(r)
+            # Sync and map roles
+            log.info(f'Syncing roles')
+            roles = roles_to_rows(self.guild.roles)
+            self.role_map = { role['did']: role for role in roles }
             self.db.sync_table(db.Role, 'did', roles)
+            log.info(f'Commiting changes')
             self.db.commit()
+
+            # Sync users
+            log.info(f'Syncing users')
+            async for member in self.guild.fetch_members(limit=None):
+                # Skip bots
+                if member.bot:
+                    continue
+                row = member_to_row(member, self.role_map)
+                self.db.update_or_add(db.User, 'did', row)
+                self.db.commit()
+            log.info(f'Syncing done')
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])

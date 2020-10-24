@@ -165,8 +165,30 @@ def role_to_row(role: discord.Role):
     return {
         'did': role.id,
         'name': role.name,
-        'position': role.position,
         'created_at': role.created_at
+    }
+
+def roles_to_rows(roles: list):
+    rows = [role_to_row(r) for r in roles]
+    rows = sorted(rows, key = lambda i: i['did'])
+    for i in range(len(rows)):
+        rows[i]['idx'] = i
+    return rows
+
+def role_mask(user: discord.Member, role_map):
+    mask = ['0'] * len(role_map)
+    for role in user.roles:
+        idx = role_map[role.id]['idx']
+        mask[idx] = '1'
+    return ''.join(mask)
+
+def member_to_row(user: discord.Member, role_map):
+    return {
+        'did': user.id,
+        'name': user.name,
+        'disc': user.discriminator,
+        'display_name': user.display_name,
+        'roles': role_mask(user, role_map)
     }
 
 ###################

@@ -21,7 +21,7 @@ class Role(BaseModel):
 
     did = Column(Integer, nullable=False, unique=True)
     name = Column(VARCHAR(63), unique=True, nullable=False)
-    position = Column(Integer, unique=True, nullable=False)
+    idx = Column(Integer, unique=True, nullable=False)
 
     def __repr__(self):
         s = super().__repr__()[:-2]
