@@ -47,6 +47,7 @@ class Overlord(discord.Client):
         self.control_channel = None
         self.error_channel = None
         self.role_map = None
+        self.commands = {}
 
     def run(self):
         super().run(self.token)
@@ -139,6 +140,10 @@ class Overlord(discord.Client):
         if is_dm_message(message) or message.guild.id != self.guild.id:
             return
 
+        if message.channel == self.control_channel:
+            await self.on_control_message(message)
+            return
+
         user = self.db.query(db.User).filter(db.User.did == message.author.id).first()
 
         if user is None:
@@ -146,6 +151,29 @@ class Overlord(discord.Client):
             return
 
         event = db.Event()
+
+    async def on_control_message(self, message: discord.Message):
+        argv = parse_control_message(self.config["control.prefix"], message)
+
+        if argv is None or len(argv) == 0:
+            return
+            
+        cmd_name = argv[0]
+
+        if cmd_name == "help":
+            help_lines = []
+            for cmd in self.commands:
+                hook = self.commands[cmd]
+                help_lines.append(build_cmdcoro_usage(cmd, hook.or_cmdcoro))
+            help_msg = '\n'.join(help_lines)
+            await message.channel.send(f'Available commands:\n`\n{help_msg}\n`')
+            return
+
+        if cmd_name not in self.commands:
+            await message.channel.send("Unknown command")
+            return
+        
+        await self.commands[cmd_name](self, message, argv)
 
     async def on_raw_message_edit1(self, payload: discord.RawMessageUpdateEvent):
         sinks = self.get_attached_sinks(payload.channel_id)
@@ -183,26 +211,3 @@ class Overlord(discord.Client):
         
         if 'remove' in self.member_hooks:
             await self.member_hooks["remove"](self, member)
-
-    async def on_control_message1(self, message: discord.Message):
-        argv = parse_control_message(message)
-
-        if argv is None or len(argv) == 0:
-            return
-            
-        cmd_name = argv[0]
-
-        if cmd_name == "help":
-            help_lines = []
-            for cmd in self.commands:
-                hook = self.commands[cmd]
-                help_lines.append(build_cmdcoro_usage(cmd, hook.or_cmdcoro))
-            help_msg = '\n'.join(help_lines)
-            await message.channel.send(f'Available commands:\n`######------######\n{help_msg}\n######------######`')
-            return
-
-        if cmd_name not in self.commands:
-            await message.channel.send("Unknown command")
-            return
-        
-        await self.commands[cmd_name](self, message, argv)

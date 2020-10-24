@@ -17,6 +17,18 @@
           "type": "object",
           "default": {}
         },
+        "control": {
+          "type": "object",
+          "properties": {
+            "prefix": {
+              "type": "string",
+              "default": "!"
+            }
+          },
+          "required": [
+            "prefix"
+          ]
+        },
         "event": {
           "type": "object",
           "properties": {
@@ -230,7 +242,9 @@
         }
       },
       "required": [
-        "event"
+        "event",
+        "commands",
+        "control"
       ]
     }
   },
