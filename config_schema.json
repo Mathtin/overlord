@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "logger": {
+      "type": "object",
+      "default": null
+    },
+    "bot": {
+      "type": "object",
+      "properties": {
+        "egg_done": {
+          "type": "string",
+          "default": "change this part"
+        },
+        "commands": {
+          "type": "object",
+          "default": {}
+        },
+        "event": {
+          "type": "object",
+          "properties": {
+            "user": {
+              "type": "object",
+              "properties": {
+                "join": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "ban": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "kick": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                }
+              },
+              "required": [
+                "join",
+                "left",
+                "ban",
+                "kick"
+              ]
+            },
+            "message": {
+              "type": "object",
+              "properties": {
+                "new": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "delete": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "edit": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                }
+              },
+              "required": [
+                "new",
+                "delete",
+                "edit"
+              ]
+            },
+            "voice": {
+              "type": "object",
+              "properties": {
+                "join": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "kick": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                }
+              },
+              "required": [
+                "join",
+                "left",
+                "kick"
+              ]
+            }
+          },
+          "required": [
+            "user",
+            "message",
+            "voice"
+          ]
+        }
+      },
+      "required": [
+        "event"
+      ]
+    }
+  },
+  "required": [
+    "logger",
+    "bot"
+  ]
+}
