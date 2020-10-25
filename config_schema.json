@@ -239,12 +239,60 @@
             "message",
             "voice"
           ]
+        },
+        "user": {
+          "type": "object",
+          "properties": {
+            "left": {
+              "type": "object",
+              "properties": {
+                "keep": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "required": [
+                "keep"
+              ]
+            },
+            "banned": {
+              "type": "object",
+              "properties": {
+                "keep": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "required": [
+                "keep"
+              ]
+            },
+            "kicked": {
+              "type": "object",
+              "properties": {
+                "keep": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "required": [
+                "keep"
+              ]
+            }
+          },
+          "required": [
+            "left",
+            "banned",
+            "kicked"
+          ]
         }
       },
       "required": [
         "event",
         "commands",
-        "control"
+        "control",
+        "user",
+        "egg_done"
       ]
     }
   },

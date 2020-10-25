@@ -13,7 +13,9 @@
 
 __author__ = 'Mathtin'
 
-from .event import EventType, RoleEvent, KickBanEvent, MessageEvent
-from .role import Role
-from .user import User
-from .stat import Stat
+from .models import *
+from .session import SQLiteSession
+
+def get_user_by_id(db: SQLiteSession, id: int) -> User:
+    return db.query(User).filter(User.did == id).first()
+

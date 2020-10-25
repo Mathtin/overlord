@@ -13,7 +13,17 @@
 
 __author__ = 'Mathtin'
 
-from .event import EventType, RoleEvent, KickBanEvent, MessageEvent
-from .role import Role
-from .user import User
-from .stat import Stat
+from enum import unique
+from sqlalchemy import Column, VARCHAR
+from .base import BaseModel
+
+class Stat(BaseModel):
+    __tablename__ = 'stats'
+
+    name = Column(VARCHAR(63), nullable=False, unique=True)
+    value = Column(VARCHAR(255), nullable=False)
+
+    def __repr__(self):
+        s = super().__repr__()[:-2]
+        f = ",name={0.name!r},value={0.value!r}".format(self)
+        return s + f + ")>"

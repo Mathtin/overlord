@@ -19,6 +19,7 @@ import traceback
 import logging
 import discord
 import db
+import db.queries as q
 
 from util import *
 
@@ -42,15 +43,21 @@ class Overlord(discord.Client):
         self.config = config
         self.db = db_session
 
+        self.event_type_map = {row.name:row.id for row in self.db.query(db.EventType)}
+
         # Values initiated on_ready
         self.guild = None
         self.control_channel = None
         self.error_channel = None
         self.role_map = None
         self.commands = {}
+        self.bot_members = {}
 
     def run(self):
         super().run(self.token)
+
+    def event_type(self, name):
+        return self.event_type_map[name]
 
     #########
     # Hooks #
@@ -75,8 +82,7 @@ class Overlord(discord.Client):
 
     async def on_ready(self):
         # Lock current async context
-        init_lock = asyncio.Lock()
-        async with init_lock:
+        async with asyncio.Lock():
             # Find guild
             self.guild = self.get_guild(self.guild_id)
             if self.guild is None:
@@ -122,6 +128,7 @@ class Overlord(discord.Client):
             async for member in self.guild.fetch_members(limit=None):
                 # Skip bots
                 if member.bot:
+                    self.bot_members[member.id] = member
                     continue
                 row = member_to_row(member, self.role_map)
                 self.db.update_or_add(db.User, 'did', row)
@@ -140,11 +147,15 @@ class Overlord(discord.Client):
         if is_dm_message(message) or message.guild.id != self.guild.id:
             return
 
+        # ignore bot messages
+        if message.author.id in self.bot_members:
+            return
+
         if message.channel == self.control_channel:
             await self.on_control_message(message)
             return
 
-        user = self.db.query(db.User).filter(db.User.did == message.author.id).first()
+        user = q.get_user_by_id(db, message.author.id)
 
         if user is None:
             log.error(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
@@ -153,7 +164,8 @@ class Overlord(discord.Client):
         event = db.Event()
 
     async def on_control_message(self, message: discord.Message):
-        argv = parse_control_message(self.config["control.prefix"], message)
+        prefix = self.config["control.prefix"]
+        argv = parse_control_message(prefix, message)
 
         if argv is None or len(argv) == 0:
             return
@@ -164,9 +176,9 @@ class Overlord(discord.Client):
             help_lines = []
             for cmd in self.commands:
                 hook = self.commands[cmd]
-                help_lines.append(build_cmdcoro_usage(cmd, hook.or_cmdcoro))
+                help_lines.append(build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro))
             help_msg = '\n'.join(help_lines)
-            await message.channel.send(f'Available commands:\n`\n{help_msg}\n`')
+            await message.channel.send(f'`Available commands:\n{help_msg}\n`')
             return
 
         if cmd_name not in self.commands:

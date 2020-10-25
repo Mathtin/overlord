@@ -15,6 +15,7 @@ __author__ = 'Mathtin'
 
 from sqlalchemy import Column, VARCHAR, Integer, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declared_attr
 from .base import BaseModel
 
 
@@ -30,14 +31,22 @@ class EventType(BaseModel):
         return s + f + ")>"
 
 
-class Event(BaseModel):
-    __tablename__ = 'events'
+class Event(object):
 
-    type_id = Column(Integer, ForeignKey('event_types.id', ondelete='CASCADE'), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    @declared_attr
+    def type_id(cls): 
+        return Column(Integer, ForeignKey('event_types.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    @declared_attr
+    def user_id(cls):
+        return Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
 
-    type = relationship("EventType", lazy="select")
-    user = relationship("User", lazy="select")
+    @declared_attr
+    def type(cls):
+        return relationship("EventType", lazy="select")
+    @declared_attr
+    def user(cls):
+        return relationship("User", lazy="select", primaryjoin=cls.__tablename__+".c.user_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
@@ -45,18 +54,14 @@ class Event(BaseModel):
         return s + f + ")>"
 
 
-class RoleEvent(BaseModel):
+class RoleEvent(Event, BaseModel):
     __tablename__ = 'role_events'
-
-    event_id = Column(Integer, ForeignKey('events.id', ondelete='CASCADE'), nullable=False, index=True)
 
     role_id = Column(Integer, ForeignKey('roles.id', ondelete='CASCADE'), nullable=False, index=True)
     object_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
 
-    event = relationship("Event", lazy="joined", uselist=False)
-
     role = relationship("Role", lazy="select")
-    object = relationship("User", lazy="select")
+    object = relationship("User", lazy="select", primaryjoin="role_events.c.object_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
@@ -64,17 +69,13 @@ class RoleEvent(BaseModel):
         return s + f + ")>"
 
 
-class KickBanEvent(BaseModel):
+class KickBanEvent(Event, BaseModel):
     __tablename__ = 'kb_events'
-
-    event_id = Column(Integer, ForeignKey('events.id', ondelete='CASCADE'), nullable=False, index=True)
 
     object_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     is_banned = Column(Boolean, nullable=False)
 
-    event = relationship("Event", lazy="joined", uselist=False)
-
-    object = relationship("User", lazy="select")
+    object = relationship("User", lazy="select", primaryjoin="kb_events.c.object_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
@@ -82,17 +83,14 @@ class KickBanEvent(BaseModel):
         return s + f + ")>"
 
 
-class MessageEvent(BaseModel):
+class MessageEvent(Event, BaseModel):
     __tablename__ = 'message_events'
 
-    event_id = Column(Integer, ForeignKey('events.id', ondelete='CASCADE'), nullable=False, index=True)
-
     author_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    channel_id = Column(Integer, nullable=False)
+    message_id = Column(Integer, nullable=False)
+    channel_id = Column(Integer, nullable=False, index=True)
 
-    event = relationship("Event", lazy="joined", uselist=False)
-
-    author = relationship("User", lazy="select")
+    author = relationship("User", lazy="select", primaryjoin="message_events.c.author_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]

@@ -161,6 +161,11 @@ def is_dm_message(message: discord.Message):
 def is_same_author(m1: discord.Message, m2: discord.Message):
     return m1.author.id == m2.author.id
 
+
+#################
+# DB Converters #
+#################
+
 def role_to_row(role: discord.Role):
     return {
         'did': role.id,
@@ -175,20 +180,39 @@ def roles_to_rows(roles: list):
         rows[i]['idx'] = i
     return rows
 
-def role_mask(user: discord.Member, role_map):
+def role_mask(user: discord.Member, role_map: dict):
     mask = ['0'] * len(role_map)
     for role in user.roles:
         idx = role_map[role.id]['idx']
         mask[idx] = '1'
     return ''.join(mask)
 
-def member_to_row(user: discord.Member, role_map):
+def user_to_row(user: discord.User, role_map: dict):
+    return {
+        'did': user.id,
+        'name': user.name,
+        'disc': user.discriminator,
+        'display_name': None,
+        'roles': '0' * len(role_map)
+    }
+
+def member_to_row(user: discord.Member, role_map: dict):
     return {
         'did': user.id,
         'name': user.name,
         'disc': user.discriminator,
         'display_name': user.display_name,
         'roles': role_mask(user, role_map)
+    }
+
+def new_message_to_row(msg: discord.Message, event_id: int):
+    return {
+        'type_id': event_id,
+        'user_id': msg.author.id,
+        'author_id': msg.author.id,
+        'message_id': msg.id,
+        'channel_id': msg.channel.id,
+        'created_at': msg.created_at
     }
 
 ###################

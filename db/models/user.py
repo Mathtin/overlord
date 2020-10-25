@@ -22,7 +22,7 @@ class User(BaseModel):
     did = Column(Integer, nullable=False, unique=True)
     name = Column(VARCHAR(127), nullable=False)
     disc = Column(Integer, nullable=False)
-    display_name = Column(VARCHAR(127), nullable=False)
+    display_name = Column(VARCHAR(127), nullable=True)
     roles = Column(VARCHAR(127), nullable=True)
 
     def __repr__(self):
