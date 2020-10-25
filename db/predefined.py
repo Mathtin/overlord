@@ -22,7 +22,7 @@ EVENT_TYPES = [
     { 'name': 'role_del', 'description': 'role removed from user' },
     { 'name': 'new_message', 'description': 'user posted new message' },
     { 'name': 'message_edit', 'description': 'user edited message' },
-    { 'name': 'message_delele', 'description': 'user deleted message' },
+    { 'name': 'message_delete', 'description': 'user deleted message' },
     { 'name': 'vc_join', 'description': 'user joined VC' },
     { 'name': 'vc_left', 'description': 'user left VC' }
 ]

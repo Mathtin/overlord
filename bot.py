@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from db.session import DBSession
 import os
 import sys
 import traceback
@@ -27,7 +28,33 @@ log = logging.getLogger('overlord-bot')
 
 class Overlord(discord.Client):
 
-    def __init__(self, config: ConfigView, db_session: db.SQLiteSession):
+    # Members loaded from ENV
+    token: str
+    guild_id: int
+    control_channel_id: int
+    error_channel_id: int
+
+    # Members passed via constructor
+    config: ConfigView
+    db: DBSession
+
+    # Event name -> id (gathered via db)
+    event_type_map: dict
+
+    # Values initiated on_ready
+    guild: discord.Guild
+    control_channel: discord.TextChannel
+    error_channel: discord.TextChannel
+    role_map: dict
+    commands: dict
+    bot_members: dict
+    initialized: bool
+
+    def __init__(self, config: ConfigView, db_session: db.DBSession):
+        self.config = config
+        self.db = db_session
+
+        # Init base class
         intents = discord.Intents.none()
         intents.guilds = True
         intents.members = True
@@ -35,23 +62,19 @@ class Overlord(discord.Client):
 
         super().__init__(intents=intents)
 
+        # Load env values
         self.token = os.getenv('DISCORD_TOKEN')
         self.guild_id = int(os.getenv('DISCORD_GUILD'))
         self.control_channel_id = int(os.getenv('DISCORD_CONTROL_CHANNEL'))
         self.error_channel_id = int(os.getenv('DISCORD_ERROR_CHANNEL'))
 
-        self.config = config
-        self.db = db_session
-
+        # Map event types
         self.event_type_map = {row.name:row.id for row in self.db.query(db.EventType)}
 
-        # Values initiated on_ready
-        self.guild = None
-        self.control_channel = None
-        self.error_channel = None
-        self.role_map = None
+        # Preset some values initiated on_ready
         self.commands = {}
         self.bot_members = {}
+        self.initialized = False
 
     def run(self):
         super().run(self.token)
@@ -63,6 +86,11 @@ class Overlord(discord.Client):
     # Hooks #
     #########
 
+    """
+        Async error event handler
+
+        Sends stackktrace to error channel
+    """
     async def on_error(self, event, *args, **kwargs):
         ex_type = sys.exc_info()[0]
 
@@ -80,6 +108,12 @@ class Overlord(discord.Client):
         if ex_type is NotCoroutineException:
             await self.logout()
 
+
+    """
+        Async ready event handler
+
+        Completly initialize bot state
+    """
     async def on_ready(self):
         # Lock current async context
         async with asyncio.Lock():
@@ -137,8 +171,17 @@ class Overlord(discord.Client):
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
+            self.initialized = True
 
+    """
+        Async new message event handler
+
+        Saves event in database
+    """
     async def on_message(self, message: discord.Message):
+        if not self.initialized or not self.config["event.message.new.track"]:
+            return
+
         # ingore own messages
         if message.author == self.user:
             return
@@ -155,14 +198,24 @@ class Overlord(discord.Client):
             await self.on_control_message(message)
             return
 
-        user = q.get_user_by_id(db, message.author.id)
+        user = q.get_user_by_id(self.db, message.author.id)
 
         if user is None:
-            log.error(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
+            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
             return
 
-        event = db.Event()
+        event_id = self.event_type("new_message")
+        row = new_message_to_row(message, event_id)
+        log.info(f'New message {row}')
+        self.db.add(db.MessageEvent(**row))
+        self.db.commit()
 
+
+    """
+        Async new control message event handler
+
+        Calls appropriate control callback
+    """
     async def on_control_message(self, message: discord.Message):
         prefix = self.config["control.prefix"]
         argv = parse_control_message(prefix, message)
@@ -187,39 +240,110 @@ class Overlord(discord.Client):
         
         await self.commands[cmd_name](self, message, argv)
 
-    async def on_raw_message_edit1(self, payload: discord.RawMessageUpdateEvent):
-        sinks = self.get_attached_sinks(payload.channel_id)
-        if sinks is None:
+
+    """
+        Async message edit event handler
+
+        Saves event in database
+    """
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
+        if not self.initialized or not self.config["event.message.edit.track"]:
             return
 
-        channel = self.get_channel(payload.channel_id)
-
-        msg = await channel.fetch_message(payload.message_id)
-
-        # ingore own messages
-        if msg.author.id == self.user.id:
+        # ignore special channel events
+        if payload.channel_id == self.control_channel.id or \
+            payload.channel_id == self.error_channel.id:
             return
 
-        for sink in sinks:
-            if "on_message_edit" not in sink:
-                continue
-            await sink["on_message_edit"](self, msg)
-
-    async def on_raw_message_delete1(self, payload: discord.RawMessageUpdateEvent):
-        sinks = self.get_attached_sinks(payload.channel_id)
-        if sinks is None:
+        # ingore bot messages
+        msg = q.get_msg_by_id(self.db, payload.message_id)
+        if msg is None or msg.author_id in self.bot_members:
             return
 
-        for sink in sinks:
-            if "on_message_delete" not in sink:
-                continue
-            await sink["on_message_delete"](self, payload.message_id)
+        event_id = self.event_type("message_edit")
+        row = message_change_row(msg, event_id)
+        log.info(f'Message edit: {row}')
+        self.db.add(db.MessageEvent(**row))
+        self.db.commit()
 
-    async def on_member_remove1(self, member: discord.Member):
+
+    """
+        Async message delete event handler
+
+        Saves event in database
+    """
+    async def on_raw_message_delete(self, payload: discord.RawMessageUpdateEvent):
+        if not self.initialized or not self.config["event.message.delete.track"]:
+            return
+
+        # ignore special channel events
+        if payload.channel_id == self.control_channel.id or \
+            payload.channel_id == self.error_channel.id:
+            return
+
+        # ingore bot messages
+        msg = q.get_msg_by_id(self.db, payload.message_id)
+        if msg is None or msg.author_id in self.bot_members:
+            return
+
+        event_id = self.event_type("message_delete")
+        row = message_change_row(msg, event_id)
+        log.info(f'Message delete: {row}')
+        self.db.add(db.MessageEvent(**row))
+        self.db.commit()
+
+
+    """
+        Async member join event handler
+
+        Saves user in database
+    """
+    async def on_member_join(self, member: discord.Member):
+        if not self.initialized or not self.config["event.user.join.track"]:
+            return
+
+        # Skip bots
+        if member.bot:
+            self.bot_members[member.id] = member
+            return
+
+        # ingore any foreign members
+        if member.guild.id != self.guild.id:
+            return
+
+        row = member_to_row(member, self.role_map)
+        self.db.update_or_add(db.User, 'did', row)
+        self.db.commit()
+
+
+    """
+        Async member remove event handler
+
+        Removes user from database (or keep it, depends on config)
+    """
+    async def on_member_remove(self, member: discord.Member):
+        if not self.initialized or not self.config["event.user.left.track"]:
+            return
+
+        # Skip bots
+        if member.bot:
+            return
 
         # ingore any foreign members
         if member.guild.id != self.guild.id:
             return
         
-        if 'remove' in self.member_hooks:
-            await self.member_hooks["remove"](self, member)
+        # Resolve user
+        user = q.get_user_by_id(self.db, member.id)
+        if user is None:
+            return
+
+        # Apply actions
+        if self.config["user.left.keep"]:
+            row = user_to_row(member)
+            self.db.update(db.User, 'did', row)
+        else:
+            self.db.delete(user)
+        
+        # Commit changes
+        self.db.commit()

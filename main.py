@@ -21,7 +21,7 @@ import logging.config
 from dotenv import load_dotenv
 
 from util import ConfigView
-from db import SQLiteSession, EventType
+from db import DBSession, EventType
 from db.predefined import EVENT_TYPES
 
 def main(argv):
@@ -41,7 +41,7 @@ def main(argv):
         logging.config.dictConfig(config['logger'])
 
     # Init database
-    session = SQLiteSession("test.db", autocommit=False)
+    session = DBSession(autocommit=False)
     session.sync_table(EventType, 'name', EVENT_TYPES)
     session.commit()
 

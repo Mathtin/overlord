@@ -87,7 +87,7 @@ class MessageEvent(Event, BaseModel):
     __tablename__ = 'message_events'
 
     author_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    message_id = Column(Integer, nullable=False)
+    message_id = Column(Integer, nullable=False, index=True)
     channel_id = Column(Integer, nullable=False, index=True)
 
     author = relationship("User", lazy="select", primaryjoin="message_events.c.author_id == users.c.id")

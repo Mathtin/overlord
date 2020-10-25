@@ -13,10 +13,11 @@
 
 __author__ = 'Mathtin'
 
+import os
+
 from logging import getLogger
 
 from sqlalchemy import create_engine
-
 from sqlalchemy.exc import IntegrityError, DataError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -25,15 +26,15 @@ from db.models import *
 
 log = getLogger()
 
-class SQLiteSession(object):
+class DBSession(object):
 
     _session: Session
 
     # Main DB Connection Ref Obj
     db_engine = None
 
-    def __init__(self, dbname, autocommit=True, autoflush=True):
-        engine_url = 'sqlite:///' + dbname
+    def __init__(self, autocommit=True, autoflush=True):
+        engine_url = os.getenv('DATABASE_ACCESS_URL')
         log.info(f'Connecting to {engine_url}')
         self.db_engine = create_engine(engine_url)
         Base.metadata.create_all(self.db_engine)
@@ -98,13 +99,17 @@ class SQLiteSession(object):
             self.add(row)
 
     def update_or_add(self, model: BaseModel, pk: str, value: dict):
+        if not self.update(model, pk, value):
+            self.add(model(**value))
+
+    def update(self, model: BaseModel, pk: str, value: dict):
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
         if row is None:
-            self.add(model(**value))
-        else:
-            for col in value:
-                if getattr(row, col) != value[col]:
-                    setattr(row, col, value[col])
+            return False
+        for col in value:
+            if getattr(row, col) != value[col]:
+                setattr(row, col, value[col])
+        return True
 
     def close(self):
         try:

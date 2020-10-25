@@ -19,6 +19,7 @@ import os.path
 import asyncio
 import shlex
 import discord
+import db
 
 CONFIG_SCHEMA_PATH = "config_schema.json"
 
@@ -161,7 +162,6 @@ def is_dm_message(message: discord.Message):
 def is_same_author(m1: discord.Message, m2: discord.Message):
     return m1.author.id == m2.author.id
 
-
 #################
 # DB Converters #
 #################
@@ -213,6 +213,15 @@ def new_message_to_row(msg: discord.Message, event_id: int):
         'message_id': msg.id,
         'channel_id': msg.channel.id,
         'created_at': msg.created_at
+    }
+
+def message_change_row(msg: db.MessageEvent, event_id: int):
+    return {
+        'type_id': event_id,
+        'user_id': msg.user_id,
+        'author_id': msg.author_id,
+        'message_id': msg.message_id,
+        'channel_id': msg.channel_id
     }
 
 ###################
