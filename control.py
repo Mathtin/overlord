@@ -47,8 +47,6 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
     elif not is_text_channel(channel):
         await msg.channel.send("Not a text channel")
         return
-    
-    new_msg_event = client.event_type("new_message")
 
     # Tranaction begins
     async with client.sync():
@@ -65,7 +63,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
         async for message in channel.history(limit=None,oldest_first=True):
 
             # Skip bot messages
-            if message.author.id in client.bot_members:
+            if message.author.bot:
                 continue
 
             # Resolve user
@@ -82,8 +80,8 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
                 continue
 
             # Insert new message event
-            row = new_message_to_row(user, message, new_msg_event)
-            client.db.add(db.MessageEvent(**row))
+            row = new_message_to_row(user, message, client.event_type_map)
+            client.db.add(db.MessageEvent, row)
 
         # Calc stats
         #log.info(f'Calculating #{channel.name}({channel.id}) statistics')
@@ -91,7 +89,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
 
         # Commit changes
         log.info(f'Commiting changes for #{channel.name}({channel.id})')
-        await msg.channel.send(f'Commiting changes for #{channel.name}({channel.id})')
+        await msg.channel.send(f'Commiting changes for {channel.mention}')
         client.db.commit()
 
         log.info(f'Done')

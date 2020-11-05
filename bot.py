@@ -50,9 +50,6 @@ def skip_bots(func):
         elif isinstance(obj, discord.Message): 
             if self.is_bot_message(obj):
                 return
-        elif isinstance(obj, discord.Guild):
-            if self.is_bot(args[0]):
-                return
         return await func(self, obj, *args, **kwargs)
     return _func
 
@@ -63,9 +60,6 @@ def guild_member_event(func):
                 return
         elif isinstance(obj, discord.Message): 
             if not self.is_guild_member_message(obj):
-                return
-        elif isinstance(obj, discord.Guild):
-            if self.guild == obj:
                 return
         return await func(self, obj, *args, **kwargs)
     return _func
@@ -148,7 +142,7 @@ class Overlord(discord.Client):
     async def init_lock(self):
         while not self._initialized:
             async with self.mtx:
-                asyncio.sleep(0.1)
+                await asyncio.sleep(0.1)
         return
 
     def is_bot_message(self, msg: discord.Message) -> bool:
@@ -260,7 +254,7 @@ class Overlord(discord.Client):
                 # Check and repair last member event (should be join)
                 last_event = q.get_last_member_event_by_did(self.db, user.did)
                 if last_event is None or last_event.type_id != self.event_type("member_join"):
-                    e_row = member_join_row(user, self.event_type_map)
+                    e_row = member_join_row(user, member.joined_at, self.event_type_map)
                     self.db.add(db.MemberEvent, e_row)
                 self.db.commit()
             log.info(f'Syncing done')
@@ -339,7 +333,7 @@ class Overlord(discord.Client):
 
         # ingore bot messages
         msg = q.get_msg_by_did(self.db, payload.message_id)
-        if msg is None or msg.author_id in self.bot_members:
+        if msg is None or msg.user.did in self.bot_members:
             return
 
         # Sync code part
@@ -362,7 +356,7 @@ class Overlord(discord.Client):
 
         # ingore bot messages
         msg = q.get_msg_by_did(self.db, payload.message_id)
-        if msg is None or msg.author_id in self.bot_members:
+        if msg is None or msg.user.did in self.bot_members:
             return
 
         # Sync code part
@@ -389,7 +383,7 @@ class Overlord(discord.Client):
             user = self.db.update_or_add(db.User, 'did', u_row)
             self.db.commit()
             # Add event
-            e_row = member_join_row(user, self.event_type_map)
+            e_row = member_join_row(user, member.joined_at, self.event_type_map)
             self.db.add(db.MemberEvent, e_row)
             self.db.commit()
 
@@ -416,12 +410,7 @@ class Overlord(discord.Client):
             user = self.db.update(db.User, 'did', row)
             if user is None:
                 return
-            # Add event
-            #e_row = member_join_row(user, self.event_type_map)
-            #self.db.add(db.MemberEvent, e_row)
-            # Commit changes
             self.db.commit()
-
 
     """
         Async member remove event handler

@@ -56,21 +56,6 @@ class Event(object):
         return s + f + ")>"
 
 
-class RoleEvent(Event, BaseModel):
-    __tablename__ = 'role_events'
-
-    role_id = Column(Integer, ForeignKey('roles.id', ondelete='CASCADE'), nullable=False, index=True)
-    object_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-
-    role = relationship("Role", lazy="select")
-    object = relationship("User", lazy="select", primaryjoin="role_events.c.object_id == users.c.id")
-
-    def __repr__(self):
-        s = super().__repr__()[:-2]
-        f = ",event_id={0.event_id!r},role_id={0.role_id!r},object_id={0.object_id!r}".format(self)
-        return s + f + ")>"
-
-
 class MemberEvent(Event, BaseModel):
     __tablename__ = 'member_events'
 

@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from datetime import datetime
 from db.models import event
 import importlib
 import json
@@ -214,19 +215,17 @@ def member_row(user: discord.Member, role_map: dict):
         'roles': role_mask(user, role_map)
     }
 
-def member_join_row(user: db.User, events: dict):
+def member_join_row(user: db.User, joined: datetime ,events: dict):
     return {
         'type_id': events["member_join"],
         'user_id': user.id,
-        'object_id': user.id,
-        'created_at': user.joined_at
+        'created_at': joined
     }
 
 def user_leave_row(user: db.User, events: dict):
     return {
         'type_id': events["member_leave"],
-        'user_id': user.id,
-        'object_id': user.id
+        'user_id': user.id
     }
 #
 # Messages
@@ -264,14 +263,14 @@ def message_delete_row(msg: db.MessageEvent, events: dict):
 def vc_join_row(user: db.User, channel: discord.VoiceChannel, events: dict):
     return {
         'type_id': events["vc_join"],
-        'user_id': user.user_id,
+        'user_id': user.id,
         'channel_id': channel.id
     }
 
 def vc_leave_row(user: db.User, channel: discord.VoiceChannel, events: dict):
     return {
         'type_id': events["vc_leave"],
-        'user_id': user.user_id,
+        'user_id': user.id,
         'channel_id': channel.id
     }
 
