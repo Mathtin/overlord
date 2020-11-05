@@ -287,7 +287,7 @@ class Overlord(discord.Client):
                 return
             # Save event
             row = new_message_to_row(user, message, self.event_type_map)
-            log.info(f'New message {row}')
+            log.debug(f'New message {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
@@ -339,7 +339,7 @@ class Overlord(discord.Client):
         # Sync code part
         async with self.sync():
             row = message_edit_row(msg, self.event_type_map)
-            log.info(f'Message edit: {row}')
+            log.debug(f'Message edit {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
@@ -362,7 +362,7 @@ class Overlord(discord.Client):
         # Sync code part
         async with self.sync():
             row = message_delete_row(msg, self.event_type_map)
-            log.info(f'Message delete: {row}')
+            log.debug(f'Message delete {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
@@ -381,6 +381,7 @@ class Overlord(discord.Client):
             # Add/update user
             u_row = member_row(member, self.role_map)
             user = self.db.update_or_add(db.User, 'did', u_row)
+            log.debug(f'User join {u_row}')
             self.db.commit()
             # Add event
             e_row = member_join_row(user, member.joined_at, self.event_type_map)
@@ -409,7 +410,9 @@ class Overlord(discord.Client):
             row = member_row(after, self.role_map)
             user = self.db.update(db.User, 'did', row)
             if user is None:
+                log.warn(f'{qualified_name(user)} does not exist in db! Skipping user update event!')
                 return
+            log.debug(f'User update {row}')
             self.db.commit()
 
     """
@@ -429,8 +432,10 @@ class Overlord(discord.Client):
                 user = self.db.update(db.User, 'did', row)
                 # Add event
                 e_row = user_leave_row(user, self.event_type_map)
+                log.debug(f'User leave {e_row}')
                 self.db.add(db.MemberEvent, e_row)
             else:
+                log.debug(f'User leave (deleting) {row}')
                 self.db.delete(db.User, 'did', row)
             self.db.commit()
 
@@ -466,7 +471,7 @@ class Overlord(discord.Client):
                 return
             # Save event
             row = vc_join_row(user, channel, self.event_type_map)
-            log.info(f'VC join {row}')
+            log.debug(f'VC join {row}')
             self.db.add(db.VoiceChatEvent, row)
             self.db.commit()
             
@@ -486,6 +491,6 @@ class Overlord(discord.Client):
                 return
             # Save event
             row = vc_leave_row(user, channel, self.event_type_map)
-            log.info(f'VC join {row}')
+            log.debug(f'VC join {row}')
             self.db.add(db.VoiceChatEvent, row)
             self.db.commit()
