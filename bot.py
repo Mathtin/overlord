@@ -169,12 +169,12 @@ class Overlord(discord.Client):
     # Hooks #
     #########
 
-    """
-        Async error event handler
-
-        Sends stackktrace to error channel
-    """
     async def on_error(self, event, *args, **kwargs):
+        """
+            Async error event handler
+
+            Sends stackktrace to error channel
+        """
         ex_type = sys.exc_info()[0]
 
         logging.exception(f'Error on event: {event}')
@@ -192,12 +192,12 @@ class Overlord(discord.Client):
             await self.logout()
 
 
-    """
-        Async ready event handler
-
-        Completly initialize bot state
-    """
     async def on_ready(self):
+        """
+            Async ready event handler
+
+            Completly initialize bot state
+        """
         # Lock current async context
         async with self.sync():
             # Find guild
@@ -263,16 +263,17 @@ class Overlord(discord.Client):
             print(self.config["egg_done"])
             self._initialized = True
 
-    """
-        Async new message event handler
 
-        Saves event in database
-    """
     @after_initialized
     @event_config("message.new")
     @skip_bots
     @guild_member_event
     async def on_message(self, message: discord.Message):
+        """
+            Async new message event handler
+
+            Saves event in database
+        """
         # handle control commands seperately
         if message.channel == self.control_channel:
             await self.on_control_message(message)
@@ -291,12 +292,13 @@ class Overlord(discord.Client):
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
-    """
-        Async new control message event handler
 
-        Calls appropriate control callback
-    """
     async def on_control_message(self, message: discord.Message):
+        """
+            Async new control message event handler
+
+            Calls appropriate control callback
+        """
         prefix = self.config["control.prefix"]
         argv = parse_control_message(prefix, message)
 
@@ -320,14 +322,15 @@ class Overlord(discord.Client):
         
         await self.commands[cmd_name](self, message, prefix, argv)
 
-    """
-        Async message edit event handler
-
-        Saves event in database
-    """
+    
     @after_initialized
     @event_config("message.edit")
     async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
+        """
+            Async message edit event handler
+
+            Saves event in database
+        """
         if self.is_special_channel_id(payload.channel_id):
             return
 
@@ -343,14 +346,15 @@ class Overlord(discord.Client):
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
-    """
-        Async message delete event handler
-
-        Saves event in database
-    """
+    
     @after_initialized
     @event_config("message.delete")
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        """
+            Async message delete event handler
+
+            Saves event in database
+        """
         if self.is_special_channel_id(payload.channel_id):
             return
 
@@ -366,16 +370,17 @@ class Overlord(discord.Client):
             self.db.add(db.MessageEvent, row)
             self.db.commit()
 
-    """
-        Async member join event handler
-
-        Saves user in database
-    """
+    
     @after_initialized
     @event_config("user.join")
     @skip_bots
     @guild_member_event
     async def on_member_join(self, member: discord.Member):
+        """
+            Async member join event handler
+
+            Saves user in database
+        """
         # Sync code part
         async with self.sync():
             # Add/update user
@@ -388,16 +393,17 @@ class Overlord(discord.Client):
             self.db.add(db.MemberEvent, e_row)
             self.db.commit()
 
-    """
-        Async member remove event handler
-
-        Removes user from database (or keep it, depends on config)
-    """
+    
     @after_initialized
     @event_config("user.update")
     @skip_bots
     @guild_member_event
     async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """
+            Async member remove event handler
+
+            Removes user from database (or keep it, depends on config)
+        """
         # track only role/nickname change
         if not (before.roles != after.roles or \
                 before.display_name != after.display_name or \
@@ -415,16 +421,17 @@ class Overlord(discord.Client):
             log.debug(f'User update {row}')
             self.db.commit()
 
-    """
-        Async member remove event handler
-
-        Removes user from database (or keep it, depends on config)
-    """
+    
     @after_initialized
     @event_config("user.leave")
     @skip_bots
     @guild_member_event
     async def on_member_remove(self, member: discord.Member):
+        """
+            Async member remove event handler
+
+            Removes user from database (or keep it, depends on config)
+        """
         # Sync code part
         async with self.sync():
             row = user_row(member)
@@ -439,15 +446,16 @@ class Overlord(discord.Client):
                 self.db.delete(db.User, 'did', row)
             self.db.commit()
 
-    """
-        Async vc state change event handler
-
-        Saves event in database
-    """
+    
     @after_initialized
     @skip_bots
     @guild_member_event
     async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """
+            Async vc state change event handler
+
+            Saves event in database
+        """
         if before.channel == after.channel:
             return
         if before.channel is not None and self.check_afk_state(before):
@@ -455,13 +463,14 @@ class Overlord(discord.Client):
         if after.channel is not None and self.check_afk_state(after):
             await self.on_vc_join(user, after.channel)
             
-    """
-        Async vc join event handler
-
-        Saves event in database
-    """
+    
     @event_config("voice.join")
     async def on_vc_join(self, user: discord.Member, channel: discord.VoiceChannel):
+        """
+            Async vc join event handler
+
+            Saves event in database
+        """
         # Sync code part
         async with self.sync():
             user = q.get_user_by_did(self.db, user.id)
@@ -475,13 +484,14 @@ class Overlord(discord.Client):
             self.db.add(db.VoiceChatEvent, row)
             self.db.commit()
             
-    """
-        Async vc join event handler
-
-        Saves event in database
-    """
+    
     @event_config("voice.leave")
     async def on_vc_leave(self, user: discord.Member, channel: discord.VoiceChannel):
+        """
+            Async vc join event handler
+
+            Saves event in database
+        """
         # Sync code part
         async with self.sync():
             user = q.get_user_by_did(self.db, user.id)
