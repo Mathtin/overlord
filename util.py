@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from db.models import event
 import importlib
 import json
 import os.path
@@ -92,16 +93,16 @@ def get_module_element(path: str):
     return getattr(module, object_name)
 
 def parse_control_message(prefix: str, message: discord.Message):
-        prefix_len = len(prefix)
-        msg = message.content.strip()
+    prefix_len = len(prefix)
+    msg = message.content.strip()
 
-        msg_prefix = msg[: prefix_len]
-        msg_suffix = msg[prefix_len :]
+    msg_prefix = msg[: prefix_len]
+    msg_suffix = msg[prefix_len :]
 
-        if msg_prefix != prefix or msg_suffix == "":
-            return None
+    if msg_prefix != prefix or msg_suffix == "":
+        return None
 
-        return shlex.split(msg_suffix)
+    return shlex.split(msg_suffix)
 
 def check_coroutine(func):
     if not asyncio.iscoroutinefunction(func):
@@ -121,9 +122,9 @@ def cmdcoro(func):
     assert len(f_args) >= 2
     f_args = f_args[2:]
 
-    async def wrapped_func(client, message, argv):
+    async def wrapped_func(client, message, prefix, argv):
         if len(f_args) != len(argv) - 1:
-            usage_str = 'Usage: ' + build_cmdcoro_usage(argv[0], func)
+            usage_str = 'Usage: ' + build_cmdcoro_usage(prefix, argv[0], func)
             await message.channel.send(usage_str)
         else:
             await func(client, message, *argv[1:])
@@ -166,6 +167,10 @@ def is_same_author(m1: discord.Message, m2: discord.Message):
 # DB Converters #
 #################
 
+#
+# Roles
+#
+
 def role_to_row(role: discord.Role):
     return {
         'did': role.id,
@@ -187,16 +192,20 @@ def role_mask(user: discord.Member, role_map: dict):
         mask[idx] = '1'
     return ''.join(mask)
 
-def user_to_row(user: discord.User, role_map: dict):
+#
+# Users
+#
+
+def user_row(user: discord.User):
     return {
         'did': user.id,
         'name': user.name,
         'disc': user.discriminator,
         'display_name': None,
-        'roles': '0' * len(role_map)
+        'roles': None
     }
 
-def member_to_row(user: discord.Member, role_map: dict):
+def member_row(user: discord.Member, role_map: dict):
     return {
         'did': user.id,
         'name': user.name,
@@ -205,23 +214,65 @@ def member_to_row(user: discord.Member, role_map: dict):
         'roles': role_mask(user, role_map)
     }
 
-def new_message_to_row(msg: discord.Message, event_id: int):
+def member_join_row(user: db.User, events: dict):
     return {
-        'type_id': event_id,
-        'user_id': msg.author.id,
-        'author_id': msg.author.id,
+        'type_id': events["member_join"],
+        'user_id': user.id,
+        'object_id': user.id,
+        'created_at': user.joined_at
+    }
+
+def user_leave_row(user: db.User, events: dict):
+    return {
+        'type_id': events["member_leave"],
+        'user_id': user.id,
+        'object_id': user.id
+    }
+#
+# Messages
+#
+
+def new_message_to_row(user: db.User, msg: discord.Message, events: dict):
+    return {
+        'type_id': events["new_message"],
+        'user_id': user.id,
         'message_id': msg.id,
         'channel_id': msg.channel.id,
         'created_at': msg.created_at
     }
 
-def message_change_row(msg: db.MessageEvent, event_id: int):
+def message_edit_row(msg: db.MessageEvent, events: dict):
     return {
-        'type_id': event_id,
-        'user_id': msg.user_id,
-        'author_id': msg.author_id,
+        'type_id': events["message_edit"],
+        'user_id': msg.user.id,
         'message_id': msg.message_id,
         'channel_id': msg.channel_id
+    }
+
+def message_delete_row(msg: db.MessageEvent, events: dict):
+    return {
+        'type_id': events["message_edit"],
+        'user_id': msg.user.id,
+        'message_id': msg.message_id,
+        'channel_id': msg.channel_id
+    }
+
+#
+# VC
+#
+
+def vc_join_row(user: db.User, channel: discord.VoiceChannel, events: dict):
+    return {
+        'type_id': events["vc_join"],
+        'user_id': user.user_id,
+        'channel_id': channel.id
+    }
+
+def vc_leave_row(user: db.User, channel: discord.VoiceChannel, events: dict):
+    return {
+        'type_id': events["vc_leave"],
+        'user_id': user.user_id,
+        'channel_id': channel.id
     }
 
 ###################

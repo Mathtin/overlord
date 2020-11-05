@@ -14,7 +14,6 @@
 __author__ = 'Mathtin'
 
 import logging
-import asyncio
 import bot
 import db
 import db.queries as q
@@ -52,7 +51,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
     new_msg_event = client.event_type("new_message")
 
     # Tranaction begins
-    async with asyncio.Lock():
+    async with client.sync():
 
         # Drop full channel message history
         log.warn(f'Dropping #{channel.name}({channel.id}) history')
@@ -71,10 +70,9 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
 
             # Resolve user
             if message.author.id not in _user_cache:
-                user = q.get_user_by_id(client.db, message.author.id)
+                user = q.get_user_by_did(client.db, message.author.id)
                 if user is None and client.config["user.left.keep"]:
-                    user = db.User(**user_to_row(message.author))
-                    client.db.add(user)
+                    user = client.db.add(db.User, user_row(message.author))
                 _user_cache[message.author.id] = user
             else:
                 user = _user_cache[message.author.id]
@@ -84,7 +82,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
                 continue
 
             # Insert new message event
-            row = new_message_to_row(message, new_msg_event)
+            row = new_message_to_row(user, message, new_msg_event)
             client.db.add(db.MessageEvent(**row))
 
         # Calc stats

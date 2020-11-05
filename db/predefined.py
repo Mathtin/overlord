@@ -14,15 +14,13 @@
 __author__ = 'Mathtin'
 
 EVENT_TYPES = [
-    { 'name': 'new_member', 'description': 'user joined DS' },
-    { 'name': 'member_left', 'description': 'user left DS by himself' },
-    { 'name': 'member_kick', 'description': 'user kicked from DS' },
-    { 'name': 'member_ban', 'description': 'user banned from DS' },
+    { 'name': 'member_join', 'description': 'user joined DS' },
+    { 'name': 'member_leave', 'description': 'user left DS by himself' },
     { 'name': 'role_add', 'description': 'role applied to user' },
     { 'name': 'role_del', 'description': 'role removed from user' },
     { 'name': 'new_message', 'description': 'user posted new message' },
     { 'name': 'message_edit', 'description': 'user edited message' },
     { 'name': 'message_delete', 'description': 'user deleted message' },
     { 'name': 'vc_join', 'description': 'user joined VC' },
-    { 'name': 'vc_left', 'description': 'user left VC' }
+    { 'name': 'vc_leave', 'description': 'user left VC' }
 ]

@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from db.models.base import Base, BaseModel
 from db.models import *
 
-log = getLogger()
+log = getLogger('db')
 
 class DBSession(object):
 
@@ -44,19 +44,27 @@ class DBSession(object):
     def query(self, *entities, **kwargs):
         return self._session.query(*entities, **kwargs)
 
-    def add(self, model: BaseModel, need_flush: bool = False):
-        self._session.add(model)
+    def add(self, model: BaseModel, value: dict, need_flush: bool = False):
+        row = model(**value)
+        self.add_model(row, need_flush=need_flush)
+        return row
 
+    def add_model(self, model: BaseModel, need_flush: bool = False):
+        self._session.add(model)
         if need_flush:
             self._session.flush([model])
 
     def add_all(self, models: list):
         self._session.add_all(models)
 
-    def delete(self, model: BaseModel):
-        if model is None:
-            log.warning(f'{__name__}: model is None')
+    def delete(self, model: BaseModel, pk: str, value: dict):
+        row = self.query(model).filter_by(**{pk:value[pk]}).first()
+        if row is None:
+            return None
+        self.delete_model(row)
+        return row
 
+    def delete_model(self, model: BaseModel):
         try:
             self._session.delete(model)
         except IntegrityError as e:
@@ -85,7 +93,7 @@ class DBSession(object):
         for row in self.query(model):
             p = getattr(row, pk)
             if p not in index:
-                self.delete(row)
+                self.delete_model(row)
                 continue
             new_values = index[p]
             for col in new_values:
@@ -95,21 +103,22 @@ class DBSession(object):
 
         for id in index:
             new_values = index[id]
-            row = model(**new_values)
-            self.add(row)
+            self.add(model, new_values)
 
     def update_or_add(self, model: BaseModel, pk: str, value: dict):
-        if not self.update(model, pk, value):
-            self.add(model(**value))
+        res = self.update(model, pk, value)
+        if res is None:
+            return self.add(model, value)
+        return res
 
     def update(self, model: BaseModel, pk: str, value: dict):
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
         if row is None:
-            return False
+            return None
         for col in value:
             if getattr(row, col) != value[col]:
                 setattr(row, col, value[col])
-        return True
+        return row
 
     def close(self):
         try:

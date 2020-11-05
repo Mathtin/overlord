@@ -13,10 +13,16 @@
 
 __author__ = 'Mathtin'
 
+from os import name
+
+from discord import guild
+from discord import state
+from discord import channel
 from db.session import DBSession
 import os
 import sys
 import traceback
+import asyncio
 import logging
 import discord
 import db
@@ -26,7 +32,59 @@ from util import *
 
 log = logging.getLogger('overlord-bot')
 
+######################
+# Utility decorators #
+######################
+
+def after_initialized(func):
+    async def _func(self, *args, **kwargs):
+        await self.init_lock()
+        return await func(self, *args, **kwargs)
+    return _func
+
+def skip_bots(func):
+    async def _func(self, obj, *args, **kwargs):
+        if isinstance(obj, discord.User):
+            if self.is_bot(obj):
+                return
+        elif isinstance(obj, discord.Message): 
+            if self.is_bot_message(obj):
+                return
+        elif isinstance(obj, discord.Guild):
+            if self.is_bot(args[0]):
+                return
+        return await func(self, obj, *args, **kwargs)
+    return _func
+
+def guild_member_event(func):
+    async def _func(self, obj, *args, **kwargs):
+        if isinstance(obj, discord.Member):
+            if not self.is_guild_member(obj):
+                return
+        elif isinstance(obj, discord.Message): 
+            if not self.is_guild_member_message(obj):
+                return
+        elif isinstance(obj, discord.Guild):
+            if self.guild == obj:
+                return
+        return await func(self, obj, *args, **kwargs)
+    return _func
+
+def event_config(name: str):
+    def wrapper(func):
+        async def _func(self, *args, **kwargs):
+            if not self.config[f"event.{name}.track"]:
+                return
+            return await func(self, *args, **kwargs)
+        return _func
+    return wrapper
+
+#############################
+# Main class implementation #
+#############################
+
 class Overlord(discord.Client):
+    mtx: asyncio.Lock
 
     # Members loaded from ENV
     token: str
@@ -48,17 +106,19 @@ class Overlord(discord.Client):
     role_map: dict
     commands: dict
     bot_members: dict
-    initialized: bool
+    _initialized: bool
 
     def __init__(self, config: ConfigView, db_session: db.DBSession):
         self.config = config
         self.db = db_session
+        self.mtx = asyncio.Lock()
 
         # Init base class
         intents = discord.Intents.none()
         intents.guilds = True
         intents.members = True
         intents.messages = True
+        intents.voice_states = True
 
         super().__init__(intents=intents)
 
@@ -74,13 +134,42 @@ class Overlord(discord.Client):
         # Preset some values initiated on_ready
         self.commands = {}
         self.bot_members = {}
-        self.initialized = False
+        self._initialized = False
 
     def run(self):
         super().run(self.token)
 
     def event_type(self, name):
         return self.event_type_map[name]
+
+    def sync(self):
+        return self.mtx
+
+    async def init_lock(self):
+        while not self._initialized:
+            async with self.mtx:
+                asyncio.sleep(0.1)
+        return
+
+    def is_bot_message(self, msg: discord.Message) -> bool:
+        return msg.author.id in self.bot_members
+
+    def is_bot(self, user: discord.User) -> bool:
+        if user.bot:
+            self.bot_members[user.id] = user
+        return user.bot
+
+    def is_guild_member(self, member: discord.Member) -> bool:
+        return member.guild.id == self.guild.id
+
+    def is_guild_member_message(self, msg: discord.Message) -> bool:
+        return not is_dm_message(msg) and msg.guild.id == self.guild.id
+
+    def check_afk_state(self, state: discord.VoiceState) -> bool:
+        return not state.afk or not self.config["event.voice.afk.ignore"]
+
+    def is_special_channel_id(self, channel_id: int):
+        return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
     #########
     # Hooks #
@@ -116,7 +205,7 @@ class Overlord(discord.Client):
     """
     async def on_ready(self):
         # Lock current async context
-        async with asyncio.Lock():
+        async with self.sync():
             # Find guild
             self.guild = self.get_guild(self.guild_id)
             if self.guild is None:
@@ -164,52 +253,49 @@ class Overlord(discord.Client):
                 if member.bot:
                     self.bot_members[member.id] = member
                     continue
-                row = member_to_row(member, self.role_map)
-                self.db.update_or_add(db.User, 'did', row)
+                # Update user
+                u_row = member_row(member, self.role_map)
+                user = self.db.update_or_add(db.User, 'did', u_row)
+                self.db.commit()
+                # Check and repair last member event (should be join)
+                last_event = q.get_last_member_event_by_did(self.db, user.did)
+                if last_event is None or last_event.type_id != self.event_type("member_join"):
+                    e_row = member_join_row(user, self.event_type_map)
+                    self.db.add(db.MemberEvent, e_row)
                 self.db.commit()
             log.info(f'Syncing done')
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
-            self.initialized = True
+            self._initialized = True
 
     """
         Async new message event handler
 
         Saves event in database
     """
+    @after_initialized
+    @event_config("message.new")
+    @skip_bots
+    @guild_member_event
     async def on_message(self, message: discord.Message):
-        if not self.initialized or not self.config["event.message.new.track"]:
-            return
-
-        # ingore own messages
-        if message.author == self.user:
-            return
-
-        # ingore any foreign messages
-        if is_dm_message(message) or message.guild.id != self.guild.id:
-            return
-
-        # ignore bot messages
-        if message.author.id in self.bot_members:
-            return
-
+        # handle control commands seperately
         if message.channel == self.control_channel:
             await self.on_control_message(message)
             return
 
-        user = q.get_user_by_id(self.db, message.author.id)
-
-        if user is None:
-            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
-            return
-
-        event_id = self.event_type("new_message")
-        row = new_message_to_row(message, event_id)
-        log.info(f'New message {row}')
-        self.db.add(db.MessageEvent(**row))
-        self.db.commit()
-
+        # Sync code part
+        async with self.sync():
+            user = q.get_user_by_did(self.db, message.author.id)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
+                return
+            # Save event
+            row = new_message_to_row(user, message, self.event_type_map)
+            log.info(f'New message {row}')
+            self.db.add(db.MessageEvent, row)
+            self.db.commit()
 
     """
         Async new control message event handler
@@ -238,82 +324,103 @@ class Overlord(discord.Client):
             await message.channel.send("Unknown command")
             return
         
-        await self.commands[cmd_name](self, message, argv)
-
+        await self.commands[cmd_name](self, message, prefix, argv)
 
     """
         Async message edit event handler
 
         Saves event in database
     """
+    @after_initialized
+    @event_config("message.edit")
     async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
-        if not self.initialized or not self.config["event.message.edit.track"]:
-            return
-
-        # ignore special channel events
-        if payload.channel_id == self.control_channel.id or \
-            payload.channel_id == self.error_channel.id:
+        if self.is_special_channel_id(payload.channel_id):
             return
 
         # ingore bot messages
-        msg = q.get_msg_by_id(self.db, payload.message_id)
+        msg = q.get_msg_by_did(self.db, payload.message_id)
         if msg is None or msg.author_id in self.bot_members:
             return
 
-        event_id = self.event_type("message_edit")
-        row = message_change_row(msg, event_id)
-        log.info(f'Message edit: {row}')
-        self.db.add(db.MessageEvent(**row))
-        self.db.commit()
-
+        # Sync code part
+        async with self.sync():
+            row = message_edit_row(msg, self.event_type_map)
+            log.info(f'Message edit: {row}')
+            self.db.add(db.MessageEvent, row)
+            self.db.commit()
 
     """
         Async message delete event handler
 
         Saves event in database
     """
-    async def on_raw_message_delete(self, payload: discord.RawMessageUpdateEvent):
-        if not self.initialized or not self.config["event.message.delete.track"]:
-            return
-
-        # ignore special channel events
-        if payload.channel_id == self.control_channel.id or \
-            payload.channel_id == self.error_channel.id:
+    @after_initialized
+    @event_config("message.delete")
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        if self.is_special_channel_id(payload.channel_id):
             return
 
         # ingore bot messages
-        msg = q.get_msg_by_id(self.db, payload.message_id)
+        msg = q.get_msg_by_did(self.db, payload.message_id)
         if msg is None or msg.author_id in self.bot_members:
             return
 
-        event_id = self.event_type("message_delete")
-        row = message_change_row(msg, event_id)
-        log.info(f'Message delete: {row}')
-        self.db.add(db.MessageEvent(**row))
-        self.db.commit()
-
+        # Sync code part
+        async with self.sync():
+            row = message_delete_row(msg, self.event_type_map)
+            log.info(f'Message delete: {row}')
+            self.db.add(db.MessageEvent, row)
+            self.db.commit()
 
     """
         Async member join event handler
 
         Saves user in database
     """
+    @after_initialized
+    @event_config("user.join")
+    @skip_bots
+    @guild_member_event
     async def on_member_join(self, member: discord.Member):
-        if not self.initialized or not self.config["event.user.join.track"]:
-            return
+        # Sync code part
+        async with self.sync():
+            # Add/update user
+            u_row = member_row(member, self.role_map)
+            user = self.db.update_or_add(db.User, 'did', u_row)
+            self.db.commit()
+            # Add event
+            e_row = member_join_row(user, self.event_type_map)
+            self.db.add(db.MemberEvent, e_row)
+            self.db.commit()
 
-        # Skip bots
-        if member.bot:
-            self.bot_members[member.id] = member
-            return
+    """
+        Async member remove event handler
 
-        # ingore any foreign members
-        if member.guild.id != self.guild.id:
+        Removes user from database (or keep it, depends on config)
+    """
+    @after_initialized
+    @event_config("user.update")
+    @skip_bots
+    @guild_member_event
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        # track only role/nickname change
+        if not (before.roles != after.roles or \
+                before.display_name != after.display_name or \
+                before.name != after.name or \
+                before.discriminator != after.discriminator):
             return
-
-        row = member_to_row(member, self.role_map)
-        self.db.update_or_add(db.User, 'did', row)
-        self.db.commit()
+        # Sync code part
+        async with self.sync():
+            # Update user
+            row = member_row(after, self.role_map)
+            user = self.db.update(db.User, 'did', row)
+            if user is None:
+                return
+            # Add event
+            #e_row = member_join_row(user, self.event_type_map)
+            #self.db.add(db.MemberEvent, e_row)
+            # Commit changes
+            self.db.commit()
 
 
     """
@@ -321,29 +428,75 @@ class Overlord(discord.Client):
 
         Removes user from database (or keep it, depends on config)
     """
+    @after_initialized
+    @event_config("user.leave")
+    @skip_bots
+    @guild_member_event
     async def on_member_remove(self, member: discord.Member):
-        if not self.initialized or not self.config["event.user.left.track"]:
-            return
+        # Sync code part
+        async with self.sync():
+            row = user_row(member)
+            if self.config["user.leave.keep"]:
+                user = self.db.update(db.User, 'did', row)
+                # Add event
+                e_row = user_leave_row(user, self.event_type_map)
+                self.db.add(db.MemberEvent, e_row)
+            else:
+                self.db.delete(db.User, 'did', row)
+            self.db.commit()
 
-        # Skip bots
-        if member.bot:
-            return
+    """
+        Async vc state change event handler
 
-        # ingore any foreign members
-        if member.guild.id != self.guild.id:
+        Saves event in database
+    """
+    @after_initialized
+    @skip_bots
+    @guild_member_event
+    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        if before.channel == after.channel:
             return
-        
-        # Resolve user
-        user = q.get_user_by_id(self.db, member.id)
-        if user is None:
-            return
+        if before.channel is not None and self.check_afk_state(before):
+            await self.on_vc_leave(user, before.channel)
+        if after.channel is not None and self.check_afk_state(after):
+            await self.on_vc_join(user, after.channel)
+            
+    """
+        Async vc join event handler
 
-        # Apply actions
-        if self.config["user.left.keep"]:
-            row = user_to_row(member)
-            self.db.update(db.User, 'did', row)
-        else:
-            self.db.delete(user)
-        
-        # Commit changes
-        self.db.commit()
+        Saves event in database
+    """
+    @event_config("voice.join")
+    async def on_vc_join(self, user: discord.Member, channel: discord.VoiceChannel):
+        # Sync code part
+        async with self.sync():
+            user = q.get_user_by_did(self.db, user.id)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc join event!')
+                return
+            # Save event
+            row = vc_join_row(user, channel, self.event_type_map)
+            log.info(f'VC join {row}')
+            self.db.add(db.VoiceChatEvent, row)
+            self.db.commit()
+            
+    """
+        Async vc join event handler
+
+        Saves event in database
+    """
+    @event_config("voice.leave")
+    async def on_vc_leave(self, user: discord.Member, channel: discord.VoiceChannel):
+        # Sync code part
+        async with self.sync():
+            user = q.get_user_by_did(self.db, user.id)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc leave event!')
+                return
+            # Save event
+            row = vc_leave_row(user, channel, self.event_type_map)
+            log.info(f'VC join {row}')
+            self.db.add(db.VoiceChatEvent, row)
+            self.db.commit()

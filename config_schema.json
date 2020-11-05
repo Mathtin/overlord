@@ -52,7 +52,24 @@
                     "weight"
                   ]
                 },
-                "left": {
+                "update": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "track",
+                    "weight"
+                  ]
+                },
+                "leave": {
                   "type": "object",
                   "properties": {
                     "track": {
@@ -106,7 +123,8 @@
               },
               "required": [
                 "join",
-                "left",
+                "update",
+                "leave",
                 "ban",
                 "kick"
               ]
@@ -192,7 +210,7 @@
                     "weight"
                   ]
                 },
-                "left": {
+                "leave": {
                   "type": "object",
                   "properties": {
                     "track": {
@@ -209,28 +227,23 @@
                     "weight"
                   ]
                 },
-                "kick": {
+                "afk": {
                   "type": "object",
                   "properties": {
-                    "track": {
+                    "ignore": {
                       "type": "boolean",
-                      "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
+                      "default": true
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "ignore"
                   ]
                 }
               },
               "required": [
                 "join",
-                "left",
-                "kick"
+                "leave",
+                "afk"
               ]
             }
           },
@@ -243,7 +256,7 @@
         "user": {
           "type": "object",
           "properties": {
-            "left": {
+            "leave": {
               "type": "object",
               "properties": {
                 "keep": {
@@ -255,7 +268,7 @@
                 "keep"
               ]
             },
-            "banned": {
+            "ban": {
               "type": "object",
               "properties": {
                 "keep": {
@@ -267,7 +280,7 @@
                 "keep"
               ]
             },
-            "kicked": {
+            "kick": {
               "type": "object",
               "properties": {
                 "keep": {
@@ -281,9 +294,9 @@
             }
           },
           "required": [
-            "left",
-            "banned",
-            "kicked"
+            "leave",
+            "ban",
+            "kick"
           ]
         }
       },

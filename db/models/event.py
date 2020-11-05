@@ -32,6 +32,7 @@ class EventType(BaseModel):
 
 
 class Event(object):
+    __tablename__ = None
 
     @declared_attr
     def type_id(cls): 
@@ -44,6 +45,7 @@ class Event(object):
     @declared_attr
     def type(cls):
         return relationship("EventType", lazy="select")
+        
     @declared_attr
     def user(cls):
         return relationship("User", lazy="select", primaryjoin=cls.__tablename__+".c.user_id == users.c.id")
@@ -69,31 +71,27 @@ class RoleEvent(Event, BaseModel):
         return s + f + ")>"
 
 
-class KickBanEvent(Event, BaseModel):
-    __tablename__ = 'kb_events'
-
-    object_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    is_banned = Column(Boolean, nullable=False)
-
-    object = relationship("User", lazy="select", primaryjoin="kb_events.c.object_id == users.c.id")
-
-    def __repr__(self):
-        s = super().__repr__()[:-2]
-        f = ",object_id={0.object_id!r},is_banned={0.is_banned!r}".format(self)
-        return s + f + ")>"
+class MemberEvent(Event, BaseModel):
+    __tablename__ = 'member_events'
 
 
 class MessageEvent(Event, BaseModel):
     __tablename__ = 'message_events'
 
-    author_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     message_id = Column(Integer, nullable=False, index=True)
     channel_id = Column(Integer, nullable=False, index=True)
-
-    author = relationship("User", lazy="select", primaryjoin="message_events.c.author_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
         f = ",author_id={0.author_id!r},channel_id={0.channel_id!r}".format(self)
         return s + f + ")>"
 
+class VoiceChatEvent(Event, BaseModel):
+    __tablename__ = 'vc_events'
+
+    channel_id = Column(Integer, nullable=False, index=True)
+
+    def __repr__(self):
+        s = super().__repr__()[:-2]
+        f = ",channel_id={0.channel_id!r}".format(self)
+        return s + f + ")>"
