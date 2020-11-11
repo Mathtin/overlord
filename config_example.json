@@ -39,12 +39,6 @@
         "user": {
             "leave": {
                 "keep": true
-            },
-            "ban": {
-                "keep": true
-            },
-            "kick": {
-                "keep": true
             }
         },
         "event": {
@@ -58,14 +52,6 @@
                     "weight": 0
                 },
                 "leave": {
-                    "track": true,
-                    "weight": -100
-                },
-                "ban": {
-                    "track": true,
-                    "weight": -9999
-                },
-                "kick": {
                     "track": true,
                     "weight": -100
                 }
