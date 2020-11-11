@@ -141,8 +141,7 @@ class Overlord(discord.Client):
 
     async def init_lock(self):
         while not self._initialized:
-            async with self.mtx:
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
         return
 
     def is_bot_message(self, msg: discord.Message) -> bool:
