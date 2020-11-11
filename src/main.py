@@ -15,11 +15,11 @@ __author__ = 'Mathtin'
 
 import sys
 import argparse
-import bot
 import logging.config
 
 from dotenv import load_dotenv
 
+from bot import Overlord
 from util import ConfigView
 from db import DBSession, EventType
 from db.predefined import EVENT_TYPES
@@ -46,7 +46,7 @@ def main(argv):
     session.commit()
 
     # Init bot
-    discord_bot = bot.Overlord(config.bot, session)
+    discord_bot = Overlord(config.bot, session)
     discord_bot.run()
 
     return 0

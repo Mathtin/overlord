@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+   <!-- Basic info messages -->
+   <string name="done">✅ Done</string>
+   
+   <!-- Basic error messages -->
+   <string name="unknown_channel">❌ Unknown channel</string>
+   <string name="invalid_channel_mention">❌ Mention channel properly</string>
+   <string name="invalid_channel_type_text">❌ Not a text channel</string>
+
+   <!-- bot.py: on_control_message -->
+   <string name="unknown_command">❌ Unknown command</string>
+   <string name="commands_list_head">⚙ **Available commands:**</string>
+   <string name="commands_list_entry">> `{0}`</string>
+
+   <!-- control.py: ping -->
+   <string name="pong">🏓 Pong!</string>
+
+   <!-- control.py: calc_channel_stats -->
+   <string name="channel_history_drop">⚠ Dropping {0} history</string>
+   <string name="change_commit">⬆ Commiting changes for {0}</string>
+
+</resources>

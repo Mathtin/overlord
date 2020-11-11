@@ -13,22 +13,20 @@
 
 __author__ = 'Mathtin'
 
-from os import name
-
-from discord import guild
-from discord import state
-from discord import channel
-from db.session import DBSession
 import os
 import sys
 import traceback
 import asyncio
 import logging
+
 import discord
+from discord import channel
 import db
 import db.queries as q
+import db.converters as conv
 
 from util import *
+import util.resources as res
 
 log = logging.getLogger('overlord-bot')
 
@@ -78,7 +76,8 @@ def event_config(name: str):
 #############################
 
 class Overlord(discord.Client):
-    mtx: asyncio.Lock
+    __async_lock: asyncio.Lock
+    __initialized: bool
 
     # Members loaded from ENV
     token: str
@@ -88,7 +87,7 @@ class Overlord(discord.Client):
 
     # Members passed via constructor
     config: ConfigView
-    db: DBSession
+    db: db.DBSession
 
     # Event name -> id (gathered via db)
     event_type_map: dict
@@ -100,12 +99,13 @@ class Overlord(discord.Client):
     role_map: dict
     commands: dict
     bot_members: dict
-    _initialized: bool
 
     def __init__(self, config: ConfigView, db_session: db.DBSession):
+        self.__async_lock = asyncio.Lock()
+        self.__initialized = False
+
         self.config = config
         self.db = db_session
-        self.mtx = asyncio.Lock()
 
         # Init base class
         intents = discord.Intents.none()
@@ -128,7 +128,10 @@ class Overlord(discord.Client):
         # Preset some values initiated on_ready
         self.commands = {}
         self.bot_members = {}
-        self._initialized = False
+
+    ################
+    # Sync methods #
+    ################
 
     def run(self):
         super().run(self.token)
@@ -137,12 +140,7 @@ class Overlord(discord.Client):
         return self.event_type_map[name]
 
     def sync(self):
-        return self.mtx
-
-    async def init_lock(self):
-        while not self._initialized:
-            await asyncio.sleep(0.1)
-        return
+        return self.__async_lock
 
     def is_bot_message(self, msg: discord.Message) -> bool:
         return msg.author.id in self.bot_members
@@ -164,6 +162,15 @@ class Overlord(discord.Client):
     def is_special_channel_id(self, channel_id: int):
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
+    #################
+    # Async methods #
+    #################
+
+    async def init_lock(self):
+        while not self.__initialized:
+            await asyncio.sleep(0.1)
+        return
+
     #########
     # Hooks #
     #########
@@ -172,7 +179,7 @@ class Overlord(discord.Client):
         """
             Async error event handler
 
-            Sends stackktrace to error channel
+            Sends stacktrace to error channel
         """
         ex_type = sys.exc_info()[0]
 
@@ -232,11 +239,11 @@ class Overlord(discord.Client):
                 self.commands[cmd] = hook
 
             # Sync and map roles
-            log.info(f'Syncing roles')
-            roles = roles_to_rows(self.guild.roles)
+            log.info('Syncing roles')
+            roles = conv.roles_to_rows(self.guild.roles)
             self.role_map = { role['did']: role for role in roles }
             self.db.sync_table(db.Role, 'did', roles)
-            log.info(f'Commiting changes')
+            log.info('Commiting changes')
             self.db.commit()
 
             # Sync users
@@ -247,20 +254,20 @@ class Overlord(discord.Client):
                     self.bot_members[member.id] = member
                     continue
                 # Update user
-                u_row = member_row(member, self.role_map)
+                u_row = conv.member_row(member, self.role_map)
                 user = self.db.update_or_add(db.User, 'did', u_row)
                 self.db.commit()
                 # Check and repair last member event (should be join)
                 last_event = q.get_last_member_event_by_did(self.db, user.did)
                 if last_event is None or last_event.type_id != self.event_type("member_join"):
-                    e_row = member_join_row(user, member.joined_at, self.event_type_map)
+                    e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
                     self.db.add(db.MemberEvent, e_row)
                 self.db.commit()
             log.info(f'Syncing done')
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
-            self._initialized = True
+            self.__initialized = True
 
 
     @after_initialized
@@ -286,7 +293,7 @@ class Overlord(discord.Client):
                 log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
                 return
             # Save event
-            row = new_message_to_row(user, message, self.event_type_map)
+            row = conv.new_message_to_row(user, message, self.event_type_map)
             log.debug(f'New message {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
@@ -308,15 +315,18 @@ class Overlord(discord.Client):
 
         if cmd_name == "help":
             help_lines = []
+            line_fmt = res.get_string("messages.commands_list_entry")
             for cmd in self.commands:
                 hook = self.commands[cmd]
-                help_lines.append(build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro))
+                base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
+                help_lines.append(line_fmt.format(base_line))
+            help_header = res.get_string("messages.commands_list_head")
             help_msg = '\n'.join(help_lines)
-            await message.channel.send(f'`Available commands:\n{help_msg}\n`')
+            await message.channel.send(f'{help_header}\n{help_msg}\n')
             return
 
         if cmd_name not in self.commands:
-            await message.channel.send("Unknown command")
+            await message.channel.send(res.get_string("messages.unknown_command"))
             return
         
         await self.commands[cmd_name](self, message, prefix, argv)
@@ -340,7 +350,7 @@ class Overlord(discord.Client):
 
         # Sync code part
         async with self.sync():
-            row = message_edit_row(msg, self.event_type_map)
+            row = conv.message_edit_row(msg, self.event_type_map)
             log.debug(f'Message edit {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
@@ -364,7 +374,7 @@ class Overlord(discord.Client):
 
         # Sync code part
         async with self.sync():
-            row = message_delete_row(msg, self.event_type_map)
+            row = conv.message_delete_row(msg, self.event_type_map)
             log.debug(f'Message delete {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
@@ -383,12 +393,12 @@ class Overlord(discord.Client):
         # Sync code part
         async with self.sync():
             # Add/update user
-            u_row = member_row(member, self.role_map)
+            u_row = conv.member_row(member, self.role_map)
             user = self.db.update_or_add(db.User, 'did', u_row)
             log.debug(f'User join {u_row}')
             self.db.commit()
             # Add event
-            e_row = member_join_row(user, member.joined_at, self.event_type_map)
+            e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
             self.db.add(db.MemberEvent, e_row)
             self.db.commit()
 
@@ -412,7 +422,7 @@ class Overlord(discord.Client):
         # Sync code part
         async with self.sync():
             # Update user
-            row = member_row(after, self.role_map)
+            row = conv.member_row(after, self.role_map)
             user = self.db.update(db.User, 'did', row)
             if user is None:
                 log.warn(f'{qualified_name(user)} does not exist in db! Skipping user update event!')
@@ -433,11 +443,11 @@ class Overlord(discord.Client):
         """
         # Sync code part
         async with self.sync():
-            row = user_row(member)
+            row = conv.user_row(member)
             if self.config["user.leave.keep"]:
                 user = self.db.update(db.User, 'did', row)
                 # Add event
-                e_row = user_leave_row(user, self.event_type_map)
+                e_row = conv.user_leave_row(user, self.event_type_map)
                 log.debug(f'User leave {e_row}')
                 self.db.add(db.MemberEvent, e_row)
             else:
@@ -478,7 +488,7 @@ class Overlord(discord.Client):
                 log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc join event!')
                 return
             # Save event
-            row = vc_join_row(user, channel, self.event_type_map)
+            row = conv.vc_join_row(user, channel, self.event_type_map)
             log.debug(f'VC join {row}')
             self.db.add(db.VoiceChatEvent, row)
             self.db.commit()
@@ -499,7 +509,7 @@ class Overlord(discord.Client):
                 log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc leave event!')
                 return
             # Save event
-            row = vc_leave_row(user, channel, self.event_type_map)
+            row = conv.vc_leave_row(user, channel, self.event_type_map)
             log.debug(f'VC join {row}')
             self.db.add(db.VoiceChatEvent, row)
             self.db.commit()

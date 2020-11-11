@@ -78,10 +78,6 @@
                 "delete": {
                     "track": true,
                     "weight": -1
-                },
-                "edit": {
-                    "track": false,
-                    "weight": 0
                 }
             },
             "voice": {

@@ -17,8 +17,10 @@ import logging
 import bot
 import db
 import db.queries as q
+import db.converters as conv
 
 from util import *
+import util.resources as res
 
 log = logging.getLogger('control')
 
@@ -28,7 +30,7 @@ log = logging.getLogger('control')
 
 @cmdcoro
 async def ping(client: bot.Overlord, msg: discord.Message):
-    await msg.channel.send("pong")
+    await msg.channel.send(res.get_string("messages.pong"))
 
 @cmdcoro
 async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel: str):
@@ -36,16 +38,16 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
     try:
         channel_id = int(channel[2:-1])
     except ValueError:
-        await msg.channel.send("Mention channel properly!")
+        await msg.channel.send(res.get_string("messages.invalid_channel_mention"))
         return
     
     # Resolve channel
     channel = client.get_channel(channel_id)
     if channel is None:
-        await msg.channel.send("Unknown channel")
+        await msg.channel.send(res.get_string("messages.unknown_channel"))
         return
     elif not is_text_channel(channel):
-        await msg.channel.send("Not a text channel")
+        await msg.channel.send(res.get_string("messages.invalid_channel_type_text"))
         return
 
     # Tranaction begins
@@ -53,7 +55,8 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
 
         # Drop full channel message history
         log.warn(f'Dropping #{channel.name}({channel.id}) history')
-        await msg.channel.send(f'Attention: dropping {channel.mention} history')
+        answer = res.get_string("messages.channel_history_drop").format(channel.mention)
+        await msg.channel.send(answer)
         client.db.query(db.MessageEvent).filter_by(channel_id=channel.id).delete()
 
         _user_cache = {}
@@ -70,7 +73,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
             if message.author.id not in _user_cache:
                 user = q.get_user_by_did(client.db, message.author.id)
                 if user is None and client.config["user.left.keep"]:
-                    user = client.db.add(db.User, user_row(message.author))
+                    user = client.db.add(db.User, conv.user_row(message.author))
                 _user_cache[message.author.id] = user
             else:
                 user = _user_cache[message.author.id]
@@ -80,7 +83,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
                 continue
 
             # Insert new message event
-            row = new_message_to_row(user, message, client.event_type_map)
+            row = conv.new_message_to_row(user, message, client.event_type_map)
             client.db.add(db.MessageEvent, row)
 
         # Calc stats
@@ -89,10 +92,11 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
 
         # Commit changes
         log.info(f'Commiting changes for #{channel.name}({channel.id})')
-        await msg.channel.send(f'Commiting changes for {channel.mention}')
+        answer = res.get_string("messages.change_commit").format(channel.mention)
+        await msg.channel.send(answer)
         client.db.commit()
 
         log.info(f'Done')
-        await msg.channel.send(f'Done')
+        await msg.channel.send(res.get_string("messages.done"))
 
 
