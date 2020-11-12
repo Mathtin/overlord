@@ -17,6 +17,8 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.sql.elements import literal_column
 from sqlalchemy.sql.selectable import Select
+from sqlalchemy.sql.expression import cast
+from sqlalchemy.sql.sqltypes import Integer
 from sqlalchemy import func, insert, select, and_
 
 from .models import *
@@ -43,6 +45,14 @@ def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
     lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
     select_columns = [value_column, MessageEvent.user_id] + lit_columns
     return select(select_columns).where(MessageEvent.type_id == type_id).group_by(MessageEvent.user_id)
+
+def select_vc_time_per_user(type_id: int, lit_values: list) -> Select:
+    join_time = cast(func.strftime('%s', VoiceChatEvent.created_at), Integer)
+    left_time = cast(func.strftime('%s', VoiceChatEvent.updated_at), Integer)
+    value_column = func.sum(left_time - join_time).label('value')
+    lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
+    select_columns = [value_column, VoiceChatEvent.user_id] + lit_columns
+    return select(select_columns).where(VoiceChatEvent.type_id == type_id).group_by(VoiceChatEvent.user_id)
 
 def insert_user_stat_from_select(select_query: Query) -> Insert:
     return insert(UserStat, inline=True).from_select(['value', 'user_id', 'type_id'], select_query)

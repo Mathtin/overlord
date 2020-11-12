@@ -32,7 +32,8 @@
         "commands": {
             "ping": "control.ping",
             "calc-channel-stats": "control.calc_channel_stats",
-            "calc-message-stats": "control.calc_message_stats"
+            "calc-message-stats": "control.calc_message_stats",
+            "calc-vc-stats": "control.calc_vc_stats"
         },
         "control": {
             "prefix": "ov/"

@@ -113,9 +113,9 @@ async def calc_message_stats(client: bot.Overlord, msg: discord.Message):
         # Calc new message user stats
         log.warn(f'Calculating new message user stats')
         await msg.channel.send(res.get_string("messages.new_message_user_stat_calc"))
-        query = q.select_message_count_per_user(new_message_event_id, [('type_id',new_message_stat_id)])
-        statement = q.insert_user_stat_from_select(query)
-        client.db.execute(statement)
+        select_query = q.select_message_count_per_user(new_message_event_id, [('type_id',new_message_stat_id)])
+        insert_query = q.insert_user_stat_from_select(select_query)
+        client.db.execute(insert_query)
         client.db.commit()
 
         # Drop delete message user stats
@@ -127,9 +127,34 @@ async def calc_message_stats(client: bot.Overlord, msg: discord.Message):
         # Calc delete message user stats
         log.warn(f'Calculating delete message user stats')
         await msg.channel.send(res.get_string("messages.delete_message_user_stat_calc"))
-        query = q.select_message_count_per_user(delete_message_event_id, [('type_id',delete_message_stat_id)])
-        statement = q.insert_user_stat_from_select(query)
-        client.db.execute(statement)
+        select_query = q.select_message_count_per_user(delete_message_event_id, [('type_id',delete_message_stat_id)])
+        insert_query = q.insert_user_stat_from_select(select_query)
+        client.db.execute(insert_query)
+        client.db.commit()
+
+        log.info(f'Done')
+        await msg.channel.send(res.get_string("messages.done"))
+
+@cmdcoro
+async def calc_vc_stats(client: bot.Overlord, msg: discord.Message):
+    vc_time_stat_id = client.user_stat_type_id("vc_time")
+    vc_join_event_id = client.event_type_id("vc_join")
+
+    # Tranaction begins
+    async with client.sync():
+
+        # Drop vc time user stats
+        log.warn(f'Dropping vc time user stats')
+        await msg.channel.send(res.get_string("messages.vc_time_user_stat_drop"))
+        client.db.query(db.UserStat).filter_by(type_id=vc_time_stat_id).delete()
+        client.db.commit()
+
+        # Calc vc time user stats
+        log.warn(f'Calculating new message user stats')
+        await msg.channel.send(res.get_string("messages.vc_time_user_stat_calc"))
+        select_query = q.select_vc_time_per_user(vc_join_event_id, [('type_id',vc_time_stat_id)])
+        insert_query = q.insert_user_stat_from_select(select_query)
+        client.db.execute(insert_query)
         client.db.commit()
 
         log.info(f'Done')

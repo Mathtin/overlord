@@ -22,8 +22,12 @@
 
    <!-- control.py: calc_message_stats -->
    <string name="new_message_user_stat_drop">⚠ Dropping stats for "new message" event</string>
-   <string name="delete_message_user_stat_drop">⚠ Dropping stats for "message delete" event</string>
    <string name="new_message_user_stat_calc">🧮 Calculating stats for "new message" event</string>
+   <string name="delete_message_user_stat_drop">⚠ Dropping stats for "message delete" event</string>
    <string name="delete_message_user_stat_calc">🧮 Calculating stats for "message delete" event</string>
+
+   <!-- control.py: calc_vc_stats -->
+   <string name="vc_time_user_stat_drop">⚠ Dropping voice chat stats</string>
+   <string name="vc_time_user_stat_calc">🧮 Calculating voice chat stats</string>
 
 </resources>
