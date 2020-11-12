@@ -13,6 +13,12 @@
 
 __author__ = 'Mathtin'
 
+from sqlalchemy.orm.query import Query
+from sqlalchemy.sql.dml import Insert
+from sqlalchemy.sql.elements import literal_column
+from sqlalchemy.sql.selectable import Select
+from sqlalchemy import func, insert, select, and_
+
 from .models import *
 from .session import DBSession
 
@@ -23,5 +29,20 @@ def get_msg_by_did(db: DBSession, id: int) -> MessageEvent:
     return db.query(MessageEvent).filter(MessageEvent.message_id == id).first()
 
 def get_last_member_event_by_did(db: DBSession, id: int) -> MessageEvent:
-    return db.query(MemberEvent).join(User).filter(User.did == id).order_by(MemberEvent.created_at.desc()).first()
+    return db.query(MemberEvent).join(User)\
+            .filter(User.did == id)\
+            .order_by(MemberEvent.created_at.desc()).first()
 
+def get_last_vc_event_by_id(db: DBSession, id: int, channel_id: int) -> VoiceChatEvent:
+    return db.query(VoiceChatEvent)\
+            .filter(and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id))\
+            .order_by(VoiceChatEvent.created_at.desc()).first()
+
+def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
+    value_column = func.count(MessageEvent.id).label('value')
+    lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
+    select_columns = [value_column, MessageEvent.user_id] + lit_columns
+    return select(select_columns).where(MessageEvent.type_id == type_id).group_by(MessageEvent.user_id)
+
+def insert_user_stat_from_select(select_query: Query) -> Insert:
+    return insert(UserStat, inline=True).from_select(['value', 'user_id', 'type_id'], select_query)

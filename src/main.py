@@ -20,9 +20,10 @@ import logging.config
 from dotenv import load_dotenv
 
 from bot import Overlord
+from db.models.stat import UserStatType
 from util import ConfigView
 from db import DBSession, EventType
-from db.predefined import EVENT_TYPES
+from db.predefined import EVENT_TYPES, USER_STAT_TYPES
 
 def main(argv):
     # Load env variables
@@ -43,6 +44,7 @@ def main(argv):
     # Init database
     session = DBSession(autocommit=False)
     session.sync_table(EventType, 'name', EVENT_TYPES)
+    session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
     session.commit()
 
     # Init bot

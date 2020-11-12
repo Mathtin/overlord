@@ -2,6 +2,7 @@
 <resources>
    <!-- Basic info messages -->
    <string name="done">✅ Done</string>
+   <string name="commit">💾 Commiting changes</string>
    
    <!-- Basic error messages -->
    <string name="unknown_channel">❌ Unknown channel</string>
@@ -18,6 +19,11 @@
 
    <!-- control.py: calc_channel_stats -->
    <string name="channel_history_drop">⚠ Dropping {0} history</string>
-   <string name="change_commit">⬆ Commiting changes for {0}</string>
+
+   <!-- control.py: calc_message_stats -->
+   <string name="new_message_user_stat_drop">⚠ Dropping stats for "new message" event</string>
+   <string name="delete_message_user_stat_drop">⚠ Dropping stats for "message delete" event</string>
+   <string name="new_message_user_stat_calc">🧮 Calculating stats for "new message" event</string>
+   <string name="delete_message_user_stat_calc">🧮 Calculating stats for "message delete" event</string>
 
 </resources>

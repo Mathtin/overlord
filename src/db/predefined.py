@@ -22,3 +22,9 @@ EVENT_TYPES = [
     { 'name': 'vc_join', 'description': 'user joined VC' },
     { 'name': 'vc_leave', 'description': 'user left VC' }
 ]
+
+USER_STAT_TYPES = [
+    { 'name': 'new_message_count', 'description': 'overall message sent count per user' },
+    { 'name': 'delete_message_count', 'description': 'overall message delete count per user' },
+    { 'name': 'vc_time', 'description': 'overall tim spent in voice chat per user in seconds' },
+]

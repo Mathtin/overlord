@@ -17,7 +17,7 @@ import os
 
 from logging import getLogger
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, update
 from sqlalchemy.exc import IntegrityError, DataError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -43,6 +43,9 @@ class DBSession(object):
 
     def query(self, *entities, **kwargs):
         return self._session.query(*entities, **kwargs)
+
+    def execute(self, *entities, **kwargs):
+        return self._session.execute(*entities, **kwargs)
 
     def add(self, model: BaseModel, value: dict, need_flush: bool = False):
         row = model(**value)
@@ -119,6 +122,10 @@ class DBSession(object):
             if getattr(row, col) != value[col]:
                 setattr(row, col, value[col])
         return row
+
+    def touch(self, model: BaseModel, id: int):
+        stmt = update(model).where(model.id == id)
+        self.execute(stmt)
 
     def close(self):
         try:

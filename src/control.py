@@ -14,6 +14,8 @@
 __author__ = 'Mathtin'
 
 import logging
+
+from sqlalchemy.orm import query
 import bot
 import db
 import db.queries as q
@@ -58,6 +60,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
         answer = res.get_string("messages.channel_history_drop").format(channel.mention)
         await msg.channel.send(answer)
         client.db.query(db.MessageEvent).filter_by(channel_id=channel.id).delete()
+        client.db.commit()
 
         _user_cache = {}
 
@@ -85,18 +88,50 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
             # Insert new message event
             row = conv.new_message_to_row(user, message, client.event_type_map)
             client.db.add(db.MessageEvent, row)
-
-        # Calc stats
-        #log.info(f'Calculating #{channel.name}({channel.id}) statistics')
-        #await msg.channel.send(f'Calculating #{channel.name}({channel.id}) statistics')
-
-        # Commit changes
-        log.info(f'Commiting changes for #{channel.name}({channel.id})')
-        answer = res.get_string("messages.change_commit").format(channel.mention)
-        await msg.channel.send(answer)
-        client.db.commit()
+            client.db.commit()
 
         log.info(f'Done')
         await msg.channel.send(res.get_string("messages.done"))
 
+@cmdcoro
+async def calc_message_stats(client: bot.Overlord, msg: discord.Message):
+    new_message_stat_id = client.user_stat_type_id("new_message_count")
+    delete_message_stat_id = client.user_stat_type_id("delete_message_count")
+
+    new_message_event_id = client.event_type_id("new_message")
+    delete_message_event_id = client.event_type_id("message_delete")
+
+    # Tranaction begins
+    async with client.sync():
+
+        # Drop new message user stats
+        log.warn(f'Dropping new message user stats')
+        await msg.channel.send(res.get_string("messages.new_message_user_stat_drop"))
+        client.db.query(db.UserStat).filter_by(type_id=new_message_stat_id).delete()
+        client.db.commit()
+
+        # Calc new message user stats
+        log.warn(f'Calculating new message user stats')
+        await msg.channel.send(res.get_string("messages.new_message_user_stat_calc"))
+        query = q.select_message_count_per_user(new_message_event_id, [('type_id',new_message_stat_id)])
+        statement = q.insert_user_stat_from_select(query)
+        client.db.execute(statement)
+        client.db.commit()
+
+        # Drop delete message user stats
+        log.warn(f'Dropping delete message user stats')
+        await msg.channel.send(res.get_string("messages.delete_message_user_stat_drop"))
+        client.db.query(db.UserStat).filter_by(type_id=delete_message_stat_id).delete()
+        client.db.commit()
+
+        # Calc delete message user stats
+        log.warn(f'Calculating delete message user stats')
+        await msg.channel.send(res.get_string("messages.delete_message_user_stat_calc"))
+        query = q.select_message_count_per_user(delete_message_event_id, [('type_id',delete_message_stat_id)])
+        statement = q.insert_user_stat_from_select(query)
+        client.db.execute(statement)
+        client.db.commit()
+
+        log.info(f'Done')
+        await msg.channel.send(res.get_string("messages.done"))
 

@@ -89,8 +89,9 @@ class Overlord(discord.Client):
     config: ConfigView
     db: db.DBSession
 
-    # Event name -> id (gathered via db)
+    # Maps name -> id (gathered via db)
     event_type_map: dict
+    user_stat_type_map: dict
 
     # Values initiated on_ready
     guild: discord.Guild
@@ -124,6 +125,7 @@ class Overlord(discord.Client):
 
         # Map event types
         self.event_type_map = {row.name:row.id for row in self.db.query(db.EventType)}
+        self.user_stat_type_map = {row.name:row.id for row in self.db.query(db.UserStatType)}
 
         # Preset some values initiated on_ready
         self.commands = {}
@@ -136,8 +138,11 @@ class Overlord(discord.Client):
     def run(self):
         super().run(self.token)
 
-    def event_type(self, name):
+    def event_type_id(self, name):
         return self.event_type_map[name]
+
+    def user_stat_type_id(self, name):
+        return self.user_stat_type_map[name]
 
     def sync(self):
         return self.__async_lock
@@ -187,7 +192,7 @@ class Overlord(discord.Client):
 
         exception_lines = traceback.format_exception(*sys.exc_info())
 
-        exception_msg = '`' + ''.join(exception_lines).replace('`', '\'') + '`'
+        exception_msg = '`' + ''.join(exception_lines).replace('`', '\'')[:1000] + '`'
 
         if self.error_channel is not None:
             await self.error_channel.send(exception_msg)
@@ -259,7 +264,7 @@ class Overlord(discord.Client):
                 self.db.commit()
                 # Check and repair last member event (should be join)
                 last_event = q.get_last_member_event_by_did(self.db, user.did)
-                if last_event is None or last_event.type_id != self.event_type("member_join"):
+                if last_event is None or last_event.type_id != self.event_type_id("member_join"):
                     e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
                     self.db.add(db.MemberEvent, e_row)
                 self.db.commit()
@@ -474,7 +479,7 @@ class Overlord(discord.Client):
             
     
     @event_config("voice.join")
-    async def on_vc_join(self, user: discord.Member, channel: discord.VoiceChannel):
+    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel):
         """
             Async vc join event handler
 
@@ -482,11 +487,17 @@ class Overlord(discord.Client):
         """
         # Sync code part
         async with self.sync():
-            user = q.get_user_by_did(self.db, user.id)
+            user = q.get_user_by_did(self.db, member.id)
             # Skip non-existing users
             if user is None:
-                log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc join event!')
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
                 return
+            # Apply constraints
+            event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
+            if event.type_id == self.event_type_id("vc_join"):
+                # Skip absent vc leave
+                log.warn(f'VC leave event is absent for {qualified_name(member)} in <{channel.name}! Removing last vc join event!')
+                self.db.delete_model(event)
             # Save event
             row = conv.vc_join_row(user, channel, self.event_type_map)
             log.debug(f'VC join {row}')
@@ -495,7 +506,7 @@ class Overlord(discord.Client):
             
     
     @event_config("voice.leave")
-    async def on_vc_leave(self, user: discord.Member, channel: discord.VoiceChannel):
+    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel):
         """
             Async vc join event handler
 
@@ -503,13 +514,20 @@ class Overlord(discord.Client):
         """
         # Sync code part
         async with self.sync():
-            user = q.get_user_by_did(self.db, user.id)
+            user = q.get_user_by_did(self.db, member.id)
             # Skip non-existing users
             if user is None:
-                log.warn(f'{qualified_name(user)} does not exist in db! Skipping vc leave event!')
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
                 return
-            # Save event
+            # Apply constraints
+            event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
+            if event.type_id != self.event_type_id("vc_join"):
+                # Skip absent vc join
+                log.warn(f'VC join event is absent for {qualified_name(member)} in <{channel.name}! Skipping vc leave event!')
+                return
+            # Save event + update previous
             row = conv.vc_leave_row(user, channel, self.event_type_map)
             log.debug(f'VC join {row}')
             self.db.add(db.VoiceChatEvent, row)
+            self.db.touch(db.VoiceChatEvent, event.id)
             self.db.commit()
