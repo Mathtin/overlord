@@ -46,8 +46,7 @@
         "event": {
             "user": {
                 "join": {
-                    "track": true,
-                    "weight": 100
+                    "track": true
                 },
                 "update": {
                     "track": true
@@ -58,18 +57,15 @@
             },
             "message": {
                 "new": {
-                    "track": true,
-                    "weight": 1
+                    "track": true
                 },
                 "delete": {
-                    "track": true,
-                    "weight": -1
+                    "track": true
                 }
             },
             "voice": {
                 "join": {
-                    "track": true,
-                    "weight": 1
+                    "track": true
                 },
                 "leave": {
                     "track": true

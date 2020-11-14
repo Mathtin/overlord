@@ -75,7 +75,7 @@ async def calc_channel_stats(client: bot.Overlord, msg: discord.Message, channel
             # Resolve user
             if message.author.id not in _user_cache:
                 user = q.get_user_by_did(client.db, message.author.id)
-                if user is None and client.config["user.left.keep"]:
+                if user is None and client.config["user.leave.keep"]:
                     user = client.db.add(db.User, conv.user_row(message.author))
                 _user_cache[message.author.id] = user
             else:

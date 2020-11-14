@@ -41,15 +41,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "update": {
@@ -58,15 +53,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "leave": {
@@ -75,58 +65,17 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
-                  ]
-                },
-                "ban": {
-                  "type": "object",
-                  "properties": {
-                    "track": {
-                      "type": "boolean",
-                      "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
-                    }
-                  },
-                  "required": [
-                    "track",
-                    "weight"
-                  ]
-                },
-                "kick": {
-                  "type": "object",
-                  "properties": {
-                    "track": {
-                      "type": "boolean",
-                      "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
-                    }
-                  },
-                  "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 }
               },
               "required": [
                 "join",
                 "update",
-                "leave",
-                "ban",
-                "kick"
+                "leave"
               ]
             },
             "message": {
@@ -138,15 +87,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "delete": {
@@ -155,15 +99,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "edit": {
@@ -172,15 +111,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 }
               },
@@ -199,15 +133,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "leave": {
@@ -216,15 +145,10 @@
                     "track": {
                       "type": "boolean",
                       "default": false
-                    },
-                    "weight": {
-                      "type": "integer",
-                      "default": 0
                     }
                   },
                   "required": [
-                    "track",
-                    "weight"
+                    "track"
                   ]
                 },
                 "afk": {

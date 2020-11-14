@@ -99,7 +99,7 @@ def message_edit_row(msg: MessageEvent, events: dict):
 
 def message_delete_row(msg: MessageEvent, events: dict):
     return {
-        'type_id': events["message_edit"],
+        'type_id': events["message_delete"],
         'user_id': msg.user.id,
         'message_id': msg.message_id,
         'channel_id': msg.channel_id
@@ -121,4 +121,15 @@ def vc_leave_row(user: User, channel: d.VoiceChannel, events: dict):
         'type_id': events["vc_leave"],
         'user_id': user.id,
         'channel_id': channel.id
+    }
+
+#
+# User Stat
+#
+
+def empty_user_stat_row(user_id: int, type_id: int):
+    return {
+        'type_id': type_id,
+        'user_id': user_id,
+        'value': 0
     }

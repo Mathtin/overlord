@@ -290,6 +290,8 @@ class Overlord(discord.Client):
             await self.on_control_message(message)
             return
 
+        new_message_stat_id = self.user_stat_type_id("new_message_count")
+
         # Sync code part
         async with self.sync():
             user = q.get_user_by_did(self.db, message.author.id)
@@ -301,6 +303,13 @@ class Overlord(discord.Client):
             row = conv.new_message_to_row(user, message, self.event_type_map)
             log.debug(f'New message {row}')
             self.db.add(db.MessageEvent, row)
+            # Update stats
+            stat = q.get_user_stat_by_id(self.db, user.id, new_message_stat_id)
+            if stat is None:
+                empty_stat_row = conv.empty_user_stat_row(user.id, new_message_stat_id)
+                stat = self.db.add(db.UserStat, empty_stat_row)
+            stat.value += 1
+            # Commit
             self.db.commit()
 
 
@@ -377,11 +386,20 @@ class Overlord(discord.Client):
         if msg is None or msg.user.did in self.bot_members:
             return
 
+        delete_message_stat_id = self.user_stat_type_id("delete_message_count")
+
         # Sync code part
         async with self.sync():
             row = conv.message_delete_row(msg, self.event_type_map)
             log.debug(f'Message delete {row}')
             self.db.add(db.MessageEvent, row)
+            # Update stats
+            stat = q.get_user_stat_by_id(self.db, msg.user_id, delete_message_stat_id)
+            if stat is None:
+                empty_stat_row = conv.empty_user_stat_row(msg.user_id, delete_message_stat_id)
+                stat = self.db.add(db.UserStat, empty_stat_row)
+            stat.value += 1
+            # Commit
             self.db.commit()
 
     
@@ -512,6 +530,7 @@ class Overlord(discord.Client):
 
             Saves event in database
         """
+        vc_time_stat_id = self.user_stat_type_id("vc_time")
         # Sync code part
         async with self.sync():
             user = q.get_user_by_did(self.db, member.id)
@@ -520,14 +539,21 @@ class Overlord(discord.Client):
                 log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
                 return
             # Apply constraints
-            event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-            if event.type_id != self.event_type_id("vc_join"):
+            join_event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
+            if join_event.type_id != self.event_type_id("vc_join"):
                 # Skip absent vc join
                 log.warn(f'VC join event is absent for {qualified_name(member)} in <{channel.name}! Skipping vc leave event!')
                 return
             # Save event + update previous
             row = conv.vc_leave_row(user, channel, self.event_type_map)
             log.debug(f'VC join {row}')
-            self.db.add(db.VoiceChatEvent, row)
-            self.db.touch(db.VoiceChatEvent, event.id)
+            leave_event = self.db.add(db.VoiceChatEvent, row)
+            self.db.touch(db.VoiceChatEvent, join_event.id)
+            self.db.commit()
+            # Update stats
+            stat = q.get_user_stat_by_id(self.db, join_event.user_id, vc_time_stat_id)
+            if stat is None:
+                empty_stat_row = conv.empty_user_stat_row(user.id, vc_time_stat_id)
+                stat = self.db.add(db.UserStat, empty_stat_row)
+            stat.value += (leave_event.created_at - join_event.created_at).total_seconds()
             self.db.commit()
