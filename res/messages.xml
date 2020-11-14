@@ -8,6 +8,13 @@
    <string name="unknown_channel">❌ Unknown channel</string>
    <string name="invalid_channel_mention">❌ Mention channel properly</string>
    <string name="invalid_channel_type_text">❌ Not a text channel</string>
+   <string name="unknown_user">❌ No such user in database</string>
+   <string name="invalid_user_mention">❌ Mention user properly</string>
+   
+   <!-- User stat names -->
+   <string name="new_message_user_stat">new message count</string>
+   <string name="delete_message_user_stat">message deleted count</string>
+   <string name="vc_time_user_stat">VC time (in seconds)</string>
 
    <!-- bot.py: on_control_message -->
    <string name="unknown_command">❌ Unknown command</string>
@@ -20,14 +27,12 @@
    <!-- control.py: calc_channel_stats -->
    <string name="channel_history_drop">⚠ Dropping {0} history</string>
 
-   <!-- control.py: calc_message_stats -->
-   <string name="new_message_user_stat_drop">⚠ Dropping stats for "new message" event</string>
-   <string name="new_message_user_stat_calc">🧮 Calculating stats for "new message" event</string>
-   <string name="delete_message_user_stat_drop">⚠ Dropping stats for "message delete" event</string>
-   <string name="delete_message_user_stat_calc">🧮 Calculating stats for "message delete" event</string>
+   <!-- control.py: calc_message_stats, calc_vc_stats -->
+   <string name="user_stat_drop">⚠ Dropping stat "{0}"</string>
+   <string name="user_stat_calc">🧮 Calculating stat "{0}"</string>
 
-   <!-- control.py: calc_vc_stats -->
-   <string name="vc_time_user_stat_drop">⚠ Dropping voice chat stats</string>
-   <string name="vc_time_user_stat_calc">🧮 Calculating voice chat stats</string>
+   <!-- control.py: get_user_stats -->
+   <string name="user_stats_head">📊 Stats for {0}:</string>
+   <string name="user_stats_entry">> {0}: {1}</string>
 
 </resources>
