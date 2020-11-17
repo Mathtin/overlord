@@ -131,12 +131,9 @@ class Overlord(discord.Client):
         self.commands = {}
         self.bot_members = {}
 
-    ################
-    # Sync methods #
-    ################
-
-    def run(self):
-        super().run(self.token)
+    ###########
+    # Getters #
+    ###########
 
     def event_type_id(self, name):
         return self.event_type_map[name]
@@ -167,6 +164,13 @@ class Overlord(discord.Client):
     def is_special_channel_id(self, channel_id: int):
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
+    ################
+    # Sync methods #
+    ################
+
+    def run(self):
+        super().run(self.token)
+
     #################
     # Async methods #
     #################
@@ -175,6 +179,33 @@ class Overlord(discord.Client):
         while not self.__initialized:
             await asyncio.sleep(0.1)
         return
+
+    async def sync_roles(self):
+        log.info('Syncing roles')
+        roles = conv.roles_to_rows(self.guild.roles)
+        self.role_map = { role['did']: role for role in roles }
+        self.db.sync_table(db.Role, 'did', roles)
+        self.db.commit()
+        log.info('Syncing roles done')
+
+    async def sync_users(self):
+        log.info(f'Syncing users')
+        async for member in self.guild.fetch_members(limit=None):
+            # Skip bots
+            if member.bot:
+                self.bot_members[member.id] = member
+                continue
+            # Update user
+            u_row = conv.member_row(member, self.role_map)
+            user = self.db.update_or_add(db.User, 'did', u_row)
+            self.db.commit()
+            # Check and repair last member event (should be join)
+            last_event = q.get_last_member_event_by_did(self.db, user.did)
+            if last_event is None or last_event.type_id != self.event_type_id("member_join"):
+                e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
+                self.db.add(db.MemberEvent, e_row)
+            self.db.commit()
+        log.info(f'Syncing users done')
 
     #########
     # Hooks #
@@ -243,32 +274,9 @@ class Overlord(discord.Client):
                 check_coroutine(hook)
                 self.commands[cmd] = hook
 
-            # Sync and map roles
-            log.info('Syncing roles')
-            roles = conv.roles_to_rows(self.guild.roles)
-            self.role_map = { role['did']: role for role in roles }
-            self.db.sync_table(db.Role, 'did', roles)
-            log.info('Commiting changes')
-            self.db.commit()
-
-            # Sync users
-            log.info(f'Syncing users')
-            async for member in self.guild.fetch_members(limit=None):
-                # Skip bots
-                if member.bot:
-                    self.bot_members[member.id] = member
-                    continue
-                # Update user
-                u_row = conv.member_row(member, self.role_map)
-                user = self.db.update_or_add(db.User, 'did', u_row)
-                self.db.commit()
-                # Check and repair last member event (should be join)
-                last_event = q.get_last_member_event_by_did(self.db, user.did)
-                if last_event is None or last_event.type_id != self.event_type_id("member_join"):
-                    e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-                    self.db.add(db.MemberEvent, e_row)
-                self.db.commit()
-            log.info(f'Syncing done')
+            # Sync roles and users
+            await self.sync_roles()
+            await self.sync_users()
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
@@ -329,18 +337,18 @@ class Overlord(discord.Client):
 
         if cmd_name == "help":
             help_lines = []
-            line_fmt = res.get_string("messages.commands_list_entry")
+            line_fmt = res.get("messages.commands_list_entry")
             for cmd in self.commands:
                 hook = self.commands[cmd]
                 base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
                 help_lines.append(line_fmt.format(base_line))
-            help_header = res.get_string("messages.commands_list_head")
+            help_header = res.get("messages.commands_list_head")
             help_msg = '\n'.join(help_lines)
             await message.channel.send(f'{help_header}\n{help_msg}\n')
             return
 
         if cmd_name not in self.commands:
-            await message.channel.send(res.get_string("messages.unknown_command"))
+            await message.channel.send(res.get("messages.unknown_command"))
             return
         
         await self.commands[cmd_name](self, message, prefix, argv)

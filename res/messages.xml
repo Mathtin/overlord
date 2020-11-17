@@ -21,15 +21,20 @@
    <string name="commands_list_head">⚙ **Available commands:**</string>
    <string name="commands_list_entry">> `{0}`</string>
 
+   <!-- control.py: sync_users -->
+   <string name="sync_roles_begin">🔄 Synchronizing roles</string>
+   <string name="sync_users_begin">🔄 Synchronizing users</string>
+
    <!-- control.py: ping -->
    <string name="pong">🏓 Pong!</string>
 
    <!-- control.py: calc_channel_stats -->
    <string name="channel_history_drop">⚠ Dropping {0} history</string>
+   <string name="channel_history_load">⬇ Loading {0} history</string>
 
    <!-- control.py: calc_message_stats, calc_vc_stats -->
-   <string name="user_stat_drop">⚠ Dropping stat "{0}"</string>
-   <string name="user_stat_calc">🧮 Calculating stat "{0}"</string>
+   <string name="user_stat_drop">⚠ Dropping "{0}" stats</string>
+   <string name="user_stat_calc">🧮 Calculating "{0}" stats</string>
 
    <!-- control.py: get_user_stats -->
    <string name="user_stats_head">📊 Stats for {0}:</string>

@@ -38,24 +38,18 @@ __xml_cache = {}
 def __get_node(xml_path: str, string_path: str):
     # Load xml
     if xml_path not in __xml_cache:
+        if not os.path.isfile(xml_path):
+            raise MissingResourceException(xml_path, string_path)
         log.info(f'Loading {xml_path}')
         __xml_cache[xml_path] = ET.parse(xml_path)
     root = __xml_cache[xml_path].getroot()
     # Find value
     return root.find(string_path)
 
-def get_string(path: str, default=None, safe=True):
-    if default is None:
-        default = path
+def get(path: str):
     xml_path = __xml_path(path)
     string_path = __string_path(path)
     node = __get_node(xml_path, string_path)
     if node is None:
-        if not safe:
-            raise MissingResourceException(xml_path, string_path)
-        log.warn(f'Missing resource in {xml_path}: {string_path}')
-        return default
+        return path
     return node.text
-
-def get_int(path: str, default=None, safe=False):
-    return int(get_string(path, default=default, safe=safe))
