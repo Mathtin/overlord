@@ -15,6 +15,9 @@ __author__ = 'Mathtin'
 
 import json
 import os.path
+import copy
+
+from discord.errors import InvalidArgument
 
 from .resources import res_path
 
@@ -72,36 +75,42 @@ def check_with_schema(schema: dict, v):
 
 class ConfigView(object):
 
-    schema = None
+    schema: dict
+    value = None
 
-    def __init__(self, *args, **kwargs):
-        if len(args) == 1 or 'config_path' in kwargs:
-            self.__load_from_file(*args, **kwargs)
+    def __init__(self, **kwargs):
+        if 'path' in kwargs and 'schema_name' in kwargs:
+            self.__construct3(**kwargs)
+        elif 'value' in kwargs and 'schema_name' in kwargs:
+            self.__construct2(**kwargs)
+        elif 'value' in kwargs and 'schema' in kwargs:
+            self.__construct1(**kwargs)
         else:
-            self.__construct(*args, **kwargs)
+            raise InvalidArgument("Bad kwargs")
 
-    def __construct(self, schema: dict, config, default_config):
+    def __construct1(self, schema: dict, value):
         self.schema = schema
-        self.config = config
-        self.default_config = default_config
-
-    def __load_from_file(self, config_path: str):
-        config_schema_path = res_path(CONFIG_SCHEMA_FILE)
-        with open(config_schema_path, "r") as f:
-            self.schema = json.load(f)
-
+        self.value = value
         self.default_config = default_by_schema(self.schema)
+        check_with_schema(self.schema, self.value)
 
-        if not os.path.exists(config_path):
+    def __construct2(self, schema_name: str, value):
+        config_schema_path = res_path(f'{schema_name}.json')
+        with open(config_schema_path, "r") as f:
+            schema = json.load(f)
+        self.__construct1(schema, value)
+
+    def __construct3(self, schema_name: str, path: str):
+        if not os.path.exists(path):
             # if config not exist dump default
-            with open(config_path, "w") as f:
+            with open(path, "w") as f:
                 json.dump(self.default_config, f)
-            self.config = self.default_config
+            value = self.default_config
         else:
             # if config do exist load it
-            with open(config_path, "r") as f:
-                self.config = json.load(f)
-            check_with_schema(self.schema, self.config)
+            with open(path, "r") as f:
+                value = json.load(f)
+        self.__construct2(schema_name, value)
 
     def contains(self, path: str):
         keys = path.split('.')
@@ -112,9 +121,9 @@ class ConfigView(object):
             node = node[el]
         return True
 
-    def path(self, path: str):
+    def path(self, path: str, schema_name=None):
         keys = path.split('.')
-        node = self.config
+        node = self.value
         default_node = self.default_config
         schema_node = self.schema
         found = True
@@ -128,27 +137,41 @@ class ConfigView(object):
             default_node = default_node[el]
             schema_node = schema_node["properties"][el]
         node = node if found else default_node
-        return ConfigView(schema_node, node, default_node)
+        res = ConfigView(schema=schema_node, value=node)
+        if schema_name is not None:
+            res = res.with_schema(schema_name)
+        return res
 
     def get(self, path: str):
-        return self.path(path).config
+        return self.path(path).value
+
+    def copy(self):
+        schema = copy.deepcopy(self.schema)
+        value = copy.deepcopy(self.value)
+        return ConfigView(schema=schema, value=value)
+
+    def with_schema(self, schema_name: str):
+        return ConfigView(schema_name=schema_name, value=copy.deepcopy(self.value))
 
     def __bool__(self):
-        return self.config.__bool__()
+        return self.value.__bool__()
 
     def __getitem__(self, path):
         return self.get(path)
 
     def __setitem__(self, path, item):
         keys = path.split('.')
-        node = self.config
+        node = self.value
         for el in keys[:-1]:
             if el not in node:
                 node[el] = {}
             node = node[el]
         node[keys[-1]] = item
-        check_with_schema(self.schema, self.config)
+        check_with_schema(self.schema, self.value)
         return self.get(path)
 
     def __getattr__(self, key):
         return self.path(key)
+
+    def __iter__(self):
+        return self.default_config.__iter__()

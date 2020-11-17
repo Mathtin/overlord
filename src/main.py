@@ -35,7 +35,7 @@ def main(argv):
     args = parser.parse_args(argv[1:])
 
     # Load config
-    config = ConfigView(args.config)
+    config = ConfigView(path=args.config, schema_name="config_schema")
 
     # Apply logging config
     if config['logger']:

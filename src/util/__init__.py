@@ -15,6 +15,7 @@ __author__ = 'Mathtin'
 
 from .config import ConfigView
 from .exceptions import InvalidConfigException, NotCoroutineException
+from .resources import get as get_resource
 
 import importlib
 import os.path
@@ -73,7 +74,46 @@ def cmdcoro(func):
         else:
             await func(client, message, *argv[1:])
 
-    setattr(wrapped_func, "or_cmdcoro", func)
+    if hasattr(func, "or_cmdcoro"):
+        setattr(wrapped_func, "or_cmdcoro", func.or_cmdcoro)
+    else:
+        setattr(wrapped_func, "or_cmdcoro", func)
+    
+    return wrapped_func
+
+def member_mention_arg(func):
+    async def wrapped_func(client, msg, user_mention, *argv):
+        if len(msg.mentions) == 0:
+            await msg.channel.send(get_resource("messages.invalid_user_mention"))
+            return
+        member = msg.mentions[0]
+        if not is_user_member(member):
+            await msg.channel.send(get_resource("messages.not_member_user"))
+            return
+        await func(client, msg, member, *argv)
+
+    if hasattr(func, "or_cmdcoro"):
+        setattr(wrapped_func, "or_cmdcoro", func.or_cmdcoro)
+    else:
+        setattr(wrapped_func, "or_cmdcoro", func)
+    
+    return wrapped_func
+
+def text_channel_mention_arg(func):
+    async def wrapped_func(client, msg, channel_mention, *argv):
+        if len(msg.channel_mentions) == 0:
+            await msg.channel.send(get_resource("messages.invalid_channel_mention"))
+            return
+        channel = msg.channel_mentions[0]
+        if not is_text_channel(channel):
+            await msg.channel.send(get_resource("messages.invalid_channel_type_text"))
+            return
+        await func(client, msg, channel, *argv)
+
+    if hasattr(func, "or_cmdcoro"):
+        setattr(wrapped_func, "or_cmdcoro", func.or_cmdcoro)
+    else:
+        setattr(wrapped_func, "or_cmdcoro", func)
     
     return wrapped_func
 
@@ -106,3 +146,18 @@ def is_dm_message(message: discord.Message):
 
 def is_same_author(m1: discord.Message, m2: discord.Message):
     return m1.author.id == m2.author.id
+
+def is_role_applied(user: discord.Member, role):
+    if isinstance(role, discord.Role):
+        return is_role_applied(user, role.name)
+    for r in user.roles:
+        if r.name == role:
+            return True
+    return False
+
+def filter_roles(user: discord.Member, roles_filter: list):
+    res = []
+    for r in roles_filter:
+        if is_role_applied(user, r):
+            res.append(r)
+    return res

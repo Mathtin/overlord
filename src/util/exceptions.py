@@ -15,7 +15,7 @@ __author__ = 'Mathtin'
 
 class InvalidConfigException(Exception):
     def __init__(self, msg: str, var_name: str):
-        super().__init__(f'{msg}, check {var_name} value in .env file')
+        super().__init__(f'{msg}, check {var_name} value')
 
 class NotCoroutineException(TypeError):
     def __init__(self, func):

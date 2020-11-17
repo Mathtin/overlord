@@ -5,6 +5,7 @@
    <string name="commit">💾 Commiting changes</string>
    <string name="error">❗ Error: {0}</string>
    <string name="warning">⚠ Attention: {0}</string>
+   <string name="internal_error">❌ Internal error</string>
    
    <!-- Basic error messages -->
    <string name="unknown_channel">❌ Unknown channel</string>
@@ -12,6 +13,7 @@
    <string name="invalid_channel_type_text">❌ Not a text channel</string>
    <string name="unknown_user">❌ No such user in database</string>
    <string name="invalid_user_mention">❌ Mention user properly</string>
+   <string name="not_member_user">❌ User is not member of this guild</string>
    
    <!-- User stat names -->
    <string name="new_message_user_stat">new message count</string>
@@ -26,6 +28,10 @@
    <!-- control.py: sync_users -->
    <string name="sync_roles_begin">🔄 Synchronizing roles</string>
    <string name="sync_users_begin">🔄 Synchronizing users</string>
+
+   <!-- control.py: update_user_ranks/update_user_rank -->
+   <string name="update_ranks_begin">🔄 Updating user ranks</string>
+   <string name="update_rank_begin">🔄 Updating {0}'s rank</string>
 
    <!-- control.py: ping -->
    <string name="pong">🏓 Pong!</string>

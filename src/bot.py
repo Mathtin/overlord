@@ -21,12 +21,15 @@ import logging
 
 import discord
 from discord import channel
+from discord import member
+from sqlalchemy import schema
 import db
 import db.queries as q
 import db.converters as conv
 
 from util import *
 import util.resources as res
+from typing import Optional
 
 log = logging.getLogger('overlord-bot')
 
@@ -168,12 +171,49 @@ class Overlord(discord.Client):
     def is_special_channel_id(self, channel_id: int):
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
+    def get_user_stat(self, user: db.User, stat_name: str):
+        stat = q.get_user_stat_by_id(self.db, user.id, self.user_stat_type_map[stat_name])
+        return stat.value if stat is not None else 0
+
+    def can_apply_rank(self, user: db.User, rank: ConfigView):
+        messages = self.get_user_stat(user, "new_message_count") - self.get_user_stat(user, "delete_message_count")
+        vc_time = self.get_user_stat(user, "vc_time")
+        return messages >= rank["messages"] and vc_time >= rank["vc"]
+
+    def get_member_rank_roles(self, member: discord.Member) -> Optional[str]:
+        res = []
+        for rank_name in self.config.role.ranks:
+            if is_role_applied(member, rank_name):
+                res.append(rank_name)
+        return res
+
+    def get_role(self, role_name: str):
+        for r in self.guild.roles:
+            if r.name == role_name:
+                return r
+        return None
+
+    def is_admin(self, user: discord.Member):
+        roles = self.config["role.admin"]
+        return len(filter_roles(user, roles)) > 0
+
     ################
     # Sync methods #
     ################
 
     def run(self):
         super().run(self.token)
+
+    def find_user_rank(self, user: db.User) -> Optional[str]:
+        ranks = self.config["role.ranks"]
+        max_rank = {"weight": -1000}
+        max_rank_name = None
+        for rank_name in ranks:
+            rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
+            if self.can_apply_rank(user, rank) and max_rank["weight"] < rank["weight"]:
+                max_rank = rank
+                max_rank_name = rank_name
+        return max_rank_name
 
     #################
     # Async methods #
@@ -205,8 +245,8 @@ class Overlord(discord.Client):
 
     async def sync_users(self):
         if self.__awaiting_role_sync:
-            log.error(f'Cannot sync users: awating role sync!')
-            await self.send_error(f'Cannot sync users: awating role sync!')
+            log.error(f'Cannot sync users: awaiting role sync')
+            await self.send_error(f'Cannot sync users: awaiting role sync')
             return
         log.info(f'Syncing users')
         async for member in self.guild.fetch_members(limit=None):
@@ -226,6 +266,54 @@ class Overlord(discord.Client):
             self.db.commit()
         self.__awaiting_user_sync = False
         log.info(f'Syncing users done')
+
+    async def update_user_rank(self, user: db.User, member: discord.Member):
+        if self.__awaiting_role_sync:
+            log.error("Cannot update user rank: awaiting role sync")
+            await self.send_error(f'Cannot update user rank: awaiting role sync')
+            return
+        if self.is_admin(member):
+            return
+        # Resolve user rank
+        rank_name = self.find_user_rank(user)
+        if rank_name is None:
+            return
+        log.debug(f"Updating {qualified_name(member)}'s rank: {rank_name}'")
+        if is_role_applied(member, rank_name):
+            log.debug(f"No updating required")
+            return
+        # Get and remove already applied ranks
+        applied_rank_roles = self.get_member_rank_roles(member)
+        if applied_rank_roles:
+            applied_rank_names = ', '.join([r.name for r in applied_rank_roles])
+            log.info(f"Removing {qualified_name(member)}'s rank roles: {applied_rank_names}")
+            await member.remove_roles(*applied_rank_roles)
+        # Apply new rank
+        log.info(f"Adding rank role to {qualified_name(member)}: {rank_name}")
+        await member.add_roles(self.get_role(rank_name))
+        # Update user in db
+        u_row = conv.member_row(member, self.role_map)
+        user = self.db.update(db.User, 'did', u_row)
+        self.db.commit()
+
+    async def update_user_ranks(self):
+        if self.__awaiting_role_sync:
+            log.error("Cannot update user ranks: awaiting role sync")
+            await self.send_error(f'Cannot update user ranks: awaiting role sync')
+            return
+        log.info(f'Updating user ranks')
+        async for member in self.guild.fetch_members(limit=None):
+            # Skip bots
+            if member.bot:
+                self.bot_members[member.id] = member
+                continue
+            user = q.get_user_by_did(self.db, member.id)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
+                continue
+            await self.update_user_rank(user, member)
+        log.info(f'Done updating user ranks')
 
     #########
     # Hooks #
@@ -294,6 +382,13 @@ class Overlord(discord.Client):
                 check_coroutine(hook)
                 self.commands[cmd] = hook
 
+            # Check ranks config
+            ranks = self.config["role.ranks"]
+            for rank_name in ranks:
+                _ = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
+                if self.get_role(rank_name) is None:
+                    raise InvalidConfigException("Bad role name", "bot.role.ranks")
+
             # Sync roles and users
             await self.sync_roles()
             await self.sync_users()
@@ -337,8 +432,9 @@ class Overlord(discord.Client):
                 empty_stat_row = conv.empty_user_stat_row(user.id, new_message_stat_id)
                 stat = self.db.add(db.UserStat, empty_stat_row)
             stat.value += 1
-            # Commit
             self.db.commit()
+            # Update user rank
+            await self.update_user_rank(user, message.author)
 
 
     async def on_control_message(self, message: discord.Message):
@@ -396,6 +492,9 @@ class Overlord(discord.Client):
             log.debug(f'Message edit {row}')
             self.db.add(db.MessageEvent, row)
             self.db.commit()
+            # Update user rank
+            member = await self.guild.fetch_member(msg.user.did)
+            await self.update_user_rank(msg.user, member)
 
     
     @after_initialized
@@ -427,8 +526,10 @@ class Overlord(discord.Client):
                 empty_stat_row = conv.empty_user_stat_row(msg.user_id, delete_message_stat_id)
                 stat = self.db.add(db.UserStat, empty_stat_row)
             stat.value += 1
-            # Commit
             self.db.commit()
+            # Update user rank
+            member = await self.guild.fetch_member(msg.user.did)
+            await self.update_user_rank(msg.user, member)
 
     
     @after_initialized
@@ -595,6 +696,8 @@ class Overlord(discord.Client):
                 stat = self.db.add(db.UserStat, empty_stat_row)
             stat.value += (leave_event.created_at - join_event.created_at).total_seconds()
             self.db.commit()
+            # Update user rank
+            await self.update_user_rank(user, member)
 
     async def on_guild_role_create(self, role: discord.Role):
         if self.__awaiting_role_sync and self.__awaiting_user_sync:

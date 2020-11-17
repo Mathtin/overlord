@@ -31,9 +31,13 @@
     "bot": {
         "commands": {
             "ping": "control.ping",
-            "calc-channel-stats": "control.calc_channel_stats",
+            "sync-roles": "control.sync_roles",
+            "update-ranks": "control.update_user_ranks",
+            "update-rank": "control.update_user_rank",
+            "reload-channel": "control.reload_channel_history",
             "calc-message-stats": "control.calc_message_stats",
-            "calc-vc-stats": "control.calc_vc_stats"
+            "calc-vc-stats": "control.calc_vc_stats",
+            "user-stats": "control.get_user_stats"
         },
         "control": {
             "prefix": "ov/"
@@ -72,6 +76,16 @@
                 },
                 "afk": {
                     "ignore": true
+                }
+            }
+        },
+        "role": {
+            "admin": ["Headquarter"],
+            "ranks": {
+                "TestRole#1": {
+                    "weight": 1,
+                    "messages": 10,
+                    "vc": 20
                 }
             }
         }

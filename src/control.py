@@ -48,9 +48,7 @@ async def __calc_user_stats(client: bot.Overlord, stat_name: str, stat_id: int, 
 
 def __build_stat_line(client: bot.Overlord, user: db.User, res_stat_name: str, stat_id_name: int):
     stat_name = res.get(f"messages.{res_stat_name}")
-    stat_id = client.user_stat_type_id(stat_id_name)
-    stat = q.get_user_stat_by_id(client.db, user.id, stat_id)
-    stat_val = stat.value if stat is not None else 0
+    stat_val = client.get_user_stat(user, stat_id_name)
     return res.get("messages.user_stats_entry").format(stat_name, stat_val)
 
 ############################
@@ -74,16 +72,29 @@ async def sync_roles(client: bot.Overlord, msg: discord.Message):
 
 
 @cmdcoro
-async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: str):
-    # Resolve channel
-    if len(msg.channel_mentions) == 0:
-        await msg.channel.send(res.get("messages.invalid_channel_mention"))
-        return
-    channel = msg.channel_mentions[0]
-    if not is_text_channel(channel):
-        await msg.channel.send(res.get("messages.invalid_channel_type_text"))
-        return
+async def update_user_ranks(client: bot.Overlord, msg: discord.Message):
+    async with client.sync():
+        await msg.channel.send(res.get("messages.update_ranks_begin"))
+        await client.update_user_ranks()
+        await msg.channel.send(res.get("messages.done"))
 
+
+@cmdcoro
+@member_mention_arg
+async def update_user_rank(client: bot.Overlord, msg: discord.Message, member: discord.Member):
+    async with client.sync():
+        user = q.get_user_by_did(client.db, member.id)
+        if user is None:
+            await msg.channel.send(res.get("messages.unknown_user"))
+            return
+        await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
+        await client.update_user_rank(user, member)
+        await msg.channel.send(res.get("messages.done"))
+
+
+@cmdcoro
+@text_channel_mention_arg
+async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: discord.TextChannel):
     # Tranaction begins
     async with client.sync():
 
@@ -168,12 +179,9 @@ async def calc_vc_stats(client: bot.Overlord, msg: discord.Message):
 
 
 @cmdcoro
-async def get_user_stats(client: bot.Overlord, msg: discord.Message, username: str):
+@member_mention_arg
+async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: discord.Member):
     # Resolve user
-    if len(msg.mentions) == 0:
-        await msg.channel.send(res.get("messages.invalid_user_mention"))
-        return
-    member = msg.mentions[0]
     user = q.get_user_by_did(client.db, member.id)
     if user is None:
         await msg.channel.send(res.get("messages.unknown_user"))

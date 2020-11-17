@@ -1,0 +1,24 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "properties": {
+        "weight": {
+          "type": "integer",
+          "default": 0
+        },
+        "messages": {
+          "type": "integer",
+          "default": 0
+        },
+        "vc": {
+          "type": "integer",
+          "default": 0
+        }
+    },
+    "required": [
+      "weight",
+      "messages",
+      "vc"
+    ]
+}
+  

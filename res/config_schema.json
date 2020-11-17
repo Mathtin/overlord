@@ -222,6 +222,23 @@
             "ban",
             "kick"
           ]
+        },
+        "role": {
+          "type": "object",
+          "properties": {
+            "admin": {
+              "type": "array",
+              "default": []
+            },
+            "ranks": {
+              "type": "object",
+              "default": {}
+            }
+          },
+          "required": [
+            "admin",
+            "ranks"
+          ]
         }
       },
       "required": [
@@ -229,6 +246,7 @@
         "commands",
         "control",
         "user",
+        "role",
         "egg_done"
       ]
     }
