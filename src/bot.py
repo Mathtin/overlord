@@ -78,6 +78,8 @@ def event_config(name: str):
 class Overlord(discord.Client):
     __async_lock: asyncio.Lock
     __initialized: bool
+    __awaiting_role_sync: bool
+    __awaiting_user_sync: bool
 
     # Members loaded from ENV
     token: str
@@ -104,6 +106,8 @@ class Overlord(discord.Client):
     def __init__(self, config: ConfigView, db_session: db.DBSession):
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
+        self.__awaiting_role_sync = True
+        self.__awaiting_user_sync = True
 
         self.config = config
         self.db = db_session
@@ -180,15 +184,30 @@ class Overlord(discord.Client):
             await asyncio.sleep(0.1)
         return
 
+    async def send_error(self, msg: str):
+        if self.error_channel is not None:
+            await self.error_channel.send(res.get("messages.error").format(msg))
+        return
+
+    async def send_warning(self, msg: str):
+        if self.error_channel is not None:
+            await self.error_channel.send(res.get("messages.warning").format(msg))
+        return
+
     async def sync_roles(self):
         log.info('Syncing roles')
         roles = conv.roles_to_rows(self.guild.roles)
         self.role_map = { role['did']: role for role in roles }
         self.db.sync_table(db.Role, 'did', roles)
         self.db.commit()
+        self.__awaiting_role_sync = False
         log.info('Syncing roles done')
 
     async def sync_users(self):
+        if self.__awaiting_role_sync:
+            log.error(f'Cannot sync users: awating role sync!')
+            await self.send_error(f'Cannot sync users: awating role sync!')
+            return
         log.info(f'Syncing users')
         async for member in self.guild.fetch_members(limit=None):
             # Skip bots
@@ -205,6 +224,7 @@ class Overlord(discord.Client):
                 e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
                 self.db.add(db.MemberEvent, e_row)
             self.db.commit()
+        self.__awaiting_user_sync = False
         log.info(f'Syncing users done')
 
     #########
@@ -421,6 +441,8 @@ class Overlord(discord.Client):
 
             Saves user in database
         """
+        if self.__awaiting_user_sync:
+            return
         # Sync code part
         async with self.sync():
             # Add/update user
@@ -444,6 +466,8 @@ class Overlord(discord.Client):
 
             Removes user from database (or keep it, depends on config)
         """
+        if self.__awaiting_user_sync:
+            return
         # track only role/nickname change
         if not (before.roles != after.roles or \
                 before.display_name != after.display_name or \
@@ -477,13 +501,19 @@ class Overlord(discord.Client):
             row = conv.user_row(member)
             if self.config["user.leave.keep"]:
                 user = self.db.update(db.User, 'did', row)
+                if user is None:
+                    log.warn(f'{qualified_name(user)} does not exist in db! Skipping user leave event!')
+                    return
                 # Add event
                 e_row = conv.user_leave_row(user, self.event_type_map)
                 log.debug(f'User leave {e_row}')
                 self.db.add(db.MemberEvent, e_row)
             else:
                 log.debug(f'User leave (deleting) {row}')
-                self.db.delete(db.User, 'did', row)
+                user = self.db.delete(db.User, 'did', row)
+                if user is None:
+                    log.warn(f'{qualified_name(user)} does not exist in db! Skipping user leave event!')
+                    return
             self.db.commit()
 
     
@@ -565,3 +595,24 @@ class Overlord(discord.Client):
                 stat = self.db.add(db.UserStat, empty_stat_row)
             stat.value += (leave_event.created_at - join_event.created_at).total_seconds()
             self.db.commit()
+
+    async def on_guild_role_create(self, role: discord.Role):
+        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+            return
+        self.__awaiting_role_sync = True
+        self.__awaiting_user_sync = True
+        await self.send_warning('New role detected. Awaiting role syncronization.')
+
+    async def on_guild_role_delete(self, role: discord.Role):
+        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+            return
+        self.__awaiting_role_sync = True
+        self.__awaiting_user_sync = True
+        await self.send_warning('Role remove detected. Awaiting role syncronization.')
+
+    async def on_guild_role_update(self, before: discord.Role, after: discord.Role):
+        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+            return
+        self.__awaiting_role_sync = True
+        self.__awaiting_user_sync = True
+        await self.send_warning('Role change detected. Awaiting role syncronization.')

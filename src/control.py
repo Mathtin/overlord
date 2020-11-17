@@ -64,7 +64,7 @@ async def ping(client: bot.Overlord, msg: discord.Message):
 
 
 @cmdcoro
-async def sync_users(client: bot.Overlord, msg: discord.Message):
+async def sync_roles(client: bot.Overlord, msg: discord.Message):
     async with client.sync():
         await msg.channel.send(res.get("messages.sync_roles_begin"))
         await client.sync_roles()

@@ -3,6 +3,8 @@
    <!-- Basic info messages -->
    <string name="done">✅ Done</string>
    <string name="commit">💾 Commiting changes</string>
+   <string name="error">❗ Error: {0}</string>
+   <string name="warning">⚠ Attention: {0}</string>
    
    <!-- Basic error messages -->
    <string name="unknown_channel">❌ Unknown channel</string>
