@@ -1,4 +1,4 @@
 sqlalchemy
 discord.py == 1.5.0
 python-dotenv
-MySQL-python
+mysqlclient
