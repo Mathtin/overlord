@@ -17,14 +17,15 @@ import os
 
 from logging import getLogger
 
-from sqlalchemy import create_engine, update
+from sqlalchemy import create_engine, update, event
 from sqlalchemy.exc import IntegrityError, DataError
 from sqlalchemy.orm import Session, sessionmaker
 
 from db.models.base import Base, BaseModel
 from db.models import *
 
-log = getLogger('db')
+log = getLogger('db')  
+
 
 class DBSession(object):
 
@@ -37,6 +38,16 @@ class DBSession(object):
         engine_url = os.getenv('DATABASE_ACCESS_URL')
         log.info(f'Connecting to {engine_url}')
         self.db_engine = create_engine(engine_url)
+
+        if 'mysql' in self.db_engine:
+            def set_unicode(dbapi_conn, conn_record):
+                cursor = dbapi_conn.cursor()
+                try:
+                    cursor.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
+                except Exception as e:
+                    log.debug(e)
+            event.listens_for(self.db_engine, "connect")(set_unicode)
+        
         Base.metadata.create_all(self.db_engine)
         session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
         self._session = session_factory()
