@@ -13,13 +13,13 @@
 
 __author__ = 'Mathtin'
 
-from sqlalchemy import Column, Integer, VARCHAR
+from sqlalchemy import Column, Integer, VARCHAR, BigInteger
 from .base import BaseModel
 
 class User(BaseModel):
     __tablename__ = 'users'
 
-    did = Column(Integer, nullable=False, unique=True)
+    did = Column(BigInteger, nullable=False, unique=True)
     name = Column(VARCHAR(127), nullable=False)
     disc = Column(Integer, nullable=False)
     display_name = Column(VARCHAR(127), nullable=True)

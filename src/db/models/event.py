@@ -13,7 +13,7 @@
 
 __author__ = 'Mathtin'
 
-from sqlalchemy import Column, VARCHAR, Integer, ForeignKey, Text
+from sqlalchemy import Column, VARCHAR, Integer, ForeignKey, Text, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql.schema import Index
@@ -64,8 +64,8 @@ class MemberEvent(Event, BaseModel):
 class MessageEvent(Event, BaseModel):
     __tablename__ = 'message_events'
 
-    message_id = Column(Integer, nullable=False, index=True)
-    channel_id = Column(Integer, nullable=False, index=True)
+    message_id = Column(BigInteger, nullable=False, index=True)
+    channel_id = Column(BigInteger, nullable=False, index=True)
 
     __table_args__ = (Index('cix_message_events', "user_id"), )
 
@@ -77,7 +77,7 @@ class MessageEvent(Event, BaseModel):
 class VoiceChatEvent(Event, BaseModel):
     __tablename__ = 'vc_events'
 
-    channel_id = Column(Integer, nullable=False, index=True)
+    channel_id = Column(BigInteger, nullable=False, index=True)
 
     __table_args__ = (Index('cix_vc_events', "user_id", "channel_id", "created_at"), )
 

@@ -13,13 +13,13 @@
 
 __author__ = 'Mathtin'
 
-from sqlalchemy import Column, VARCHAR, Integer, Text
+from sqlalchemy import Column, VARCHAR, Integer, BigInteger
 from .base import BaseModel
 
 class Role(BaseModel):
     __tablename__ = 'roles'
 
-    did = Column(Integer, nullable=False, unique=True)
+    did = Column(BigInteger, nullable=False, unique=True)
     name = Column(VARCHAR(63), unique=True, nullable=False)
     idx = Column(Integer, unique=True, nullable=False)
 
