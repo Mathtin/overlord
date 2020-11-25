@@ -39,7 +39,7 @@ class DBSession(object):
         log.info(f'Connecting to {engine_url}')
         self.db_engine = create_engine(engine_url)
 
-        if 'mysql' in self.db_engine:
+        if 'mysql' in engine_url:
             def set_unicode(dbapi_conn, conn_record):
                 cursor = dbapi_conn.cursor()
                 try:
