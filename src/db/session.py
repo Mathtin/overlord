@@ -39,16 +39,6 @@ class DBSession(object):
         engine_url = os.getenv('DATABASE_ACCESS_URL')
         log.info(f'Connecting to {engine_url}')
         self.db_engine = create_engine(engine_url)
-
-        if 'mysql' in engine_url:
-            def set_unicode(dbapi_conn, conn_record):
-                cursor = dbapi_conn.cursor()
-                try:
-                    cursor.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
-                except Exception as e:
-                    log.debug(e)
-            event_listens_for(self.db_engine, "connect")(set_unicode)
-        
         Base.metadata.create_all(self.db_engine)
         session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
         self._session = session_factory()
