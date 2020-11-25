@@ -17,9 +17,10 @@ import os
 
 from logging import getLogger
 
-from sqlalchemy import create_engine, update, event
+from sqlalchemy import create_engine, update
 from sqlalchemy.exc import IntegrityError, DataError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.event import listens_for as event_listens_for
 
 from db.models.base import Base, BaseModel
 from db.models import *
@@ -46,7 +47,7 @@ class DBSession(object):
                     cursor.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
                 except Exception as e:
                     log.debug(e)
-            event.listens_for(self.db_engine, "connect")(set_unicode)
+            event_listens_for(self.db_engine, "connect")(set_unicode)
         
         Base.metadata.create_all(self.db_engine)
         session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
