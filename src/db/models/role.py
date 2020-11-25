@@ -13,14 +13,14 @@
 
 __author__ = 'Mathtin'
 
-from sqlalchemy import Column, VARCHAR, Integer, BigInteger
+from sqlalchemy import Column, Unicode, Integer, BigInteger
 from .base import BaseModel
 
 class Role(BaseModel):
     __tablename__ = 'roles'
 
     did = Column(BigInteger, nullable=False, unique=True)
-    name = Column(VARCHAR(63), unique=True, nullable=False)
+    name = Column(Unicode(63), unique=True, nullable=False)
     idx = Column(Integer, unique=True, nullable=False)
 
     def __repr__(self):
