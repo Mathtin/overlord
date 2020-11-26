@@ -235,7 +235,7 @@ class Overlord(discord.Client):
             return
         self.__awaiting_role_sync = True
         self.__awaiting_user_sync = True
-        await self.send_warning('Awaiting role syncronization.')
+        await self.send_warning('Awaiting role syncronization')
 
     async def send_warning(self, msg: str):
         if self.error_channel is not None:
@@ -474,6 +474,9 @@ class Overlord(discord.Client):
         if cmd_name not in self.commands:
             await message.channel.send(res.get("messages.unknown_command"))
             return
+
+        if self.__awaiting_role_sync or self.__awaiting_user_sync:
+            await self.send_warning('Awaiting role syncronization')
         
         await self.commands[cmd_name](self, message, prefix, argv)
 
