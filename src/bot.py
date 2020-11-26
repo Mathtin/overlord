@@ -42,7 +42,7 @@ def after_initialized(func):
 
 def skip_bots(func):
     async def _func(self, obj, *args, **kwargs):
-        if isinstance(obj, discord.User):
+        if isinstance(obj, discord.User) or isinstance(obj, discord.Member):
             if self.is_bot(obj):
                 return
         elif isinstance(obj, discord.Message): 
@@ -593,7 +593,7 @@ class Overlord(discord.Client):
             row = conv.member_row(after, self.role_map)
             user = self.db.update(db.User, 'did', row)
             if user is None:
-                log.warn(f'{qualified_name(user)} does not exist in db! Skipping user update event!')
+                log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
                 return
             log.debug(f'User update {row}')
             self.db.commit()
@@ -615,7 +615,7 @@ class Overlord(discord.Client):
             if self.config["user.leave.keep"]:
                 user = self.db.update(db.User, 'did', row)
                 if user is None:
-                    log.warn(f'{qualified_name(user)} does not exist in db! Skipping user leave event!')
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
                     return
                 # Add event
                 e_row = conv.user_leave_row(user, self.event_type_map)
@@ -625,7 +625,7 @@ class Overlord(discord.Client):
                 log.debug(f'User leave (deleting) {row}')
                 user = self.db.delete(db.User, 'did', row)
                 if user is None:
-                    log.warn(f'{qualified_name(user)} does not exist in db! Skipping user leave event!')
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
                     return
             self.db.commit()
 
