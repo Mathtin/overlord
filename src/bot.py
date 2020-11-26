@@ -131,7 +131,11 @@ class Overlord(discord.Client):
         self.event_type_map = {row.name:row.id for row in self.db.query(db.EventType)}
         self.user_stat_type_map = {row.name:row.id for row in self.db.query(db.UserStatType)}
 
-        # Preset some values initiated on_ready
+        # Preset values initiated on_ready
+        self.guild = None
+        self.control_channel = None
+        self.error_channel = None
+        self.role_map = {}
         self.commands = {}
         self.bot_members = {}
 
@@ -370,7 +374,7 @@ class Overlord(discord.Client):
             self.control_channel = channel
 
             # Attach error channel
-            if self.error_channel_id is not None:
+            if self.error_channel_id:
                 channel = self.get_channel(self.error_channel_id)
                 if channel is None:
                     raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
