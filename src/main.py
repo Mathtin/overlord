@@ -45,7 +45,6 @@ def main(argv):
     session = DBSession(autocommit=False)
     session.sync_table(EventType, 'name', EVENT_TYPES)
     session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
-    session.commit()
 
     # Init bot
     discord_bot = Overlord(config.bot, session)

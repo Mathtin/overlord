@@ -26,7 +26,7 @@ import db.converters as conv
 
 from util import *
 import util.resources as res
-from typing import Optional
+from typing import List, Optional
 
 log = logging.getLogger('overlord-bot')
 
@@ -100,6 +100,7 @@ class Overlord(discord.Client):
     control_channel: discord.TextChannel
     error_channel: discord.TextChannel
     role_map: dict
+    role_obj_name_map: dict
     commands: dict
     bot_members: dict
 
@@ -136,6 +137,7 @@ class Overlord(discord.Client):
         self.control_channel = None
         self.error_channel = None
         self.role_map = {}
+        self.role_obj_name_map = {}
         self.commands = {}
         self.bot_members = {}
 
@@ -143,13 +145,13 @@ class Overlord(discord.Client):
     # Getters #
     ###########
 
-    def event_type_id(self, name):
+    def event_type_id(self, name) -> int:
         return self.event_type_map[name]
 
-    def user_stat_type_id(self, name):
+    def user_stat_type_id(self, name) -> int:
         return self.user_stat_type_map[name]
 
-    def sync(self):
+    def sync(self) -> asyncio.Lock:
         return self.__async_lock
 
     def is_bot_message(self, msg: discord.Message) -> bool:
@@ -169,32 +171,30 @@ class Overlord(discord.Client):
     def check_afk_state(self, state: discord.VoiceState) -> bool:
         return not state.afk or not self.config["event.voice.afk.ignore"]
 
-    def is_special_channel_id(self, channel_id: int):
+    def is_special_channel_id(self, channel_id: int) -> bool:
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
-    def get_user_stat(self, user: db.User, stat_name: str):
+    def get_user_stat(self, user: db.User, stat_name: str) -> int:
         stat = q.get_user_stat_by_id(self.db, user.id, self.user_stat_type_map[stat_name])
         return stat.value if stat is not None else 0
 
-    def can_apply_rank(self, user: db.User, rank: ConfigView):
+    def can_apply_rank(self, user: db.User, rank: ConfigView) -> bool:
         messages = self.get_user_stat(user, "new_message_count") - self.get_user_stat(user, "delete_message_count")
         vc_time = self.get_user_stat(user, "vc_time")
         return messages >= rank["messages"] and vc_time >= rank["vc"]
 
-    def get_member_rank_roles(self, member: discord.Member) -> Optional[str]:
-        res = []
-        for rank_name in self.config.role.ranks:
-            if is_role_applied(member, rank_name):
-                res.append(rank_name)
-        return res
+    def get_member_rank_roles(self, member: discord.Member) -> List[discord.Role]:
+        rank_roles = []
+        for rank_name in self.config.role['ranks']:
+            rank_roles.append(self.get_role(rank_name))
+        return filter_roles(member, rank_roles)
 
-    def get_role(self, role_name: str):
-        for r in self.guild.roles:
-            if r.name == role_name:
-                return r
+    def get_role(self, role_name: str) -> Optional[discord.Role]:
+        if role_name in self.role_obj_name_map:
+            return self.role_obj_name_map[role_name]
         return None
 
-    def is_admin(self, user: discord.Member):
+    def is_admin(self, user: discord.Member) -> bool:
         roles = self.config["role.admin"]
         return len(filter_roles(user, roles)) > 0
 
@@ -244,10 +244,10 @@ class Overlord(discord.Client):
 
     async def sync_roles(self):
         log.info('Syncing roles')
+        self.role_obj_name_map = { role.name: role for role in self.guild.roles }
         roles = conv.roles_to_rows(self.guild.roles)
         self.role_map = { role['did']: role for role in roles }
         self.db.sync_table(db.Role, 'did', roles)
-        self.db.commit()
         self.__awaiting_role_sync = False
         log.info('Syncing roles done')
 
@@ -391,16 +391,16 @@ class Overlord(discord.Client):
                 check_coroutine(hook)
                 self.commands[cmd] = hook
 
+            # Sync roles and users
+            await self.sync_roles()
+            await self.sync_users()
+
             # Check ranks config
             ranks = self.config["role.ranks"]
             for rank_name in ranks:
                 _ = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
                 if self.get_role(rank_name) is None:
                     raise InvalidConfigException("Bad role name", "bot.role.ranks")
-
-            # Sync roles and users
-            await self.sync_roles()
-            await self.sync_users()
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])

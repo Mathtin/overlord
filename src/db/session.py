@@ -105,10 +105,12 @@ class DBSession(object):
                 if getattr(row, col) != new_values[col]:
                     setattr(row, col, new_values[col])
             del index[p]
+        self.commit()
 
         for id in index:
             new_values = index[id]
             self.add(model, new_values)
+        self.commit()
 
     def update_or_add(self, model: BaseModel, pk: str, value: dict):
         res = self.update(model, pk, value)
