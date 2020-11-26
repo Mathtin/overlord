@@ -226,6 +226,13 @@ class Overlord(discord.Client):
             await self.error_channel.send(res.get("messages.error").format(msg))
         return
 
+    async def set_awaiting_sync(self):
+        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+            return
+        self.__awaiting_role_sync = True
+        self.__awaiting_user_sync = True
+        await self.send_warning('Awaiting role syncronization.')
+
     async def send_warning(self, msg: str):
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.warning").format(msg))
@@ -648,7 +655,7 @@ class Overlord(discord.Client):
                 return
             # Apply constraints
             event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-            if event.type_id == self.event_type_id("vc_join"):
+            if event is not None and event.type_id == self.event_type_id("vc_join"):
                 # Skip absent vc leave
                 log.warn(f'VC leave event is absent for {qualified_name(member)} in <{channel.name}! Removing last vc join event!')
                 self.db.delete_model(event)
@@ -676,7 +683,7 @@ class Overlord(discord.Client):
                 return
             # Apply constraints
             join_event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-            if join_event.type_id != self.event_type_id("vc_join"):
+            if join_event is None or join_event.type_id != self.event_type_id("vc_join"):
                 # Skip absent vc join
                 log.warn(f'VC join event is absent for {qualified_name(member)} in <{channel.name}! Skipping vc leave event!')
                 return

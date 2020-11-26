@@ -197,7 +197,7 @@ async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: dis
 @cmdcoro
 async def clear_data(client: bot.Overlord, msg: discord.Message):
 
-    models = [db.MemberEvent, db.MessageEvent, db.VoiceChatEvent, db.UserStat]
+    models = [db.MemberEvent, db.MessageEvent, db.VoiceChatEvent, db.UserStat, db.User, db.Role]
     table_data_drop = res.get("messages.table_data_drop")
 
     # Tranaction begins
@@ -209,5 +209,6 @@ async def clear_data(client: bot.Overlord, msg: discord.Message):
             await client.control_channel.send(table_data_drop.format(model.table_name()))
             client.db.query(model).delete()
             client.db.commit()
+        await client.set_awaiting_sync()
         log.info(f'Done')
         await client.control_channel.send(res.get("messages.done"))
