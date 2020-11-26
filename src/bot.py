@@ -20,9 +20,6 @@ import asyncio
 import logging
 
 import discord
-from discord import channel
-from discord import member
-from sqlalchemy import schema
 import db
 import db.queries as q
 import db.converters as conv

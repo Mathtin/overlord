@@ -15,7 +15,6 @@ __author__ = 'Mathtin'
 
 import logging
 
-from sqlalchemy.orm import query
 import bot
 import db
 import db.queries as q
@@ -195,3 +194,20 @@ async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: dis
     answer = f'{header}\n{new_msg_stat_line}\n{del_msg_stat_line}\n{vc_time_stat_line}\n'
     await msg.channel.send(answer)
     
+@cmdcoro
+async def clear_data(client: bot.Overlord, msg: discord.Message):
+
+    models = [db.MemberEvent, db.MessageEvent, db.VoiceChatEvent, db.UserStat]
+    table_data_drop = res.get("messages.table_data_drop")
+
+    # Tranaction begins
+    async with client.sync():
+        log.warn("Clearing database")
+        await client.send_warning("Clearing database")
+        for model in models:
+            log.warn(f"Clearing table `{model.table_name()}`")
+            await client.control_channel.send(table_data_drop.format(model.table_name()))
+            client.db.query(model).delete()
+            client.db.commit()
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))
