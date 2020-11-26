@@ -284,12 +284,11 @@ class Overlord(discord.Client):
             return
         # Resolve user rank
         rank_name = self.find_user_rank(user)
-        if rank_name is None:
-            return
-        log.debug(f"Updating {qualified_name(member)}'s rank: {rank_name}'")
-        if is_role_applied(member, rank_name):
-            log.debug(f"No updating required")
-            return
+        if rank_name is not None:
+            log.debug(f"Updating {qualified_name(member)}'s rank: {rank_name}'")
+            if is_role_applied(member, rank_name):
+                log.debug(f"No updating required")
+                return
         # Get and remove already applied ranks
         applied_rank_roles = self.get_member_rank_roles(member)
         if applied_rank_roles:
@@ -297,6 +296,8 @@ class Overlord(discord.Client):
             log.info(f"Removing {qualified_name(member)}'s rank roles: {applied_rank_names}")
             await member.remove_roles(*applied_rank_roles)
         # Apply new rank
+        if rank_name is None:
+            return
         log.info(f"Adding rank role to {qualified_name(member)}: {rank_name}")
         await member.add_roles(self.get_role(rank_name))
         # Update user in db
