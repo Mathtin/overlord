@@ -56,7 +56,7 @@ def parse_control_message(prefix: str, message: discord.Message):
     for line in lines:
         if line[:2] == '> ':
             if merging:
-                merging_val += ' ' + line[2:]
+                merging_val += '\n' + line[2:]
             else:
                 merging = True
                 merging_val = line[2:]
