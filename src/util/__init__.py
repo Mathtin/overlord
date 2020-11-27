@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from os import replace
 from .config import ConfigView
 from .exceptions import InvalidConfigException, NotCoroutineException
 from .resources import get as get_resource
@@ -47,7 +48,28 @@ def parse_control_message(prefix: str, message: discord.Message):
     if msg_prefix != prefix or msg_suffix == "":
         return None
 
-    return shlex.split(msg_suffix)
+    lines = [l.strip() for l in msg_suffix.splitlines()]
+    res = shlex.split(lines[0])
+    lines = lines[1:]
+    merging = False
+    merging_val = ''
+    for line in lines:
+        if line[:2] == '> ':
+            if merging:
+                merging_val += ' ' + line[2:]
+            else:
+                merging = True
+                merging_val = line[2:]
+            continue
+        elif merging:
+            res.append(merging_val)
+            merging = False
+            merging_val = ''
+        res += shlex.split(line)
+    if merging:
+        res.append(merging_val)
+
+    return res
 
 def check_coroutine(func):
     if not asyncio.iscoroutinefunction(func):
@@ -126,6 +148,9 @@ def is_user_member(user: discord.User):
 
 def qualified_name(user: discord.User):
     return f'{user.name}#{user.discriminator}'
+
+def quote_msg(msg: str):
+    return '\n'.join(['> '+l for l in ('`'+msg.replace("`","\\`")+'`').splitlines()])
 
 def get_channel_env_var_name(n):
     return f'DISCORD_CHANNEL_{n}'

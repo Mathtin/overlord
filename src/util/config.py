@@ -75,10 +75,25 @@ def check_with_schema(schema: dict, v):
 
 class ConfigView(object):
 
-    schema: dict
-    value = None
+    __schema: dict
+    __fpath: str
+
+    __value = None
+    __default_value = None
+    __parent = None
 
     def __init__(self, **kwargs):
+
+        self.__fpath = None
+        self.__schema = None
+
+        if 'fpath' in kwargs:
+            self.__fpath = kwargs['fpath']
+            del kwargs['fpath']
+        if 'parent' in kwargs:
+            self.__parent = kwargs['parent']
+            del kwargs['parent']
+
         if 'path' in kwargs and 'schema_name' in kwargs:
             self.__construct3(**kwargs)
         elif 'value' in kwargs and 'schema_name' in kwargs:
@@ -89,10 +104,10 @@ class ConfigView(object):
             raise InvalidArgument("Bad kwargs")
 
     def __construct1(self, schema: dict, value):
-        self.schema = schema
-        self.value = value
-        self.default_config = default_by_schema(self.schema)
-        check_with_schema(self.schema, self.value)
+        self.__schema = schema
+        self.__value = value
+        self.__default_value = default_by_schema(self.__schema)
+        check_with_schema(self.__schema, self.__value)
 
     def __construct2(self, schema_name: str, value):
         config_schema_path = res_path(f'{schema_name}.json')
@@ -101,11 +116,12 @@ class ConfigView(object):
         self.__construct1(schema, value)
 
     def __construct3(self, schema_name: str, path: str):
+        self.__fpath = path
         if not os.path.exists(path):
             # if config not exist dump default
             with open(path, "w") as f:
-                json.dump(self.default_config, f)
-            value = self.default_config
+                json.dump(self.__default_value, f, indent=4)
+            value = self.__default_value
         else:
             # if config do exist load it
             with open(path, "r") as f:
@@ -114,7 +130,7 @@ class ConfigView(object):
 
     def contains(self, path: str):
         keys = path.split('.')
-        node = self.default_config
+        node = self.__default_value
         for el in keys:
             if el not in node:
                 return False
@@ -122,10 +138,12 @@ class ConfigView(object):
         return True
 
     def path(self, path: str, schema_name=None):
+        if path == '.':
+            return self
         keys = path.split('.')
-        node = self.value
-        default_node = self.default_config
-        schema_node = self.schema
+        node = self.__value
+        default_node = self.__default_value
+        schema_node = self.__schema
         found = True
         for el in keys:
             if el not in default_node:
@@ -137,41 +155,74 @@ class ConfigView(object):
             default_node = default_node[el]
             schema_node = schema_node["properties"][el]
         node = node if found else default_node
-        res = ConfigView(schema=schema_node, value=node)
+        res = ConfigView(schema=schema_node, value=node, fpath=self.fpath(), parent=self.parent())
         if schema_name is not None:
             res = res.with_schema(schema_name)
         return res
 
+    def alter(self, path: str, value):
+        if path == '.':
+            self.__construct1(self.__schema, value)
+            return
+        keys = path.split('.')
+        last_key = keys[-1]
+        keys = keys[:-1]
+        node = self.__value
+        default_node = self.__default_value
+        schema_node = self.__schema
+        for el in keys:
+            if el not in default_node:
+                raise KeyError(f"No such path '{path}' in config schema")
+            elif el not in node:
+                node[el] = copy.deepcopy(default_node[el])
+            node = node[el]
+            default_node = default_node[el]
+            schema_node = schema_node["properties"][el]
+        node[last_key] = value
+        self.__construct1(self.__schema, self.__value)
+
     def get(self, path: str):
-        return self.path(path).value
+        return self.path(path).__value
+
+    def parent(self):
+        return self.__parent if self.__parent is not None else self
+
+    def schema(self):
+        return self.__schema
+
+    def fpath(self):
+        return self.__fpath
+
+    def value(self):
+        return self.__value
 
     def copy(self):
-        schema = copy.deepcopy(self.schema)
-        value = copy.deepcopy(self.value)
-        return ConfigView(schema=schema, value=value)
+        schema = copy.deepcopy(self.__schema)
+        value = copy.deepcopy(self.__value)
+        return ConfigView(schema=schema, value=value, fpath=self.__fpath, parent=self.__parent)
 
     def with_schema(self, schema_name: str):
-        return ConfigView(schema_name=schema_name, value=copy.deepcopy(self.value))
+        return ConfigView(schema_name=schema_name, value=copy.deepcopy(self.__value), fpath=self.__fpath, parent=self.__parent)
 
     def __bool__(self):
-        return self.value.__bool__()
+        return bool(self.__value)
 
     def __getitem__(self, path):
         return self.get(path)
 
     def __setitem__(self, path, item):
         keys = path.split('.')
-        node = self.value
+        node = self.__value
         for el in keys[:-1]:
             if el not in node:
                 node[el] = {}
             node = node[el]
         node[keys[-1]] = item
-        check_with_schema(self.schema, self.value)
+        check_with_schema(self.__schema, self.__value)
         return self.get(path)
 
     def __getattr__(self, key):
         return self.path(key)
 
     def __iter__(self):
-        return self.default_config.__iter__()
+        return self.__default_value.__iter__()

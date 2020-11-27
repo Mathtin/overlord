@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+import json
 import logging
 
 import bot
@@ -212,3 +213,51 @@ async def clear_data(client: bot.Overlord, msg: discord.Message):
         await client.set_awaiting_sync()
         log.info(f'Done')
         await client.control_channel.send(res.get("messages.done"))
+
+@cmdcoro
+async def reload_config(client: bot.Overlord, msg: discord.Message):
+    log.info(f'Reloading config')
+    # Reload config
+    parent_config = client.config.parent()
+    new_config = ConfigView(path=parent_config.fpath(), schema_name="config_schema")
+    if new_config['logger']:
+        logging.config.dictConfig(new_config['logger'])
+    client.config = new_config.bot
+    log.info(f'Done')
+    await client.control_channel.send(res.get("messages.done"))
+
+@cmdcoro
+async def save_config(client: bot.Overlord, msg: discord.Message):
+    log.info(f'Saving config')
+    parent_config = client.config.parent()
+    with open(parent_config.fpath(), "w") as f:
+        json.dump(parent_config.value(), f, indent=4)
+    log.info(f'Done')
+    await client.control_channel.send(res.get("messages.done"))
+
+@cmdcoro
+async def get_config_value(client: bot.Overlord, msg: discord.Message, path: str):
+    parent_config = client.config.parent()
+    try:
+        value = parent_config[path]
+        value_s = quote_msg(json.dumps(value, indent=4))
+        header = res.get("messages.config_value_header")
+        await client.control_channel.send(f'{header}\n{value_s}')
+    except KeyError:
+        await client.control_channel.send(res.get("messages.invalid_config_path"))
+
+@cmdcoro
+async def alter_config(client: bot.Overlord, msg: discord.Message, path: str, value: str):
+    log.info(f'Altering config')
+    parent_config = client.config.parent()
+    try:
+        value_obj = json.loads(value)
+        parent_config.alter(path, value_obj)
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))
+    except json.decoder.JSONDecodeError:
+        log.info(f'Invalid json value provided: {value}')
+        await client.control_channel.send(res.get("messages.invalid_json_value"))
+    except KeyError:
+        log.info(f'Invalid config path provided: {path}')
+        await client.control_channel.send(res.get("messages.invalid_config_path"))

@@ -101,7 +101,6 @@ class Overlord(discord.Client):
     error_channel: discord.TextChannel
     role_map: dict
     role_obj_name_map: dict
-    commands: dict
     bot_members: dict
 
     def __init__(self, config: ConfigView, db_session: db.DBSession):
@@ -138,7 +137,6 @@ class Overlord(discord.Client):
         self.error_channel = None
         self.role_map = {}
         self.role_obj_name_map = {}
-        self.commands = {}
         self.bot_members = {}
 
     ###########
@@ -384,13 +382,6 @@ class Overlord(discord.Client):
                 log.info(f'Attached to {channel.name} as error channel ({channel.id})')
                 self.error_channel = channel
 
-            # Attach control hooks
-            control_hooks = self.config["commands"]
-            for cmd in control_hooks:
-                hook = get_module_element(control_hooks[cmd])
-                check_coroutine(hook)
-                self.commands[cmd] = hook
-
             # Sync roles and users
             await self.sync_roles()
             await self.sync_users()
@@ -460,11 +451,13 @@ class Overlord(discord.Client):
             
         cmd_name = argv[0]
 
+        control_hooks = self.config["commands"]
+
         if cmd_name == "help":
             help_lines = []
             line_fmt = res.get("messages.commands_list_entry")
-            for cmd in self.commands:
-                hook = self.commands[cmd]
+            for cmd in control_hooks:
+                hook = get_module_element(control_hooks[cmd])
                 base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
                 help_lines.append(line_fmt.format(base_line))
             help_header = res.get("messages.commands_list_head")
@@ -472,14 +465,16 @@ class Overlord(discord.Client):
             await message.channel.send(f'{help_header}\n{help_msg}\n')
             return
 
-        if cmd_name not in self.commands:
+        if cmd_name not in control_hooks:
             await message.channel.send(res.get("messages.unknown_command"))
             return
 
         if self.__awaiting_role_sync or self.__awaiting_user_sync:
             await self.send_warning('Awaiting role syncronization')
         
-        await self.commands[cmd_name](self, message, prefix, argv)
+        hook = get_module_element(control_hooks[cmd_name])
+        check_coroutine(hook)
+        await hook(self, message, prefix, argv)
 
     
     @after_initialized

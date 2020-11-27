@@ -51,4 +51,9 @@
    <!-- control.py: clear_data -->
    <string name="table_data_drop">🗑 Clearing `{0}` table data</string>
 
+   <!-- control.py: get_config_value/alter_config -->
+   <string name="invalid_config_path">❌ Invalid config path</string>
+   <string name="invalid_json_value">❌ Unable to decode json value</string>
+   <string name="config_value_header">⚙ Config value:</string>
+
 </resources>
