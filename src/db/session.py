@@ -16,6 +16,7 @@ __author__ = 'Mathtin'
 import os
 
 from logging import getLogger
+from datetime import datetime
 
 from sqlalchemy import create_engine, update
 from sqlalchemy.exc import IntegrityError, DataError
@@ -30,24 +31,34 @@ log = getLogger('db')
 
 class DBSession(object):
 
-    _session: Session
+    __session: Session
 
     # Main DB Connection Ref Obj
     db_engine = None
+    session_factory = None
 
     def __init__(self, autocommit=True, autoflush=True):
         engine_url = os.getenv('DATABASE_ACCESS_URL')
         log.info(f'Connecting to {engine_url}')
         self.db_engine = create_engine(engine_url, pool_recycle=60)
         Base.metadata.create_all(self.db_engine)
-        session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
-        self._session = session_factory()
+        self.session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
+        self.__last_connection = None
+        self.__check_connection()
+
+    def __check_connection(self):
+        now = datetime.now()
+        if self.__last_connection is None or (now - self.__last_connection).total_seconds() > 4:
+            self.__session = self.session_factory()
+            self.__last_connection = now
 
     def query(self, *entities, **kwargs):
-        return self._session.query(*entities, **kwargs)
+        self.__check_connection()
+        return self.__session.query(*entities, **kwargs)
 
     def execute(self, *entities, **kwargs):
-        return self._session.execute(*entities, **kwargs)
+        self.__check_connection()
+        return self.__session.execute(*entities, **kwargs)
 
     def add(self, model: BaseModel, value: dict, need_flush: bool = False):
         row = model(**value)
@@ -55,12 +66,14 @@ class DBSession(object):
         return row
 
     def add_model(self, model: BaseModel, need_flush: bool = False):
-        self._session.add(model)
+        self.__check_connection()
+        self.__session.add(model)
         if need_flush:
-            self._session.flush([model])
+            self.__session.flush([model])
 
     def add_all(self, models: list):
-        self._session.add_all(models)
+        self.__check_connection()
+        self.__session.add_all(models)
 
     def delete(self, model: BaseModel, pk: str, value: dict):
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
@@ -70,16 +83,18 @@ class DBSession(object):
         return row
 
     def delete_model(self, model: BaseModel):
+        self.__check_connection()
         try:
-            self._session.delete(model)
+            self.__session.delete(model)
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
         except DataError as e:
             log.error(f'`{__name__}` {e}')
 
     def commit(self, need_close: bool = False):
+        self.__check_connection()
         try:
-            self._session.commit()
+            self.__session.commit()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
@@ -91,6 +106,7 @@ class DBSession(object):
             self.close_session()
 
     def sync_table(self, model: BaseModel, pk: str, values: list):
+        self.__check_connection()
         index = {}
         for v in values:
             index[v[pk]] = v
@@ -119,6 +135,7 @@ class DBSession(object):
         return res
 
     def update(self, model: BaseModel, pk: str, value: dict):
+        self.__check_connection()
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
         if row is None:
             return None
@@ -128,12 +145,13 @@ class DBSession(object):
         return row
 
     def touch(self, model: BaseModel, id: int):
+        self.__check_connection()
         stmt = update(model).where(model.id == id)
         self.execute(stmt)
 
     def close(self):
         try:
-            self._session.close()
+            self.__session.close()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
