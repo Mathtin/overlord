@@ -45,7 +45,8 @@
             "conf-reload": "control.reload_config",
             "conf-save": "control.save_config",
             "conf-get": "control.get_config_value",
-            "conf-set": "control.alter_config"
+            "conf-set": "control.alter_config",
+            "ranks": "control.get_ranks"
         },
         "control": {
             "prefix": "ov/"

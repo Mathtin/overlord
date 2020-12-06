@@ -38,6 +38,29 @@ def get_module_element(path: str):
     module = __module_cache[module_name]
     return getattr(module, object_name)
 
+def dict_fancy_table(values: dict, key_name='name'):
+    if not values:
+        return '++\n'*2
+
+    col0 = [key_name] + list(values.keys())
+    row_count = len(col0)
+    col_names = list(values[col0[-1]].keys())
+
+    to_col = lambda k: [k] + [values[v][k] for v in values]
+    table = [col0] + [to_col(k) for k in col_names]
+
+    col_width = lambda col: max(len(str(v)) for v in col)
+    cols_width = [col_width(col) for col in table]
+
+    cols_format = [f'{{:{w}}}' for w in cols_width]
+    str_row_values = lambda i: [cols_format[j].format(col[i]) for (j,col) in enumerate(table)]
+    format_line = lambda i: '| ' + ' | '.join(str_row_values(i)) + ' |\n'
+    separator = '+-' + '-+-'.join(['-'*w for w in cols_width]) + '-+\n'
+
+    lines = [format_line(i) for i in range(row_count)]
+    return separator + separator.join(lines) + separator
+
+
 def parse_control_message(prefix: str, message: discord.Message):
     prefix_len = len(prefix)
     msg = message.content.strip()

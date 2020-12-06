@@ -261,3 +261,10 @@ async def alter_config(client: bot.Overlord, msg: discord.Message, path: str, va
     except KeyError:
         log.info(f'Invalid config path provided: {path}')
         await client.control_channel.send(res.get("messages.invalid_config_path"))
+
+@cmdcoro
+async def get_ranks(client: bot.Overlord, msg: discord.Message):
+    ranks = client.config["role.ranks"]
+    table_header = res.get('messages.rank_table_header')
+    table = dict_fancy_table(ranks, key_name='rank')
+    await msg.channel.send(f'{table_header}\n{quote_msg(table)}')

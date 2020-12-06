@@ -56,4 +56,7 @@
    <string name="invalid_json_value">❌ Unable to decode json value</string>
    <string name="config_value_header">⚙ Config value:</string>
 
+   <!-- control.py: get_ranks -->
+   <string name="rank_table_header">🎖 Ranks table 🎖</string>
+
 </resources>
