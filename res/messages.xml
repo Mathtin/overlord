@@ -56,7 +56,12 @@
    <string name="invalid_json_value">❌ Unable to decode json value</string>
    <string name="config_value_header">⚙ Config value:</string>
 
-   <!-- control.py: get_ranks -->
+   <!-- control.py: get_ranks/add_rank/remove_rank/edit_rank -->
    <string name="rank_table_header">🎖 Ranks table 🎖</string>
+   <string name="rank_arg_parse_error">❌ Weight, messages count and vc time should be integers</string>
+   <string name="rank_role_unknown">❌ No such role '{0}'</string>
+   <string name="rank_role_exists">❌ Rank already exists</string>
+   <string name="rank_role_same_weight">❌ Rank {0} have same weight</string>
+   <string name="rank_unknown">❌ No such rank '{0}'</string>
 
 </resources>

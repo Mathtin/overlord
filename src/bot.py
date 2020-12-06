@@ -214,6 +214,19 @@ class Overlord(discord.Client):
                 max_rank_name = rank_name
         return max_rank_name
 
+    def check_config(self):
+        # Check ranks config
+        ranks = self.config["role.ranks"]
+        ranks_weights = {}
+        for rank_name in ranks:
+            rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
+            if self.get_role(rank_name) is None:
+                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.role.ranks")
+            if rank['weight'] in ranks_weights:
+                dup_rank = ranks_weights[rank['weight']]
+                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.role.ranks")
+            ranks_weights[rank['weight']] = rank_name
+
     #################
     # Async methods #
     #################
@@ -386,12 +399,7 @@ class Overlord(discord.Client):
             await self.sync_roles()
             await self.sync_users()
 
-            # Check ranks config
-            ranks = self.config["role.ranks"]
-            for rank_name in ranks:
-                _ = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
-                if self.get_role(rank_name) is None:
-                    raise InvalidConfigException("Bad role name", "bot.role.ranks")
+            self.check_config()
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])

@@ -226,12 +226,16 @@ async def reload_config(client: bot.Overlord, msg: discord.Message):
     log.info(f'Done')
     await client.control_channel.send(res.get("messages.done"))
 
-@cmdcoro
-async def save_config(client: bot.Overlord, msg: discord.Message):
-    log.info(f'Saving config')
+def __save_config(client: bot.Overlord):
+    log.warn(f'Dumping raw config')
     parent_config = client.config.parent()
     with open(parent_config.fpath(), "w") as f:
         json.dump(parent_config.value(), f, indent=4)
+
+@cmdcoro
+async def save_config(client: bot.Overlord, msg: discord.Message):
+    log.info(f'Saving config')
+    __save_config(client)
     log.info(f'Done')
     await client.control_channel.send(res.get("messages.done"))
 
@@ -246,21 +250,42 @@ async def get_config_value(client: bot.Overlord, msg: discord.Message, path: str
     except KeyError:
         await client.control_channel.send(res.get("messages.invalid_config_path"))
 
-@cmdcoro
-async def alter_config(client: bot.Overlord, msg: discord.Message, path: str, value: str):
-    log.info(f'Altering config')
+async def __safe_alter_config(client: bot.Overlord, path: str, value):
     parent_config = client.config.parent()
+
     try:
-        value_obj = json.loads(value)
-        parent_config.alter(path, value_obj)
-        log.info(f'Done')
-        await client.control_channel.send(res.get("messages.done"))
-    except json.decoder.JSONDecodeError:
-        log.info(f'Invalid json value provided: {value}')
-        await client.control_channel.send(res.get("messages.invalid_json_value"))
+        old_value = parent_config[path]
     except KeyError:
         log.info(f'Invalid config path provided: {path}')
         await client.control_channel.send(res.get("messages.invalid_config_path"))
+        return False
+
+    log.warn(f'Altering raw config path {path}')
+    parent_config.alter(path, value)
+
+    try:
+        client.check_config()
+    except InvalidConfigException as e:
+        log.warn(f'Invalid config value provided: {value}, reason: {e}. Reverting.')
+        parent_config.alter(path, old_value)
+        msg = res.get("messages.error").format(e) + '\n' + res.get("messages.warning").format('Config reverted')
+        await client.control_channel.send(msg)
+        return False
+    
+    return True
+
+@cmdcoro
+async def alter_config(client: bot.Overlord, msg: discord.Message, path: str, value: str):
+    try:
+        value_obj = json.loads(value)
+    except json.decoder.JSONDecodeError:
+        log.info(f'Invalid json value provided: {value}')
+        await client.control_channel.send(res.get("messages.invalid_json_value"))
+        return
+
+    if await __safe_alter_config(client, path, value_obj):
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))
 
 @cmdcoro
 async def get_ranks(client: bot.Overlord, msg: discord.Message):
@@ -268,3 +293,87 @@ async def get_ranks(client: bot.Overlord, msg: discord.Message):
     table_header = res.get('messages.rank_table_header')
     table = dict_fancy_table(ranks, key_name='rank')
     await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
+
+@cmdcoro
+async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, messages_count: str, vc_time: str):
+    try:
+        weight = int(weight)
+        messages_count = int(messages_count)
+        vc_time = int(vc_time)
+    except ValueError:
+        await msg.channel.send(res.get("messages.rank_arg_parse_error"))
+        return
+    role = client.get_role(role_name)
+    if role is None:
+        await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
+        return
+    ranks = client.config.role.ranks.copy().value()
+    if role_name in ranks:
+        await msg.channel.send(res.get("messages.rank_role_exists"))
+        return
+    ranks_weights = {ranks[r]['weight']:r for r in ranks}
+    if weight in ranks_weights:
+        await msg.channel.send(res.get("messages.rank_role_same_weight").format(ranks_weights[weight]))
+        return
+    ranks[role_name] = {
+        "weight": weight,
+        "messages": messages_count,
+        "vc": vc_time
+    }
+    path = 'bot.role.ranks'
+
+    if await __safe_alter_config(client, path, ranks):
+        __save_config(client)
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))
+
+@cmdcoro
+async def remove_rank(client: bot.Overlord, msg: discord.Message, role_name: str):
+    role = client.get_role(role_name)
+    if role is None:
+        await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
+        return
+    ranks = client.config.role.ranks.copy().value()
+    if role_name not in ranks:
+        await msg.channel.send(res.get("messages.rank_unknown"))
+        return
+    del ranks[role_name]
+    path = 'bot.role.ranks'
+
+    if await __safe_alter_config(client, path, ranks):
+        __save_config(client)
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))
+
+@cmdcoro
+async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, messages_count: str, vc_time: str):
+    try:
+        weight = int(weight)
+        messages_count = int(messages_count)
+        vc_time = int(vc_time)
+    except ValueError:
+        await msg.channel.send(res.get("messages.rank_arg_parse_error"))
+        return
+    role = client.get_role(role_name)
+    if role is None:
+        await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
+        return
+    ranks = client.config.role.ranks.copy().value()
+    if role_name not in ranks:
+        await msg.channel.send(res.get("messages.rank_unknown"))
+        return
+    ranks_weights = {ranks[r]['weight']:r for r in ranks}
+    if weight in ranks_weights and ranks_weights[weight] != role_name:
+        await msg.channel.send(res.get("messages.rank_role_same_weight").format(ranks_weights[weight]))
+        return
+    ranks[role_name] = {
+        "weight": weight,
+        "messages": messages_count,
+        "vc": vc_time
+    }
+    path = 'bot.role.ranks'
+
+    if await __safe_alter_config(client, path, ranks):
+        __save_config(client)
+        log.info(f'Done')
+        await client.control_channel.send(res.get("messages.done"))

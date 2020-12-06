@@ -46,7 +46,10 @@
             "conf-save": "control.save_config",
             "conf-get": "control.get_config_value",
             "conf-set": "control.alter_config",
-            "ranks": "control.get_ranks"
+            "ranks": "control.get_ranks",
+            "ranks-add": "control.add_rank",
+            "ranks-remove": "control.remove_rank",
+            "ranks-edit": "control.edit_rank"
         },
         "control": {
             "prefix": "ov/"
@@ -95,6 +98,11 @@
                     "weight": 2,
                     "messages": 10,
                     "vc": 20
+                },
+                "Visitor": {
+                    "weight": 3,
+                    "messages": 123,
+                    "vc": 1234
                 }
             }
         }
