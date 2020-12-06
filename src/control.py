@@ -260,12 +260,11 @@ async def __safe_alter_config(client: bot.Overlord, path: str, value):
         await client.control_channel.send(res.get("messages.invalid_config_path"))
         return False
 
-    log.warn(f'Altering raw config path {path}')
-    parent_config.alter(path, value)
-
     try:
+        log.warn(f'Altering raw config path {path}')
+        parent_config.alter(path, value)
         client.check_config()
-    except InvalidConfigException as e:
+    except (InvalidConfigException, TypeError) as e:
         log.warn(f'Invalid config value provided: {value}, reason: {e}. Reverting.')
         parent_config.alter(path, old_value)
         msg = res.get("messages.error").format(e) + '\n' + res.get("messages.warning").format('Config reverted')
@@ -289,7 +288,7 @@ async def alter_config(client: bot.Overlord, msg: discord.Message, path: str, va
 
 @cmdcoro
 async def get_ranks(client: bot.Overlord, msg: discord.Message):
-    ranks = client.config["role.ranks"]
+    ranks = client.config["ranks.role"]
     table_header = res.get('messages.rank_table_header')
     table = dict_fancy_table(ranks, key_name='rank')
     await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
@@ -307,7 +306,7 @@ async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, w
     if role is None:
         await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
         return
-    ranks = client.config.role.ranks.copy().value()
+    ranks = client.config.ranks.role.copy().value()
     if role_name in ranks:
         await msg.channel.send(res.get("messages.rank_role_exists"))
         return
@@ -320,7 +319,7 @@ async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, w
         "messages": messages_count,
         "vc": vc_time
     }
-    path = 'bot.role.ranks'
+    path = 'bot.ranks.role'
 
     if await __safe_alter_config(client, path, ranks):
         __save_config(client)
@@ -333,12 +332,12 @@ async def remove_rank(client: bot.Overlord, msg: discord.Message, role_name: str
     if role is None:
         await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
         return
-    ranks = client.config.role.ranks.copy().value()
+    ranks = client.config.ranks.role.copy().value()
     if role_name not in ranks:
         await msg.channel.send(res.get("messages.rank_unknown"))
         return
     del ranks[role_name]
-    path = 'bot.role.ranks'
+    path = 'bot.ranks.role'
 
     if await __safe_alter_config(client, path, ranks):
         __save_config(client)
@@ -358,7 +357,7 @@ async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, 
     if role is None:
         await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
         return
-    ranks = client.config.role.ranks.copy().value()
+    ranks = client.config.ranks.role.copy().value()
     if role_name not in ranks:
         await msg.channel.send(res.get("messages.rank_unknown"))
         return
@@ -371,7 +370,7 @@ async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, 
         "messages": messages_count,
         "vc": vc_time
     }
-    path = 'bot.role.ranks'
+    path = 'bot.ranks.role'
 
     if await __safe_alter_config(client, path, ranks):
         __save_config(client)

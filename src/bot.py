@@ -193,7 +193,7 @@ class Overlord(discord.Client):
         return None
 
     def is_admin(self, user: discord.Member) -> bool:
-        roles = self.config["role.admin"]
+        roles = self.config["control.roles"]
         return len(filter_roles(user, roles)) > 0
 
     ################
@@ -204,7 +204,7 @@ class Overlord(discord.Client):
         super().run(self.token)
 
     def find_user_rank(self, user: db.User) -> Optional[str]:
-        ranks = self.config["role.ranks"]
+        ranks = self.config["ranks.role"]
         max_rank = {"weight": -1000}
         max_rank_name = None
         for rank_name in ranks:
@@ -215,16 +215,24 @@ class Overlord(discord.Client):
         return max_rank_name
 
     def check_config(self):
+        admin_roles = self.config["control.roles"]
+        for role_name in admin_roles:
+            if self.get_role(role_name) is None:
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.control.roles")
         # Check ranks config
-        ranks = self.config["role.ranks"]
+        admin_rank_roles = self.config["ranks.admin"]
+        for role_name in admin_rank_roles:
+            if self.get_role(role_name) is None:
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.admin")
+        ranks = self.config["ranks.role"]
         ranks_weights = {}
         for rank_name in ranks:
             rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
             if self.get_role(rank_name) is None:
-                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.role.ranks")
+                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.ranks.role")
             if rank['weight'] in ranks_weights:
                 dup_rank = ranks_weights[rank['weight']]
-                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.role.ranks")
+                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.ranks.role")
             ranks_weights[rank['weight']] = rank_name
 
     #################
@@ -291,7 +299,8 @@ class Overlord(discord.Client):
             log.error("Cannot update user rank: awaiting role sync")
             await self.send_error(f'Cannot update user rank: awaiting role sync')
             return
-        if self.is_admin(member):
+        # Ignore admin ranks
+        if len(filter_roles(member, self.config["ranks.admin"])) > 0:
             return
         # Resolve user rank
         rank_name = self.find_user_rank(user)
@@ -451,6 +460,9 @@ class Overlord(discord.Client):
 
             Calls appropriate control callback
         """
+        if not self.is_admin(message.author):
+            return
+
         prefix = self.config["control.prefix"]
         argv = parse_control_message(prefix, message)
 

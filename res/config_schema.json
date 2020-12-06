@@ -23,10 +23,15 @@
             "prefix": {
               "type": "string",
               "default": "!"
+            },
+            "roles": {
+              "type": "array",
+              "default": []
             }
           },
           "required": [
-            "prefix"
+            "prefix",
+            "roles"
           ]
         },
         "event": {
@@ -223,21 +228,21 @@
             "kick"
           ]
         },
-        "role": {
+        "ranks": {
           "type": "object",
           "properties": {
             "admin": {
               "type": "array",
               "default": []
             },
-            "ranks": {
+            "role": {
               "type": "object",
               "default": {}
             }
           },
           "required": [
             "admin",
-            "ranks"
+            "role"
           ]
         }
       },
@@ -246,7 +251,7 @@
         "commands",
         "control",
         "user",
-        "role",
+        "ranks",
         "egg_done"
       ]
     }

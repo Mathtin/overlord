@@ -52,7 +52,8 @@
             "ranks-edit": "control.edit_rank"
         },
         "control": {
-            "prefix": "ov/"
+            "prefix": "ov/",
+            "roles": ["CEO", "Director", "Supervisor"]
         },
         "user": {
             "leave": {
@@ -91,9 +92,9 @@
                 }
             }
         },
-        "role": {
-            "admin": [],
-            "ranks": {
+        "ranks": {
+            "admin": ["CEO", "Director", "Supervisor", "Operator"],
+            "role": {
                 "Shitposter": {
                     "weight": 2,
                     "messages": 10,
