@@ -209,7 +209,7 @@ class Overlord(discord.Client):
 
     def get_member_rank_roles(self, member: discord.Member) -> List[discord.Role]:
         rank_roles = []
-        for rank_name in self.config.role['ranks']:
+        for rank_name in self.config.ranks['role']:
             rank_roles.append(self.get_role(rank_name))
         return filter_roles(member, rank_roles)
 
