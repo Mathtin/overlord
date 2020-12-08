@@ -20,7 +20,7 @@
                 "class": "logging.handlers.RotatingFileHandler",
                 "filename": "overlord-bot.log",
                 "maxBytes": 1048576,
-                "backupCount": "4"
+                "backupCount": 4
             }
         },
         "root": {
@@ -38,8 +38,7 @@
             "update-ranks": "control.update_user_ranks",
             "update-rank": "control.update_user_rank",
             "reload-channel": "control.reload_channel_history",
-            "calc-message-stats": "control.calc_message_stats",
-            "calc-vc-stats": "control.calc_vc_stats",
+            "reload-stats": "control.recalculate_stats",
             "user-stats": "control.get_user_stats",
             "clear-data": "control.clear_data",
             "conf-reload": "control.reload_config",
@@ -57,7 +56,7 @@
         },
         "user": {
             "leave": {
-                "keep": false
+                "keep": true
             }
         },
         "event": {
@@ -97,11 +96,13 @@
             "role": {
                 "Shitposter": {
                     "weight": 2,
+                    "membership": 3,
                     "messages": 10,
                     "vc": 20
                 },
                 "Visitor": {
                     "weight": 3,
+                    "membership": 4,
                     "messages": 123,
                     "vc": 1234
                 }
