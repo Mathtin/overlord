@@ -15,12 +15,12 @@ __author__ = 'Mathtin'
 
 from datetime import datetime
 from sqlalchemy.orm.query import Query
-from sqlalchemy.sql.dml import Insert
+from sqlalchemy.sql.dml import Insert, Update
 from sqlalchemy.sql.elements import literal_column
 from sqlalchemy.sql.selectable import Select
 from sqlalchemy.sql.expression import cast
 from sqlalchemy.sql.sqltypes import Integer
-from sqlalchemy import func, insert, select, and_
+from sqlalchemy import func, insert, select, update, and_
 
 from .models import *
 from .session import DBSession
@@ -85,3 +85,7 @@ def select_vc_time_per_user(type_id: int, lit_values: list) -> Select:
 
 def insert_user_stat_from_select(select_query: Query) -> Insert:
     return insert(UserStat, inline=True).from_select(['value', 'user_id', 'type_id'], select_query)
+
+def update_inc_user_member_stat(stat_id: int) -> Update:
+    return update(UserStat).values(value=UserStat.value + 1)\
+        .where(UserStat.type_id == stat_id)

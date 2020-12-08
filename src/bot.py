@@ -87,9 +87,10 @@ class StatUpdate(commands.Cog):
     async def stat_updater(self):
         stat_id = self.client.user_stat_type_id("membership")
         async with self.client.sync():
-            self.client.db.query(DB.UserStat).join(DB.User)\
-                .filter(DB.User.roles != None, DB.UserStat.type_id == stat_id)\
-                .update({'value': DB.UserStat.value + 1})
+            user_ids = self.client.db.query(DB.User).filter_by(roles=None).with_entities(DB.User.id).subquery()
+            self.client.db.query(DB.UserStat).filter(DB.UserStat.user_id.in_(user_ids)).delete(synchronize_session='fetch')
+            self.client.db.commit()
+            self.client.db.execute(q.update_inc_user_member_stat(stat_id))
             self.client.db.commit()
             
     @stat_updater.before_loop
@@ -105,12 +106,13 @@ class Overlord(discord.Client):
     __initialized: bool
     __awaiting_role_sync: bool
     __awaiting_user_sync: bool
+    __awaiting_user_sync: bool
 
     # Members loaded from ENV
     token: str
     guild_id: int
     control_channel_id: int
-    error_channel_id: int
+    __stat_updater: StatUpdate
 
     # Members passed via constructor
     config: ConfigView
@@ -133,6 +135,7 @@ class Overlord(discord.Client):
         self.__initialized = False
         self.__awaiting_role_sync = True
         self.__awaiting_user_sync = True
+        self.__stat_updater = StatUpdate(self)
 
         self.config = config
         self.db = db_session
