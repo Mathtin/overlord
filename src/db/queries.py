@@ -29,7 +29,7 @@ def date_to_secs_sqlite(col):
     return cast(func.strftime('%s', col), Integer)
 
 def date_to_secs_mysql(col):
-    return cast(func.date_format(col, '%s'), Integer)
+    return func.unix_timestamp(col)
 
 MODE_SQLITE = 'sqlite'
 MODE_MYSQL = 'mysql'
