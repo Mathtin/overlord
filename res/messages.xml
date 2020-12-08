@@ -16,8 +16,9 @@
    <string name="not_member_user">❌ User is not member of this guild</string>
    
    <!-- User stat names -->
-   <string name="new_message_user_stat">new message count</string>
-   <string name="delete_message_user_stat">message deleted count</string>
+   <string name="membership_stat">Membership period (in days)</string>
+   <string name="new_message_user_stat">New message count</string>
+   <string name="delete_message_user_stat">Message deleted count</string>
    <string name="vc_time_user_stat">VC time (in seconds)</string>
 
    <!-- bot.py: on_control_message -->
@@ -58,7 +59,7 @@
 
    <!-- control.py: get_ranks/add_rank/remove_rank/edit_rank -->
    <string name="rank_table_header">🎖 Ranks table 🎖</string>
-   <string name="rank_arg_parse_error">❌ Weight, messages count and vc time should be integers</string>
+   <string name="rank_arg_parse_error">❌ Weight, membership, messages count and vc time should be integers</string>
    <string name="rank_role_unknown">❌ No such role '{0}'</string>
    <string name="rank_role_exists">❌ Rank already exists</string>
    <string name="rank_role_same_weight">❌ Rank {0} have same weight</string>

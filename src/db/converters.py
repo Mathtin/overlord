@@ -61,7 +61,8 @@ def member_row(user: d.Member, role_map: dict):
         'name': user.name,
         'disc': user.discriminator,
         'display_name': user.display_name,
-        'roles': role_mask(user, role_map)
+        'roles': role_mask(user, role_map),
+        'created_at': user.joined_at
     }
 
 def member_join_row(user: User, joined: datetime ,events: dict):

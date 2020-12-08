@@ -26,5 +26,6 @@ EVENT_TYPES = [
 USER_STAT_TYPES = [
     { 'name': 'new_message_count', 'description': 'overall message sent count per user' },
     { 'name': 'delete_message_count', 'description': 'overall message delete count per user' },
-    { 'name': 'vc_time', 'description': 'overall tim spent in voice chat per user in seconds' },
+    { 'name': 'vc_time', 'description': 'overall time spent in voice chat per user in seconds' },
+    { 'name': 'membership', 'description': 'days user being member of discord server' }
 ]

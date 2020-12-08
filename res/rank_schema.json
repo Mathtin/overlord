@@ -6,6 +6,10 @@
           "type": "integer",
           "default": 0
         },
+        "membership": {
+          "type": "integer",
+          "default": 0
+        },
         "messages": {
           "type": "integer",
           "default": 0

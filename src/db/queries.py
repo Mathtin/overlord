@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from datetime import datetime
 from sqlalchemy.orm.query import Query
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.sql.elements import literal_column
@@ -43,6 +44,14 @@ def get_last_vc_event_by_id(db: DBSession, id: int, channel_id: int) -> VoiceCha
 def get_user_stat_by_id(db: DBSession, id: int, type_id: int) -> UserStat:
     return db.query(UserStat)\
             .filter(and_(UserStat.user_id == id, UserStat.type_id == type_id)).first()
+
+def select_membership_time_per_user(type_id: int, lit_values: list) -> Select:
+    join_time = cast(func.strftime('%s', func.max(MemberEvent.created_at)), Integer)
+    current_time = int(datetime.now().timestamp())
+    membership_value = cast((current_time - join_time) / 86400, Integer).label('value')
+    lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
+    select_columns = [membership_value, MemberEvent.user_id] + lit_columns
+    return select(select_columns).where(and_(MemberEvent.type_id == type_id, User.roles != None)).group_by(MemberEvent.user_id)
 
 def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
     value_column = func.count(MessageEvent.id).label('value')

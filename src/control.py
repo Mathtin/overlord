@@ -140,9 +140,16 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
 
 
 @cmdcoro
-async def calc_message_stats(client: bot.Overlord, msg: discord.Message):
+async def recalculate_stats(client: bot.Overlord, msg: discord.Message):
     # Tranaction begins
     async with client.sync():
+
+        # Drop and recalculate "membership" user stats
+        stat_name = res.get("messages.membership_stat")
+        stat_id = client.user_stat_type_id("membership")
+        event_id = client.event_type_id("member_join")
+        await __drop_user_stats(client, stat_name, stat_id)
+        await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_membership_time_per_user)
 
         # Drop and recalculate "new message count" user stats
         stat_name = res.get("messages.new_message_user_stat")
@@ -157,15 +164,6 @@ async def calc_message_stats(client: bot.Overlord, msg: discord.Message):
         event_id = client.event_type_id("message_delete")
         await __drop_user_stats(client, stat_name, stat_id)
         await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_message_count_per_user)
-
-        log.info(f'Done')
-        await msg.channel.send(res.get("messages.done"))
-
-
-@cmdcoro
-async def calc_vc_stats(client: bot.Overlord, msg: discord.Message):
-    # Tranaction begins
-    async with client.sync():
 
         # Drop and recalculate "vc time" user stats
         stat_name = res.get("messages.vc_time_user_stat")
@@ -188,11 +186,12 @@ async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: dis
         return
 
     header = res.get("messages.user_stats_head").format(member.mention)
+    membership_stat_line = __build_stat_line(client, user, "membership_stat", "membership")
     new_msg_stat_line = __build_stat_line(client, user, "new_message_user_stat", "new_message_count")
     del_msg_stat_line = __build_stat_line(client, user, "delete_message_user_stat", "delete_message_count")
     vc_time_stat_line = __build_stat_line(client, user, "vc_time_user_stat", "vc_time")
 
-    answer = f'{header}\n{new_msg_stat_line}\n{del_msg_stat_line}\n{vc_time_stat_line}\n'
+    answer = f'{header}\n{membership_stat_line}\n{new_msg_stat_line}\n{del_msg_stat_line}\n{vc_time_stat_line}\n'
     await msg.channel.send(answer)
     
 @cmdcoro
@@ -294,10 +293,11 @@ async def get_ranks(client: bot.Overlord, msg: discord.Message):
     await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
 
 @cmdcoro
-async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, messages_count: str, vc_time: str):
+async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, membership: str, msg_count: str, vc_time: str):
     try:
         weight = int(weight)
-        messages_count = int(messages_count)
+        membership = int(membership)
+        messages_count = int(msg_count)
         vc_time = int(vc_time)
     except ValueError:
         await msg.channel.send(res.get("messages.rank_arg_parse_error"))
@@ -316,6 +316,7 @@ async def add_rank(client: bot.Overlord, msg: discord.Message, role_name: str, w
         return
     ranks[role_name] = {
         "weight": weight,
+        "membership": membership,
         "messages": messages_count,
         "vc": vc_time
     }
@@ -345,10 +346,11 @@ async def remove_rank(client: bot.Overlord, msg: discord.Message, role_name: str
         await client.control_channel.send(res.get("messages.done"))
 
 @cmdcoro
-async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, messages_count: str, vc_time: str):
+async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, weight: str, membership: str, msg_count: str, vc_time: str):
     try:
         weight = int(weight)
-        messages_count = int(messages_count)
+        membership = int(membership)
+        messages_count = int(msg_count)
         vc_time = int(vc_time)
     except ValueError:
         await msg.channel.send(res.get("messages.rank_arg_parse_error"))
@@ -367,6 +369,7 @@ async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, 
         return
     ranks[role_name] = {
         "weight": weight,
+        "membership": membership,
         "messages": messages_count,
         "vc": vc_time
     }
