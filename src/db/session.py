@@ -37,10 +37,10 @@ class DBSession(object):
     db_engine = None
     session_factory = None
 
-    def __init__(self, autocommit=True, autoflush=True):
-        engine_url = os.getenv('DATABASE_ACCESS_URL')
-        log.info(f'Connecting to {engine_url}')
-        self.db_engine = create_engine(engine_url, pool_recycle=60)
+    def __init__(self, engine_url, autocommit=True, autoflush=True):
+        self.engine_url = engine_url
+        log.info(f'Connecting to database')
+        self.db_engine = create_engine(self.engine_url, pool_recycle=60)
         Base.metadata.create_all(self.db_engine)
         self.session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
         self.__last_connection = None

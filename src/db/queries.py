@@ -25,6 +25,22 @@ from sqlalchemy import func, insert, select, and_
 from .models import *
 from .session import DBSession
 
+def date_to_secs_sqlite(col):
+    return cast(func.strftime('%s', col), Integer)
+
+def date_to_secs_mysql(col):
+    return cast(func.date_format(col, '%s'), Integer)
+
+MODE_SQLITE = 'sqlite'
+MODE_MYSQL = 'mysql'
+MODE = MODE_MYSQL
+
+def date_to_secs(col):
+    if MODE == MODE_SQLITE:
+        return date_to_secs_sqlite(col)
+    if MODE == MODE_MYSQL:
+        return date_to_secs_mysql(col)
+
 def get_user_by_did(db: DBSession, id: int) -> User:
     return db.query(User).filter(User.did == id).first()
 
@@ -46,7 +62,7 @@ def get_user_stat_by_id(db: DBSession, id: int, type_id: int) -> UserStat:
             .filter(and_(UserStat.user_id == id, UserStat.type_id == type_id)).first()
 
 def select_membership_time_per_user(type_id: int, lit_values: list) -> Select:
-    join_time = cast(func.strftime('%s', func.max(MemberEvent.created_at)), Integer)
+    join_time = date_to_secs(func.max(MemberEvent.created_at))
     current_time = int(datetime.now().timestamp())
     membership_value = cast((current_time - join_time) / 86400, Integer).label('value')
     lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
@@ -60,8 +76,8 @@ def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
     return select(select_columns).where(MessageEvent.type_id == type_id).group_by(MessageEvent.user_id)
 
 def select_vc_time_per_user(type_id: int, lit_values: list) -> Select:
-    join_time = cast(func.strftime('%s', VoiceChatEvent.created_at), Integer)
-    left_time = cast(func.strftime('%s', VoiceChatEvent.updated_at), Integer)
+    join_time = date_to_secs(VoiceChatEvent.created_at)
+    left_time = date_to_secs(VoiceChatEvent.updated_at)
     value_column = func.sum(left_time - join_time).label('value')
     lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
     select_columns = [value_column, VoiceChatEvent.user_id] + lit_columns

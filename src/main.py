@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+import os
 import sys
 import argparse
 import logging.config
@@ -42,7 +43,11 @@ def main(argv):
         logging.config.dictConfig(config['logger'])
 
     # Init database
-    session = DBSession(autocommit=False)
+    url = os.getenv('DATABASE_ACCESS_URL')
+    if 'sqlite' in url:
+        import db.queries as q
+        q.MODE = q.MODE_SQLITE
+    session = DBSession(url, autocommit=False)
     session.sync_table(EventType, 'name', EVENT_TYPES)
     session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
 
