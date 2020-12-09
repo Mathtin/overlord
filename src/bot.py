@@ -181,7 +181,7 @@ class Overlord(discord.Client):
         return self.__async_lock
 
     def is_bot_message(self, msg: discord.Message) -> bool:
-        return msg.author.id in self.bot_members
+        return self.is_bot(msg.author)
 
     def is_bot(self, user: discord.User) -> bool:
         if user.bot:
