@@ -96,6 +96,12 @@ async def update_user_rank(client: bot.Overlord, msg: discord.Message, member: d
 @cmdcoro
 @text_channel_mention_arg
 async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: discord.TextChannel):
+    permissions = channel.permissions_for(client.me)
+    if not permissions.read_message_history:
+        answer = res.get("messages.missing_access").format(channel.mention) + ' (can\'t read message history)'
+        await msg.channel.send(answer)
+        return
+
     # Tranaction begins
     async with client.sync():
 

@@ -130,6 +130,7 @@ class Overlord(discord.Client):
     role_map: dict
     role_obj_name_map: dict
     bot_members: dict
+    me: discord.Member
 
     def __init__(self, config: ConfigView, db_session: DB.DBSession):
         self.__async_lock = asyncio.Lock()
@@ -167,6 +168,7 @@ class Overlord(discord.Client):
         self.role_map = {}
         self.role_obj_name_map = {}
         self.bot_members = {}
+        self.me = None
 
     ###########
     # Getters #
@@ -423,6 +425,8 @@ class Overlord(discord.Client):
             if self.guild is None:
                 raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
             log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
+
+            self.me = await self.guild.fetch_member(self.user.id)
 
             # Attach control channel
             channel = self.get_channel(self.control_channel_id)

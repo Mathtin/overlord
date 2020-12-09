@@ -14,6 +14,7 @@
    <string name="unknown_user">❌ No such user in database</string>
    <string name="invalid_user_mention">❌ Mention user properly</string>
    <string name="not_member_user">❌ User is not member of this guild</string>
+   <string name="missing_access">❌ Missing access for {0}</string>
    
    <!-- User stat names -->
    <string name="membership_stat">Membership period</string>
