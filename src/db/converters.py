@@ -81,10 +81,10 @@ def user_leave_row(user: User, events: dict):
 # Messages
 #
 
-def new_message_to_row(user: User, msg: d.Message, events: dict):
+def new_message_to_row(user_id: int, msg: d.Message, events: dict):
     return {
         'type_id': events["new_message"],
-        'user_id': user.id,
+        'user_id': user_id,
         'message_id': msg.id,
         'channel_id': msg.channel.id,
         'created_at': msg.created_at

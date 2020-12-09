@@ -75,6 +75,7 @@ def event_config(name: str):
 ###################
 # Scheduled Tasks #
 ###################
+
 class StatUpdate(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -477,7 +478,7 @@ class Overlord(discord.Client):
                 log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
                 return
             # Save event
-            row = conv.new_message_to_row(user, message, self.event_type_map)
+            row = conv.new_message_to_row(user.id, message, self.event_type_map)
             log.debug(f'New message {row}')
             self.db.add(DB.MessageEvent, row)
             # Update stats

@@ -122,16 +122,17 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
                 user = q.get_user_by_did(client.db, message.author.id)
                 if user is None and client.config["user.leave.keep"]:
                     user = client.db.add(db.User, conv.user_row(message.author))
-                user_cache[message.author.id] = user
-            else:
-                user = user_cache[message.author.id]
+                    client.db.commit()
+                user_cache[message.author.id] = user.id
+            
+            user_id = user_cache[message.author.id]
 
             # Skip users not in db
             if user is None:
                 continue
 
             # Insert new message event
-            row = conv.new_message_to_row(user, message, client.event_type_map)
+            row = conv.new_message_to_row(user_id, message, client.event_type_map)
             client.db.add(db.MessageEvent, row)
             client.db.commit()
 
