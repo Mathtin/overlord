@@ -14,6 +14,7 @@
 __author__ = 'Mathtin'
 
 from os import replace
+from datetime import datetime, timedelta
 from .config import ConfigView
 from .exceptions import InvalidConfigException, NotCoroutineException
 from .resources import get as get_resource
@@ -60,6 +61,43 @@ def dict_fancy_table(values: dict, key_name='name'):
     lines = [format_line(i) for i in range(row_count)]
     return separator + separator.join(lines) + separator
 
+def pretty_days(days: int):
+    _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
+    if days == 0:
+        return '0 days'
+    res = ''
+    years = days // 365
+    if years > 0:
+        res += f'{years} year{_s(years)} '
+        days %= 365
+    months = days // 30
+    if months > 0:
+        res += f'{months} month{_s(months)} '
+        days %= 30
+    if days > 0:
+        res += f'{days} day{_s(days)} '
+    return res.strip()
+
+def pretty_seconds(seconds: int):
+    _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
+    if seconds == 0:
+        return '0 seconds'
+    res = ''
+    days = seconds // 86400
+    if days > 0:
+        seconds %= 86400
+        res += pretty_days(days) + ' '
+    hours = seconds // 3600
+    if hours > 0:
+        res += f'{hours} hour{_s(hours)} '
+        seconds %= 3600
+    mins = seconds // 60
+    if mins > 0:
+        res += f'{mins} min{_s(mins)} '
+        seconds %= 60
+    if seconds > 0:
+        res += f'{seconds} second{_s(seconds)} '
+    return res.strip()
 
 def parse_control_message(prefix: str, message: discord.Message):
     prefix_len = len(prefix)

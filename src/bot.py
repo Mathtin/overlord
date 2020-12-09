@@ -393,15 +393,16 @@ class Overlord(discord.Client):
             Sends stacktrace to error channel
         """
         ex_type = sys.exc_info()[0]
+        ex = sys.exc_info()[1]
 
         logging.exception(f'Error on event: {event}')
 
-        exception_lines = traceback.format_exception(*sys.exc_info())
-
-        exception_msg = '`' + ''.join(exception_lines).replace('`', '\'')[:1000] + '`'
+        # exception_lines = traceback.format_exception(*sys.exc_info())
+        # exception_msg = '`' + ''.join(exception_lines).replace('`', '\'')[:1800] + '`'
+        exception_msg_short = f'`{str(ex)}`\nBlame <@281130377488236554>'
 
         if self.error_channel is not None:
-            await self.error_channel.send(exception_msg)
+            await self.send_error(exception_msg_short)
 
         if ex_type is InvalidConfigException:
             await self.logout()

@@ -16,10 +16,10 @@
    <string name="not_member_user">❌ User is not member of this guild</string>
    
    <!-- User stat names -->
-   <string name="membership_stat">Membership period (in days)</string>
+   <string name="membership_stat">Membership period</string>
    <string name="new_message_user_stat">New message count</string>
    <string name="delete_message_user_stat">Message deleted count</string>
-   <string name="vc_time_user_stat">VC time (in seconds)</string>
+   <string name="vc_time_user_stat">VC time</string>
 
    <!-- bot.py: on_control_message -->
    <string name="unknown_command">❌ Unknown command</string>

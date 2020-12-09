@@ -46,10 +46,11 @@ async def __calc_user_stats(client: bot.Overlord, stat_name: str, stat_id: int, 
     client.db.execute(insert_query)
     client.db.commit()
 
-def __build_stat_line(client: bot.Overlord, user: db.User, res_stat_name: str, stat_id_name: int):
+def __build_stat_line(client: bot.Overlord, user: db.User, res_stat_name: str, stat_id_name: int, formatter=lambda x:str(x)):
     stat_name = res.get(f"messages.{res_stat_name}")
     stat_val = client.get_user_stat(user, stat_id_name)
-    return res.get("messages.user_stats_entry").format(stat_name, stat_val)
+    stat_val_f = formatter(stat_val)
+    return res.get("messages.user_stats_entry").format(stat_name, stat_val_f)
 
 ############################
 # Control command Handlers #
@@ -187,10 +188,10 @@ async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: dis
         return
 
     header = res.get("messages.user_stats_head").format(member.mention)
-    membership_stat_line = __build_stat_line(client, user, "membership_stat", "membership")
+    membership_stat_line = __build_stat_line(client, user, "membership_stat", "membership", formatter=pretty_days)
     new_msg_stat_line = __build_stat_line(client, user, "new_message_user_stat", "new_message_count")
     del_msg_stat_line = __build_stat_line(client, user, "delete_message_user_stat", "delete_message_count")
-    vc_time_stat_line = __build_stat_line(client, user, "vc_time_user_stat", "vc_time")
+    vc_time_stat_line = __build_stat_line(client, user, "vc_time_user_stat", "vc_time", formatter=pretty_seconds)
 
     answer = f'{header}\n{membership_stat_line}\n{new_msg_stat_line}\n{del_msg_stat_line}\n{vc_time_stat_line}\n'
     await msg.channel.send(answer)
