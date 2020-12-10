@@ -252,10 +252,10 @@ class Overlord(discord.Client):
             if self.get_role(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", "bot.control.roles")
         # Check ranks config
-        admin_rank_roles = self.config["ranks.admin"]
-        for role_name in admin_rank_roles:
+        ignore_roles = self.config["ranks.ignore"]
+        for role_name in ignore_roles:
             if self.get_role(role_name) is None:
-                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.admin")
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.ignore")
         ranks = self.config["ranks.role"]
         ranks_weights = {}
         for rank_name in ranks:
@@ -339,8 +339,8 @@ class Overlord(discord.Client):
             log.error("Cannot update user rank: awaiting role sync")
             await self.send_error(f'Cannot update user rank: awaiting role sync')
             return
-        # Ignore admin ranks
-        if len(filter_roles(member, self.config["ranks.admin"])) > 0:
+        # Ignore ranks
+        if len(filter_roles(member, self.config["ranks.ignore"])) > 0:
             return
         # Resolve user rank
         rank_name = self.find_user_rank(user)
@@ -383,6 +383,23 @@ class Overlord(discord.Client):
                 continue
             await self.update_user_rank(user, member)
         log.info(f'Done updating user ranks')
+
+    async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
+            if '#' in user_mention:
+                [name, disc] = user_mention.split('#')
+                user = self.db.query(DB.User).filter_by(name=name, disc=disc).first()
+            else:
+                user = self.db.query(DB.User).filter_by(display_name=user_mention).first()
+            
+            if user is None:
+                return None
+            try:
+                return await self.fetch_user(user.did)
+            except discord.NotFound:
+                return None
+
+            
+
 
     #########
     # Hooks #

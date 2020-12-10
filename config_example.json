@@ -92,7 +92,7 @@
             }
         },
         "ranks": {
-            "admin": ["CEO", "Director", "Supervisor", "Operator"],
+            "ignore": ["CEO", "Director", "Supervisor", "Operator", "Visitor"],
             "role": {
                 "Shitposter": {
                     "weight": 2,

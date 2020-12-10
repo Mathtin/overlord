@@ -167,9 +167,17 @@ def cmdcoro(func):
 def member_mention_arg(func):
     async def wrapped_func(client, msg, user_mention, *argv):
         if len(msg.mentions) == 0:
-            await msg.channel.send(get_resource("messages.invalid_user_mention"))
-            return
-        member = msg.mentions[0]
+            user = await client.resolve_user(user_mention)
+            if user is None:
+                await msg.channel.send(get_resource("messages.unknown_user"))
+                return
+            try:
+                member = await client.guild.fetch_member(user.id)
+            except discord.NotFound:
+                await msg.channel.send(get_resource("messages.not_member_user"))
+                return
+        else:
+            member = msg.mentions[0]
         if not is_user_member(member):
             await msg.channel.send(get_resource("messages.not_member_user"))
             return

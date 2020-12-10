@@ -231,7 +231,7 @@
         "ranks": {
           "type": "object",
           "properties": {
-            "admin": {
+            "ignore": {
               "type": "array",
               "default": []
             },
@@ -241,7 +241,7 @@
             }
           },
           "required": [
-            "admin",
+            "ignore",
             "role"
           ]
         }
