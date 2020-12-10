@@ -90,8 +90,7 @@ class StatUpdate(commands.Cog):
         event_id = self.client.event_type_id("member_join")
         log.info("Scheduled stat update")
         async with self.client.sync():
-            user_ids = self.client.db.query(DB.User).filter_by(roles=None).with_entities(DB.User.id).subquery()
-            self.client.db.query(DB.UserStat).filter(DB.UserStat.user_id.in_(user_ids)).delete(synchronize_session='fetch')
+            self.client.db.query(DB.UserStat).delete()
             self.client.db.commit()
             select_query = q.select_membership_time_per_user(event_id, [('type_id',stat_id)])
             insert_query = q.insert_user_stat_from_select(select_query)
