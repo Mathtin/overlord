@@ -87,11 +87,15 @@ class StatUpdate(commands.Cog):
     @tasks.loop(hours=24)
     async def stat_updater(self):
         stat_id = self.client.user_stat_type_id("membership")
+        event_id = self.client.event_type_id("member_join")
+        log.info("Scheduled stat update")
         async with self.client.sync():
             user_ids = self.client.db.query(DB.User).filter_by(roles=None).with_entities(DB.User.id).subquery()
             self.client.db.query(DB.UserStat).filter(DB.UserStat.user_id.in_(user_ids)).delete(synchronize_session='fetch')
             self.client.db.commit()
-            self.client.db.execute(q.update_inc_user_member_stat(stat_id))
+            select_query = q.select_membership_time_per_user(event_id, [('type_id',stat_id)])
+            insert_query = q.insert_user_stat_from_select(select_query)
+            self.client.db.execute(insert_query)
             self.client.db.commit()
             
     @stat_updater.before_loop
