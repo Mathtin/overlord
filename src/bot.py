@@ -211,7 +211,7 @@ class Overlord(discord.Client):
         membership = self.get_user_stat(user, "membership")
         messages = self.get_user_stat(user, "new_message_count") - self.get_user_stat(user, "delete_message_count")
         vc_time = self.get_user_stat(user, "vc_time")
-        return messages >= rank["messages"] or vc_time >= rank["vc"] or membership >= rank["membership"]
+        return (messages >= rank["messages"] or vc_time >= rank["vc"]) and membership >= rank["membership"]
 
     def get_member_rank_roles(self, member: discord.Member) -> List[discord.Role]:
         rank_roles = []
