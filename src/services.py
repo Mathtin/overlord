@@ -357,16 +357,6 @@ class RankingService(object):
         membership = self.stats.get(user, "membership")
         messages = self.stats.get(user, "new_message_count") - self.stats.get(user, "delete_message_count")
         vc_time = self.stats.get(user, "vc_time")
-
-        # Build expression
-        def can_apply_rank(rank: ConfigView):
-            # Predicate values
-            exact_rank = exact_weight > 0
-            exact_rank_applicable = rank["weight"] == exact_weight
-            within_rank_limit = min_weight <= rank["weight"] and not (rank["weight"] > max_weight and max_weight > 0)
-            meet_requirements = (messages >= rank["messages"] or vc_time >= rank["vc"]) and membership >= rank["membership"]
-            # Result expression
-            return within_rank_limit and meet_requirements if not exact_rank else exact_rank_applicable
         
         # Prepare rank search
         ranks = self.config["role"]
@@ -376,7 +366,27 @@ class RankingService(object):
         # Search ranks
         for rank_name in ranks:
             rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
-            if can_apply_rank(rank) and max_rank_weight < rank["weight"]:
+            # Handle exact
+            if exact_weight > 0:
+                if rank["weight"] == exact_weight:
+                    return rank_name
+                else:
+                    continue
+            # Handle minimal
+            if min_weight > 0:
+                if rank["weight"] == min_weight and max_rank_weight < rank["weight"]:
+                    max_rank_weight = rank["weight"]
+                    max_rank_name = rank_name
+                elif rank["weight"] < min_weight:
+                    continue
+            # Handle maximal
+            if max_weight > 0:
+                if rank["weight"] > max_weight:
+                    continue
+            # Predicate value
+            meet_requirements = (messages >= rank["messages"] or vc_time >= rank["vc"]) and membership >= rank["membership"]
+            # Result expression
+            if meet_requirements and max_rank_weight < rank["weight"]:
                 max_rank_weight = rank["weight"]
                 max_rank_name = rank_name
         
