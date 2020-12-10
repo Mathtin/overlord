@@ -18,9 +18,13 @@
    
    <!-- User stat names -->
    <string name="membership_stat">Membership period</string>
-   <string name="new_message_user_stat">New message count</string>
-   <string name="delete_message_user_stat">Message deleted count</string>
-   <string name="vc_time_user_stat">VC time</string>
+   <string name="new_message_count_stat">New message count</string>
+   <string name="delete_message_count_stat">Message deleted count</string>
+   <string name="edit_message_count_stat">Message edited count</string>
+   <string name="vc_time_stat">VC time</string>
+   <string name="min_weight_stat">Mimimal weight (rank)</string>
+   <string name="max_weight_stat">Maximal weight (rank)</string>
+   <string name="exact_weight_stat">Exact weight (rank)</string>
 
    <!-- bot.py: on_control_message -->
    <string name="unknown_command">❌ Unknown command</string>
@@ -43,8 +47,8 @@
    <string name="channel_history_load">⬇ Loading {0} history</string>
 
    <!-- control.py: calc_message_stats, calc_vc_stats -->
-   <string name="user_stat_drop">🗑 Clearing "{0}" stats</string>
-   <string name="user_stat_calc">🧮 Calculating "{0}" stats</string>
+   <string name="user_stat_drop">🗑 Clearing {0} stats</string>
+   <string name="user_stat_calc">🧮 Calculating {0} stats</string>
 
    <!-- control.py: get_user_stats -->
    <string name="user_stats_head">📊 Stats for {0}:</string>

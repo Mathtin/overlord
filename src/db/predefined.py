@@ -26,6 +26,10 @@ EVENT_TYPES = [
 USER_STAT_TYPES = [
     { 'name': 'new_message_count', 'description': 'overall message sent count per user' },
     { 'name': 'delete_message_count', 'description': 'overall message delete count per user' },
+    { 'name': 'edit_message_count', 'description': 'overall message edit count per user' },
     { 'name': 'vc_time', 'description': 'overall time spent in voice chat per user in seconds' },
-    { 'name': 'membership', 'description': 'days user being member of discord server' }
+    { 'name': 'membership', 'description': 'days user being member of discord server' },
+    { 'name': 'min_weight', 'description': 'minimal weith (rank) applicable to user' },
+    { 'name': 'max_weight', 'description': 'maximal weith (rank) applicable to user' },
+    { 'name': 'exact_weight', 'description': 'exact weith (rank) applicable to user' }
 ]

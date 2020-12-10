@@ -18,8 +18,6 @@ import logging
 
 import bot
 import db
-import db.queries as q
-import db.converters as conv
 
 from util import *
 import util.resources as res
@@ -30,6 +28,7 @@ log = logging.getLogger('control')
 # Utility funcs #
 #################
 
+'''
 async def __drop_user_stats(client: bot.Overlord, stat_name: str, stat_id: int):
     log.warn(f'Dropping "{stat_name}" stats')
     answer = res.get("messages.user_stat_drop").format(stat_name)
@@ -45,10 +44,11 @@ async def __calc_user_stats(client: bot.Overlord, stat_name: str, stat_id: int, 
     insert_query = q.insert_user_stat_from_select(select_query)
     client.db.execute(insert_query)
     client.db.commit()
+'''
 
-def __build_stat_line(client: bot.Overlord, user: db.User, res_stat_name: str, stat_id_name: int, formatter=lambda x:str(x)):
-    stat_name = res.get(f"messages.{res_stat_name}")
-    stat_val = client.get_user_stat(user, stat_id_name)
+def __build_stat_line(client: bot.Overlord, user: db.User, stat: str, formatter=lambda x:str(x)):
+    stat_name = res.get(f"messages.{stat}_stat")
+    stat_val = client.s_stats.get(user, stat)
     stat_val_f = formatter(stat_val)
     return res.get("messages.user_stats_entry").format(stat_name, stat_val_f)
 
@@ -84,12 +84,8 @@ async def update_user_ranks(client: bot.Overlord, msg: discord.Message):
 @member_mention_arg
 async def update_user_rank(client: bot.Overlord, msg: discord.Message, member: discord.Member):
     async with client.sync():
-        user = q.get_user_by_did(client.db, member.id)
-        if user is None:
-            await msg.channel.send(res.get("messages.unknown_user"))
-            return
         await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
-        await client.update_user_rank(user, member)
+        await client.update_user_rank(member)
         await msg.channel.send(res.get("messages.done"))
 
 
@@ -109,10 +105,7 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
         log.warn(f'Dropping #{channel.name}({channel.id}) history')
         answer = res.get("messages.channel_history_drop").format(channel.mention)
         await msg.channel.send(answer)
-        client.db.query(db.MessageEvent).filter_by(channel_id=channel.id).delete()
-        client.db.commit()
-
-        user_cache = {}
+        client.s_events.clear_text_channel_history(channel)
 
         # Load all messages
         log.warn(f'Loading #{channel.name}({channel.id}) history')
@@ -125,23 +118,16 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
                 continue
 
             # Resolve user
-            if message.author.id not in user_cache:
-                user = q.get_user_by_did(client.db, message.author.id)
-                if user is None and client.config["user.leave.keep"]:
-                    user = client.db.add(db.User, conv.user_row(message.author))
-                    client.db.commit()
-                user_cache[message.author.id] = user.id
-            
-            user_id = user_cache[message.author.id]
+            user = client.s_users.get(message.author)
+            if user is None and client.config["user.leave.keep"]:
+                user = client.s_users.add_user(message.author)
 
             # Skip users not in db
             if user is None:
                 continue
 
             # Insert new message event
-            row = conv.new_message_to_row(user_id, message, client.event_type_map)
-            client.db.add(db.MessageEvent, row)
-            client.db.commit()
+            client.s_events.create_new_message_event(user, message)
 
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
@@ -151,34 +137,12 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
 async def recalculate_stats(client: bot.Overlord, msg: discord.Message):
     # Tranaction begins
     async with client.sync():
+        log.info(f"Recalculating all stats")
+        answer = res.get("messages.user_stat_calc")
+        await msg.channel.send(answer.format('all'))
 
-        # Drop and recalculate "membership" user stats
-        stat_name = res.get("messages.membership_stat")
-        stat_id = client.user_stat_type_id("membership")
-        event_id = client.event_type_id("member_join")
-        await __drop_user_stats(client, stat_name, stat_id)
-        await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_membership_time_per_user)
-
-        # Drop and recalculate "new message count" user stats
-        stat_name = res.get("messages.new_message_user_stat")
-        stat_id = client.user_stat_type_id("new_message_count")
-        event_id = client.event_type_id("new_message")
-        await __drop_user_stats(client, stat_name, stat_id)
-        await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_message_count_per_user)
-
-        # Drop and recalculate "delete message count" user stats
-        stat_name = res.get("messages.delete_message_user_stat")
-        stat_id = client.user_stat_type_id("delete_message_count")
-        event_id = client.event_type_id("message_delete")
-        await __drop_user_stats(client, stat_name, stat_id)
-        await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_message_count_per_user)
-
-        # Drop and recalculate "vc time" user stats
-        stat_name = res.get("messages.vc_time_user_stat")
-        stat_id = client.user_stat_type_id("vc_time")
-        event_id = client.event_type_id("vc_join")
-        await __drop_user_stats(client, stat_name, stat_id)
-        await __calc_user_stats(client, stat_name, stat_id, event_id, q.select_vc_time_per_user)
+        for stat_type in client.s_stats.user_stat_type_map:
+            client.s_stats.reload_stat(stat_type)
 
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
@@ -188,18 +152,25 @@ async def recalculate_stats(client: bot.Overlord, msg: discord.Message):
 @member_mention_arg
 async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: discord.Member):
     # Resolve user
-    user = q.get_user_by_did(client.db, member.id)
+    user = client.s_users.get(member)
     if user is None:
         await msg.channel.send(res.get("messages.unknown_user"))
         return
 
-    header = res.get("messages.user_stats_head").format(member.mention)
-    membership_stat_line = __build_stat_line(client, user, "membership_stat", "membership", formatter=pretty_days)
-    new_msg_stat_line = __build_stat_line(client, user, "new_message_user_stat", "new_message_count")
-    del_msg_stat_line = __build_stat_line(client, user, "delete_message_user_stat", "delete_message_count")
-    vc_time_stat_line = __build_stat_line(client, user, "vc_time_user_stat", "vc_time", formatter=pretty_seconds)
+    answer = res.get("messages.user_stats_head").format(member.mention) + '\n'
+    answer += __build_stat_line(client, user, "membership", formatter=pretty_days) + '\n'
+    answer += __build_stat_line(client, user, "new_message_count") + '\n'
+    answer += __build_stat_line(client, user, "delete_message_count") + '\n'
+    answer += __build_stat_line(client, user, "edit_message_count") + '\n'
+    answer += __build_stat_line(client, user, "vc_time", formatter=pretty_seconds) + '\n'
 
-    answer = f'{header}\n{membership_stat_line}\n{new_msg_stat_line}\n{del_msg_stat_line}\n{vc_time_stat_line}\n'
+    if client.s_stats.get(user, "min_weight") > 0:
+        answer += __build_stat_line(client, user, "min_weight") + '\n'
+    if client.s_stats.get(user, "max_weight") > 0:
+        answer += __build_stat_line(client, user, "max_weight") + '\n'
+    if client.s_stats.get(user, "exact_weight") > 0:
+        answer += __build_stat_line(client, user, "exact_weight") + '\n'
+
     await msg.channel.send(answer)
     
 @cmdcoro
@@ -229,7 +200,7 @@ async def reload_config(client: bot.Overlord, msg: discord.Message):
     new_config = ConfigView(path=parent_config.fpath(), schema_name="config_schema")
     if new_config['logger']:
         logging.config.dictConfig(new_config['logger'])
-    client.config = new_config.bot
+    client.update_config(new_config.bot)
     log.info(f'Done')
     await client.control_channel.send(res.get("messages.done"))
 
@@ -270,10 +241,15 @@ async def __safe_alter_config(client: bot.Overlord, path: str, value):
     try:
         log.warn(f'Altering raw config path {path}')
         parent_config.alter(path, value)
-        client.check_config()
+        if parent_config['logger']:
+            logging.config.dictConfig(parent_config['logger'])
+        client.update_config(parent_config.bot)
     except (InvalidConfigException, TypeError) as e:
         log.warn(f'Invalid config value provided: {value}, reason: {e}. Reverting.')
         parent_config.alter(path, old_value)
+        if parent_config['logger']:
+            logging.config.dictConfig(parent_config['logger'])
+        client.update_config(parent_config.bot)
         msg = res.get("messages.error").format(e) + '\n' + res.get("messages.warning").format('Config reverted')
         await client.control_channel.send(msg)
         return False

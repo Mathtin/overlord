@@ -75,6 +75,9 @@
                 "new": {
                     "track": true
                 },
+                "edit": {
+                    "track": true
+                },
                 "delete": {
                     "track": true
                 }

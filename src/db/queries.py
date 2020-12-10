@@ -52,6 +52,11 @@ def get_last_member_event_by_did(db: DBSession, id: int) -> MessageEvent:
             .filter(User.did == id)\
             .order_by(MemberEvent.created_at.desc()).first()
 
+def get_last_member_event_by_id(db: DBSession, id: int) -> MessageEvent:
+    return db.query(MemberEvent)\
+            .filter(MemberEvent.user_id == id)\
+            .order_by(MemberEvent.created_at.desc()).first()
+
 def get_last_vc_event_by_id(db: DBSession, id: int, channel_id: int) -> VoiceChatEvent:
     return db.query(VoiceChatEvent)\
             .filter(and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id))\

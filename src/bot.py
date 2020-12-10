@@ -21,13 +21,11 @@ import logging
 
 import discord
 import db as DB
-import db.queries as q
-import db.converters as conv
 
 from util import *
 import util.resources as res
-from typing import List, Optional
-from discord.ext import tasks, commands
+from typing import Dict, List, Optional
+from services import EventService, RankingService, RoleService, StatService, UserService
 
 log = logging.getLogger('overlord-bot')
 
@@ -44,10 +42,10 @@ def after_initialized(func):
 def skip_bots(func):
     async def _func(self, obj, *args, **kwargs):
         if isinstance(obj, discord.User) or isinstance(obj, discord.Member):
-            if self.is_bot(obj):
+            if obj.bot:
                 return
         elif isinstance(obj, discord.Message): 
-            if self.is_bot_message(obj):
+            if obj.author.bot:
                 return
         return await func(self, obj, *args, **kwargs)
     return _func
@@ -72,36 +70,6 @@ def event_config(name: str):
         return _func
     return wrapper
 
-###################
-# Scheduled Tasks #
-###################
-
-class StatUpdate(commands.Cog):
-    def __init__(self, client):
-        self.client = client
-        self.stat_updater.start()
-
-    def cog_unload(self):
-        self.stat_updater.cancel()
-
-    @tasks.loop(hours=24)
-    async def stat_updater(self):
-        stat_id = self.client.user_stat_type_id("membership")
-        event_id = self.client.event_type_id("member_join")
-        log.info("Scheduled stat update")
-        async with self.client.sync():
-            self.client.db.query(DB.UserStat).delete()
-            self.client.db.commit()
-            select_query = q.select_membership_time_per_user(event_id, [('type_id',stat_id)])
-            insert_query = q.insert_user_stat_from_select(select_query)
-            self.client.db.execute(insert_query)
-            self.client.db.commit()
-        log.info("Done scheduled stat update")
-            
-    @stat_updater.before_loop
-    async def before_stat_update(self):
-        await self.client.init_lock()
-
 #############################
 # Main class implementation #
 #############################
@@ -117,31 +85,34 @@ class Overlord(discord.Client):
     token: str
     guild_id: int
     control_channel_id: int
-    __stat_updater: StatUpdate
+    error_channel_id: int
 
     # Members passed via constructor
     config: ConfigView
     db: DB.DBSession
 
-    # Maps name -> id (gathered via db)
-    event_type_map: dict
-    user_stat_type_map: dict
-
     # Values initiated on_ready
     guild: discord.Guild
     control_channel: discord.TextChannel
     error_channel: discord.TextChannel
-    role_map: dict
-    role_obj_name_map: dict
-    bot_members: dict
     me: discord.Member
+
+    # Services
+    s_users: UserService
+    s_roles: RoleService
+    s_events: EventService
+    s_stats: StatService
+    s_ranking: RankingService
+
+    # Scheduled tasks
+    tasks: List[asyncio.AbstractEventLoop]
 
     def __init__(self, config: ConfigView, db_session: DB.DBSession):
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
         self.__awaiting_role_sync = True
         self.__awaiting_user_sync = True
-        self.__stat_updater = StatUpdate(self)
+        self.tasks = []
 
         self.config = config
         self.db = db_session
@@ -169,31 +140,21 @@ class Overlord(discord.Client):
         self.guild = None
         self.control_channel = None
         self.error_channel = None
-        self.role_map = {}
-        self.role_obj_name_map = {}
-        self.bot_members = {}
         self.me = None
+
+        # Services
+        self.s_roles = RoleService(self.db)
+        self.s_users = UserService(self.db, self.s_roles)
+        self.s_events = EventService(self.db)
+        self.s_stats = StatService(self.db, self.s_events)
+        self.s_ranking = RankingService(self.s_stats, self.s_roles, self.config.ranks)
 
     ###########
     # Getters #
     ###########
 
-    def event_type_id(self, name) -> int:
-        return self.event_type_map[name]
-
-    def user_stat_type_id(self, name) -> int:
-        return self.user_stat_type_map[name]
-
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
-
-    def is_bot_message(self, msg: discord.Message) -> bool:
-        return self.is_bot(msg.author)
-
-    def is_bot(self, user: discord.User) -> bool:
-        if user.bot:
-            self.bot_members[user.id] = user
-        return user.bot
 
     def is_guild_member(self, member: discord.Member) -> bool:
         return member.guild.id == self.guild.id
@@ -207,26 +168,8 @@ class Overlord(discord.Client):
     def is_special_channel_id(self, channel_id: int) -> bool:
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
 
-    def get_user_stat(self, user: DB.User, stat_name: str) -> int:
-        stat = q.get_user_stat_by_id(self.db, user.id, self.user_stat_type_map[stat_name])
-        return stat.value if stat is not None else 0
-
-    def can_apply_rank(self, user: DB.User, rank: ConfigView) -> bool:
-        membership = self.get_user_stat(user, "membership")
-        messages = self.get_user_stat(user, "new_message_count") - self.get_user_stat(user, "delete_message_count")
-        vc_time = self.get_user_stat(user, "vc_time")
-        return (messages >= rank["messages"] or vc_time >= rank["vc"]) and membership >= rank["membership"]
-
-    def get_member_rank_roles(self, member: discord.Member) -> List[discord.Role]:
-        rank_roles = []
-        for rank_name in self.config.ranks['role']:
-            rank_roles.append(self.get_role(rank_name))
-        return filter_roles(member, rank_roles)
-
     def get_role(self, role_name: str) -> Optional[discord.Role]:
-        if role_name in self.role_obj_name_map:
-            return self.role_obj_name_map[role_name]
-        return None
+        return self.s_roles.get(role_name)
 
     def is_admin(self, user: discord.Member) -> bool:
         roles = self.config["control.roles"]
@@ -239,37 +182,18 @@ class Overlord(discord.Client):
     def run(self):
         super().run(self.token)
 
-    def find_user_rank(self, user: DB.User) -> Optional[str]:
-        ranks = self.config["ranks.role"]
-        max_rank = {"weight": -1000}
-        max_rank_name = None
-        for rank_name in ranks:
-            rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
-            if self.can_apply_rank(user, rank) and max_rank["weight"] < rank["weight"]:
-                max_rank = rank
-                max_rank_name = rank_name
-        return max_rank_name
-
     def check_config(self):
         admin_roles = self.config["control.roles"]
         for role_name in admin_roles:
             if self.get_role(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", "bot.control.roles")
         # Check ranks config
-        ignore_roles = self.config["ranks.ignore"]
-        for role_name in ignore_roles:
-            if self.get_role(role_name) is None:
-                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.ignore")
-        ranks = self.config["ranks.role"]
-        ranks_weights = {}
-        for rank_name in ranks:
-            rank = ConfigView(value=ranks[rank_name], schema_name="rank_schema")
-            if self.get_role(rank_name) is None:
-                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.ranks.role")
-            if rank['weight'] in ranks_weights:
-                dup_rank = ranks_weights[rank['weight']]
-                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.ranks.role")
-            ranks_weights[rank['weight']] = rank_name
+        self.s_ranking.check_config()
+
+    def update_config(self, config: ConfigView):
+        self.config = config
+        self.s_ranking.config = config.ranks
+        self.check_config()
 
     #################
     # Async methods #
@@ -299,75 +223,62 @@ class Overlord(discord.Client):
 
     async def sync_roles(self):
         log.info('Syncing roles')
-        self.role_obj_name_map = { role.name: role for role in self.guild.roles }
-        roles = conv.roles_to_rows(self.guild.roles)
-        self.role_map = { role['did']: role for role in roles }
-        self.db.sync_table(DB.Role, 'did', roles)
+        # Update role service
+        self.s_roles.load(self.guild.roles)
+        # Drop awaiting flag
         self.__awaiting_role_sync = False
         log.info('Syncing roles done')
 
     async def sync_users(self):
+        # Check awaiting flag
         if self.__awaiting_role_sync:
             log.error(f'Cannot sync users: awaiting role sync')
             await self.send_error(f'Cannot sync users: awaiting role sync')
             return
         log.info(f'Syncing users')
-        # Clear users
-        self.db.query(DB.User).update({'roles': None, 'display_name': None})
-        self.db.commit()
+        # Mark everyone absent
+        self.s_users.mark_everyone_absent()
         # Reload
         async for member in self.guild.fetch_members(limit=None):
-            # Skip bots
+            # Cache and skip bots
             if member.bot:
-                self.bot_members[member.id] = member
+                self.s_users.cache_bot(member)
                 continue
-            # Update user
-            u_row = conv.member_row(member, self.role_map)
-            user = self.db.update_or_add(DB.User, 'did', u_row)
-            self.db.commit()
-            # Check and repair last member event (should be join)
-            last_event = q.get_last_member_event_by_did(self.db, user.did)
-            if last_event is None or last_event.type_id != self.event_type_id("member_join"):
-                e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-                last_event = self.db.add(DB.MemberEvent, e_row)
-            last_event.created_at = member.joined_at
-            self.db.commit()
+            # Update and repair
+            user = self.s_users.update_member(member)
+            self.s_events.repair_member_joined_event(member, user)
+        # Remove effectively absent
         if not self.config["user.leave.keep"]:
-            self.db.query(DB.User).filter_by(roles=None).delete()
-            self.db.commit()
+            self.s_users.remove_absent()
         self.__awaiting_user_sync = False
         log.info(f'Syncing users done')
 
-    async def update_user_rank(self, user: DB.User, member: discord.Member):
+    async def update_user_rank(self, member: discord.Member):
         if self.__awaiting_role_sync:
             log.error("Cannot update user rank: awaiting role sync")
             await self.send_error(f'Cannot update user rank: awaiting role sync')
             return
-        # Ignore ranks
-        if len(filter_roles(member, self.config["ranks.ignore"])) > 0:
+        # Resolve user
+        user = self.s_users.get(member)
+        # Skip non-existing users
+        if user is None:
+            log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
             return
-        # Resolve user rank
-        rank_name = self.find_user_rank(user)
-        if rank_name is not None:
-            log.debug(f"Updating {qualified_name(member)}'s rank: {rank_name}'")
-            if is_role_applied(member, rank_name):
-                log.debug(f"No updating required")
-                return
-        # Get and remove already applied ranks
-        applied_rank_roles = self.get_member_rank_roles(member)
-        if applied_rank_roles:
-            applied_rank_names = ', '.join([r.name for r in applied_rank_roles])
-            log.info(f"Removing {qualified_name(member)}'s rank roles: {applied_rank_names}")
-            await member.remove_roles(*applied_rank_roles)
-        # Apply new rank
-        if rank_name is None:
+        # Ignore special roles
+        if self.s_ranking.ignore_member(member):
             return
-        log.info(f"Adding rank role to {qualified_name(member)}: {rank_name}")
-        await member.add_roles(self.get_role(rank_name))
+        # Resolve roles to move
+        roles_add, roles_del = self.s_ranking.roles_to_add_and_remove(member, user)
+        # Remove old roles
+        if roles_del:
+            log.info(f"Removing {qualified_name(member)}'s rank roles: {roles_del}")
+            await member.remove_roles(*roles_del)
+        # Add new roles
+        if roles_add:
+            log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
+            await member.add_roles(*roles_add)
         # Update user in db
-        u_row = conv.member_row(member, self.role_map)
-        user = self.db.update(DB.User, 'did', u_row)
-        self.db.commit()
+        self.s_users.update_member(member)
 
     async def update_user_ranks(self):
         if self.__awaiting_role_sync:
@@ -376,34 +287,31 @@ class Overlord(discord.Client):
             return
         log.info(f'Updating user ranks')
         async for member in self.guild.fetch_members(limit=None):
-            # Skip bots
+            # Cache and skip bots
             if member.bot:
-                self.bot_members[member.id] = member
+                self.s_users.cache_bot(member)
                 continue
-            user = q.get_user_by_did(self.db, member.id)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
-                continue
-            await self.update_user_rank(user, member)
+            await self.update_user_rank(member)
         log.info(f'Done updating user ranks')
 
     async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
-            if '#' in user_mention:
-                [name, disc] = user_mention.split('#')
-                user = self.db.query(DB.User).filter_by(name=name, disc=disc).first()
-            else:
-                user = self.db.query(DB.User).filter_by(display_name=user_mention).first()
-            
-            if user is None:
-                return None
             try:
+                if '#' in user_mention:
+                    user = self.s_users.get_by_qualified_name(user_mention)
+                else:
+                    user = self.s_users.get_by_display_name(user_mention)
+                if user is None:
+                    return None
                 return await self.fetch_user(user.did)
             except discord.NotFound:
                 return None
+            except ValueError:
+                return None
 
-            
-
+    async def logout(self):
+        for task in self.tasks:
+            task.cancel()
+        await super().logout()
 
     #########
     # Hooks #
@@ -472,7 +380,13 @@ class Overlord(discord.Client):
             await self.sync_roles()
             await self.sync_users()
 
+            # Check config value
             self.check_config()
+
+            # Schedule tasks
+            self.tasks.append(self.s_stats.get_stat_update_task(self.sync(), hours=24, loop=asyncio.get_running_loop()))
+            for task in self.tasks:
+                task.start()
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
@@ -493,29 +407,20 @@ class Overlord(discord.Client):
         if message.channel == self.control_channel:
             await self.on_control_message(message)
             return
-
-        new_message_stat_id = self.user_stat_type_id("new_message_count")
-
         # Sync code part
         async with self.sync():
-            user = q.get_user_by_did(self.db, message.author.id)
+            user = self.s_users.get(message.author)
             # Skip non-existing users
             if user is None:
                 log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
                 return
             # Save event
-            row = conv.new_message_to_row(user.id, message, self.event_type_map)
-            log.debug(f'New message {row}')
-            self.db.add(DB.MessageEvent, row)
+            self.s_events.create_new_message_event(user, message)
             # Update stats
-            stat = q.get_user_stat_by_id(self.db, user.id, new_message_stat_id)
-            if stat is None:
-                empty_stat_row = conv.empty_user_stat_row(user.id, new_message_stat_id)
-                stat = self.db.add(DB.UserStat, empty_stat_row)
-            stat.value += 1
-            self.db.commit()
+            inc_value = self.s_stats.get(user, 'new_message_count') + 1
+            self.s_stats.set(user, 'new_message_count', inc_value)
             # Update user rank
-            await self.update_user_rank(user, message.author)
+            await self.update_user_rank(message.author)
 
 
     async def on_control_message(self, message: discord.Message):
@@ -571,21 +476,19 @@ class Overlord(discord.Client):
         """
         if self.is_special_channel_id(payload.channel_id):
             return
-
-        # ingore bot messages
-        msg = q.get_msg_by_did(self.db, payload.message_id)
-        if msg is None or msg.user.did in self.bot_members:
+        # ingore absent
+        msg = self.s_events.get_message(payload.message_id)
+        if msg is None:
             return
-
         # Sync code part
         async with self.sync():
-            row = conv.message_edit_row(msg, self.event_type_map)
-            log.debug(f'Message edit {row}')
-            self.db.add(DB.MessageEvent, row)
-            self.db.commit()
+            self.s_events.create_message_edit_event(msg)
+            # Update stats
+            inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
+            self.s_stats.set(msg.user, 'edit_message_count', inc_value)
             # Update user rank
             member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(msg.user, member)
+            await self.update_user_rank(member)
 
     
     @after_initialized
@@ -598,29 +501,19 @@ class Overlord(discord.Client):
         """
         if self.is_special_channel_id(payload.channel_id):
             return
-
-        # ingore bot messages
-        msg = q.get_msg_by_did(self.db, payload.message_id)
-        if msg is None or msg.user.did in self.bot_members:
+        # ingore absent
+        msg = self.s_events.get_message(payload.message_id)
+        if msg is None:
             return
-
-        delete_message_stat_id = self.user_stat_type_id("delete_message_count")
-
         # Sync code part
         async with self.sync():
-            row = conv.message_delete_row(msg, self.event_type_map)
-            log.debug(f'Message delete {row}')
-            self.db.add(DB.MessageEvent, row)
+            self.s_events.create_message_delete_event(msg)
             # Update stats
-            stat = q.get_user_stat_by_id(self.db, msg.user_id, delete_message_stat_id)
-            if stat is None:
-                empty_stat_row = conv.empty_user_stat_row(msg.user_id, delete_message_stat_id)
-                stat = self.db.add(DB.UserStat, empty_stat_row)
-            stat.value += 1
-            self.db.commit()
+            inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
+            self.s_stats.set(msg.user, 'delete_message_count', inc_value)
             # Update user rank
             member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(msg.user, member)
+            await self.update_user_rank(member)
 
     
     @after_initialized
@@ -635,25 +528,12 @@ class Overlord(discord.Client):
         """
         if self.__awaiting_user_sync:
             return
-        membership_stat_id = self.user_stat_type_id("membership")
         # Sync code part
         async with self.sync():
             # Add/update user
-            u_row = conv.member_row(member, self.role_map)
-            user = self.db.update_or_add(DB.User, 'did', u_row)
-            log.debug(f'User join {u_row}')
-            self.db.commit()
+            user = self.s_users.update_member(member)
             # Add event
-            e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-            self.db.add(DB.MemberEvent, e_row)
-            self.db.commit()
-            # Add stats
-            stat = q.get_user_stat_by_id(self.db, user.id, membership_stat_id)
-            if stat is None:
-                empty_stat_row = conv.empty_user_stat_row(user.id, membership_stat_id)
-                stat = self.db.add(DB.UserStat, empty_stat_row)
-            stat.value = 0
-            self.db.commit()
+            self.s_events.create_member_join_event(user, member)
 
     
     @after_initialized
@@ -674,16 +554,14 @@ class Overlord(discord.Client):
                 before.name != after.name or \
                 before.discriminator != after.discriminator):
             return
+        # Skip absent
+        if self.s_users.get(before) is None:
+            log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
+            return
         # Sync code part
         async with self.sync():
             # Update user
-            row = conv.member_row(after, self.role_map)
-            user = self.db.update(DB.User, 'did', row)
-            if user is None:
-                log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
-                return
-            log.debug(f'User update {row}')
-            self.db.commit()
+            self.s_users.update_member(after)
 
     
     @after_initialized
@@ -698,23 +576,17 @@ class Overlord(discord.Client):
         """
         # Sync code part
         async with self.sync():
-            row = conv.user_row(member)
             if self.config["user.leave.keep"]:
-                user = self.db.update(DB.User, 'did', row)
+                user = self.s_users.mark_absent(member)
                 if user is None:
                     log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
                     return
-                # Add event
-                e_row = conv.user_leave_row(user, self.event_type_map)
-                log.debug(f'User leave {e_row}')
-                self.db.add(DB.MemberEvent, e_row)
+                self.s_events.create_user_leave_event(user)
             else:
-                log.debug(f'User leave (deleting) {row}')
-                user = self.db.delete(DB.User, 'did', row)
+                user = self.s_users.remove(member)
                 if user is None:
                     log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
                     return
-            self.db.commit()
 
     
     @after_initialized
@@ -743,22 +615,15 @@ class Overlord(discord.Client):
         """
         # Sync code part
         async with self.sync():
-            user = q.get_user_by_did(self.db, member.id)
+            user = self.s_users.get(member)
             # Skip non-existing users
             if user is None:
                 log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
                 return
             # Apply constraints
-            event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-            if event is not None and event.type_id == self.event_type_id("vc_join"):
-                # Skip absent vc leave
-                log.warn(f'VC leave event is absent for {qualified_name(member)} in <{channel.name}! Removing last vc join event!')
-                self.db.delete_model(event)
+            self.s_events.repair_vc_leave_event(user, channel)
             # Save event
-            row = conv.vc_join_row(user, channel, self.event_type_map)
-            log.debug(f'VC join {row}')
-            self.db.add(DB.VoiceChatEvent, row)
-            self.db.commit()
+            self.s_events.create_vc_join_event(user, channel)
             
     
     @event_config("voice.leave")
@@ -768,35 +633,23 @@ class Overlord(discord.Client):
 
             Saves event in database
         """
-        vc_time_stat_id = self.user_stat_type_id("vc_time")
         # Sync code part
         async with self.sync():
-            user = q.get_user_by_did(self.db, member.id)
+            user = self.s_users.get(member)
             # Skip non-existing users
             if user is None:
                 log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
                 return
-            # Apply constraints
-            join_event = q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-            if join_event is None or join_event.type_id != self.event_type_id("vc_join"):
-                # Skip absent vc join
-                log.warn(f'VC join event is absent for {qualified_name(member)} in <{channel.name}! Skipping vc leave event!')
+            # Close event
+            join_event = self.s_events.close_vc_join_event(user, channel)
+            if join_event is None:
                 return
-            # Save event + update previous
-            row = conv.vc_leave_row(user, channel, self.event_type_map)
-            log.debug(f'VC join {row}')
-            leave_event = self.db.add(DB.VoiceChatEvent, row)
-            self.db.touch(DB.VoiceChatEvent, join_event.id)
-            self.db.commit()
             # Update stats
-            stat = q.get_user_stat_by_id(self.db, join_event.user_id, vc_time_stat_id)
-            if stat is None:
-                empty_stat_row = conv.empty_user_stat_row(user.id, vc_time_stat_id)
-                stat = self.db.add(DB.UserStat, empty_stat_row)
-            stat.value += (leave_event.created_at - join_event.created_at).total_seconds()
-            self.db.commit()
+            stat_val = self.s_stats.get(user, 'vc_time')
+            stat_val += (join_event.updated_at - join_event.created_at).total_seconds()
+            self.s_stats.set(user, 'vc_time', stat_val)
             # Update user rank
-            await self.update_user_rank(user, member)
+            await self.update_user_rank(member)
 
     async def on_guild_role_create(self, role: discord.Role):
         if self.__awaiting_role_sync and self.__awaiting_user_sync:
