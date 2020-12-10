@@ -15,12 +15,47 @@ __author__ = 'Mathtin'
 
 import os
 import discord
+import asyncio
 from .resources import get as get_resource
-from .exceptions import InvalidConfigException
+from .exceptions import InvalidConfigException, NotCoroutineException
 
 #############################
 # Bot control coro wrappers #
 #############################
+
+def check_coroutine(func):
+    if not asyncio.iscoroutinefunction(func):
+        raise NotCoroutineException(func)
+
+def build_cmdcoro_usage(prefix: str, cmdname, func):
+    f_args = func.__code__.co_varnames[:func.__code__.co_argcount]
+    assert len(f_args) >= 2
+    f_args = f_args[2:]
+    args_str = ' ' + ' '.join(["{%s}" % arg for arg in f_args])
+    return f'{prefix}{cmdname}' + args_str
+
+def cmdcoro(func):
+    check_coroutine(func)
+
+    if hasattr(func, "or_cmdcoro"):
+        or_func = func.or_cmdcoro
+    else:
+        or_func = func
+
+    f_args = or_func.__code__.co_varnames[:or_func.__code__.co_argcount]
+    assert len(f_args) >= 2
+    f_args = f_args[2:]
+
+    async def wrapped_func(client, message, prefix, argv):
+        if len(f_args) != len(argv) - 1:
+            usage_str = 'Usage: ' + build_cmdcoro_usage(prefix, argv[0], or_func)
+            await message.channel.send(usage_str)
+        else:
+            await func(client, message, *argv[1:])
+
+    setattr(wrapped_func, "or_cmdcoro", or_func)
+    
+    return wrapped_func
 
 def member_mention_arg(func):
     async def wrapped_func(client, msg, user_mention, *argv):

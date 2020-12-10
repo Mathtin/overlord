@@ -70,4 +70,8 @@
    <string name="rank_role_same_weight">❌ Rank {0} have same weight</string>
    <string name="rank_unknown">❌ No such rank '{0}'</string>
 
+   <!-- control.py: get_stat_names -->
+   <string name="stats_name_head">📊 Available stats:</string>
+   <string name="stats_name_entry">> `{0}`</string>
+
 </resources>

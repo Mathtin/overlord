@@ -363,3 +363,49 @@ async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, 
         __save_config(client)
         log.info(f'Done')
         await client.control_channel.send(res.get("messages.done"))
+
+
+@cmdcoro
+async def get_stat_names(client: bot.Overlord, msg: discord.Message):
+    names = [res.get("messages.stats_name_entry").format(s) for s in client.s_stats.user_stat_type_map]
+    answer = res.get("messages.stats_name_head") + '\n' + '\n'.join(names)
+    await msg.channel.send(answer)
+
+@cmdcoro
+@member_mention_arg
+async def get_user_stat(client: bot.Overlord, msg: discord.Message, member: discord.Member, stat_name: str):
+    user = client.s_users.get(member)
+    if user is None:
+        await msg.channel.send(res.get("messages.unknown_user"))
+        return
+
+    try:
+        answer = __build_stat_line(client, user, stat_name)
+        await msg.channel.send(answer)
+    except NameError:
+        await msg.channel.send(res.get("messages.error").format("Invalid stat name"))
+        return
+
+@cmdcoro
+@member_mention_arg
+async def set_user_stat(client: bot.Overlord, msg: discord.Message, member: discord.Member, stat_name: str, value: str):
+    try:
+        value = int(value)
+    except ValueError:
+        await msg.channel.send(res.get("messages.error").format("integer expected"))
+        return
+    
+    if value < 0:
+        await msg.channel.send(res.get("messages.warning").format("negative stat value!"))
+
+    user = client.s_users.get(member)
+    if user is None:
+        await msg.channel.send(res.get("messages.unknown_user"))
+        return
+
+    try:
+        client.s_stats.set(user, stat_name, value)
+        await client.control_channel.send(res.get("messages.done"))
+    except NameError:
+        await msg.channel.send(res.get("messages.error").format("Invalid stat name"))
+        return
