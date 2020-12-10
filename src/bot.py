@@ -96,6 +96,7 @@ class StatUpdate(commands.Cog):
             insert_query = q.insert_user_stat_from_select(select_query)
             self.client.db.execute(insert_query)
             self.client.db.commit()
+        log.info("Done scheduled stat update")
             
     @stat_updater.before_loop
     async def before_stat_update(self):
