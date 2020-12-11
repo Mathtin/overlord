@@ -275,14 +275,8 @@ class Overlord(discord.Client):
             await member.remove_roles(*roles_del)
         # Add new roles
         if roles_add:
-            applied = True
-            for role in roles_add:
-                if not is_role_applied(member, role):
-                    applied = False
-                    break
-            if not applied:
-                log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
-                await member.add_roles(*roles_add)
+            log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
+            await member.add_roles(*roles_add)
         # Update user in db
         self.s_users.update_member(member)
 
