@@ -99,6 +99,9 @@
         },
         "ranks": {
             "ignore": ["CEO", "Director", "Supervisor", "Operator", "Visitor"],
+            "require": [
+                "═════════[TAG]══════════"
+            ],
             "role": {
                 "Shitposter": {
                     "weight": 2,

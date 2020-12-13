@@ -235,6 +235,10 @@
               "type": "array",
               "default": []
             },
+            "require": {
+              "type": "array",
+              "default": []
+            },
             "role": {
               "type": "object",
               "default": {}
@@ -242,6 +246,7 @@
           },
           "required": [
             "ignore",
+            "require",
             "role"
           ]
         }

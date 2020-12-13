@@ -393,7 +393,7 @@ class RankingService(object):
         return max_rank_name
 
     def ignore_member(self, member: discord.Member) -> bool:
-        return len(filter_roles(member, self.config["ignore"])) > 0
+        return len(filter_roles(member, self.config["ignore"])) > 0 or len(filter_roles(member, self.config["require"])) == 0
 
     def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> List[discord.Role]:
         rank_roles = [self.roles.get(r) for r in self.config['role']]
