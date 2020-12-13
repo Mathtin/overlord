@@ -402,6 +402,6 @@ class RankingService(object):
         ranks_to_remove = [r for r in applied_rank_roles if r.name != effective_rank_name]
         ranks_to_apply = []
         if effective_rank_name is not None and not is_role_applied(member, effective_rank_name):
-            ranks_to_apply.append(effective_rank_name)
+            ranks_to_apply.append(self.roles.get(effective_rank_name))
         return ranks_to_apply, ranks_to_remove
 
