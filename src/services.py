@@ -338,6 +338,10 @@ class RankingService(object):
         for role_name in ignore_roles:
             if self.roles.get(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.ignore")
+        require_roles = self.config["require"]
+        for role_name in require_roles:
+            if self.roles.get(role_name) is None:
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.require")
         ranks = self.config["role"]
         ranks_weights = {}
         for rank_name in ranks:
