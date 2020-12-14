@@ -28,24 +28,6 @@ log = logging.getLogger('control')
 # Utility funcs #
 #################
 
-'''
-async def __drop_user_stats(client: bot.Overlord, stat_name: str, stat_id: int):
-    log.warn(f'Dropping "{stat_name}" stats')
-    answer = res.get("messages.user_stat_drop").format(stat_name)
-    await client.control_channel.send(answer)
-    client.db.query(db.UserStat).filter_by(type_id=stat_id).delete()
-    client.db.commit()
-
-async def __calc_user_stats(client: bot.Overlord, stat_name: str, stat_id: int, event_id: int, select_query):
-    log.warn(f'Calculating "{stat_name}" stats')
-    answer = res.get("messages.user_stat_calc").format(stat_name)
-    await client.control_channel.send(answer)
-    select_query = select_query(event_id, [('type_id',stat_id)])
-    insert_query = q.insert_user_stat_from_select(select_query)
-    client.db.execute(insert_query)
-    client.db.commit()
-'''
-
 def __build_stat_line(client: bot.Overlord, user: db.User, stat: str, formatter=lambda x:str(x)):
     stat_name = res.get(f"messages.{stat}_stat")
     stat_val = client.s_stats.get(user, stat)
@@ -59,14 +41,15 @@ def __build_stat_line(client: bot.Overlord, user: db.User, stat: str, formatter=
 
 @cmdcoro
 async def ping(client: bot.Overlord, msg: discord.Message):
-    await msg.channel.send(res.get("messages.pong"))
+    if client.sync().locked():
+        await msg.channel.send(res.get("messages.busy"))
+    else:
+        await msg.channel.send(res.get("messages.pong"))
 
 
 @cmdcoro
 async def sync_roles(client: bot.Overlord, msg: discord.Message):
     async with client.sync():
-        await msg.channel.send(res.get("messages.sync_roles_begin"))
-        await client.sync_roles()
         await msg.channel.send(res.get("messages.sync_users_begin"))
         await client.sync_users()
         await msg.channel.send(res.get("messages.done"))
@@ -188,7 +171,7 @@ async def clear_data(client: bot.Overlord, msg: discord.Message):
             await client.control_channel.send(table_data_drop.format(model.table_name()))
             client.db.query(model).delete()
             client.db.commit()
-        await client.set_awaiting_sync()
+        client.set_awaiting_sync()
         log.info(f'Done')
         await client.control_channel.send(res.get("messages.done"))
 

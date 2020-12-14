@@ -13,6 +13,7 @@
 
 __author__ = 'Mathtin'
 
+from datetime import datetime
 import os
 import sys
 import traceback
@@ -20,6 +21,7 @@ import asyncio
 import logging
 
 import discord
+from discord.ext import tasks
 import db as DB
 
 from util import *
@@ -77,9 +79,8 @@ def event_config(name: str):
 class Overlord(discord.Client):
     __async_lock: asyncio.Lock
     __initialized: bool
-    __awaiting_role_sync: bool
-    __awaiting_user_sync: bool
-    __awaiting_user_sync: bool
+    __awaiting_sync: bool
+    __awaiting_sync_last_updated: datetime
 
     # Members loaded from ENV
     token: str
@@ -110,8 +111,8 @@ class Overlord(discord.Client):
     def __init__(self, config: ConfigView, db_session: DB.DBSession):
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
-        self.__awaiting_role_sync = True
-        self.__awaiting_user_sync = True
+        self.__awaiting_sync = True
+        self.__awaiting_sync_last_updated = datetime.now()
         self.tasks = []
 
         self.config = config
@@ -131,10 +132,6 @@ class Overlord(discord.Client):
         self.guild_id = int(os.getenv('DISCORD_GUILD'))
         self.control_channel_id = int(os.getenv('DISCORD_CONTROL_CHANNEL'))
         self.error_channel_id = int(os.getenv('DISCORD_ERROR_CHANNEL'))
-
-        # Map event types
-        self.event_type_map = {row.name:row.id for row in self.db.query(DB.EventType)}
-        self.user_stat_type_map = {row.name:row.id for row in self.db.query(DB.UserStatType)}
 
         # Preset values initiated on_ready
         self.guild = None
@@ -175,6 +172,14 @@ class Overlord(discord.Client):
         roles = self.config["control.roles"]
         return len(filter_roles(user, roles)) > 0
 
+    def awaiting_sync(self):
+        return self.__awaiting_sync
+
+    def awaiting_sync_elapsed(self):
+        if not self.__awaiting_sync:
+            return 0
+        return (datetime.now() - self.__awaiting_sync_last_updated).total_seconds()
+
     ################
     # Sync methods #
     ################
@@ -195,6 +200,18 @@ class Overlord(discord.Client):
         self.s_ranking.config = config.ranks
         self.check_config()
 
+    def set_awaiting_sync(self):
+        if self.__awaiting_sync:
+            return
+        self.__awaiting_sync = True
+        self.__awaiting_sync_last_updated = datetime.now()
+
+    def unset_awaiting_sync(self):
+        if not self.__awaiting_sync:
+            return
+        self.__awaiting_sync = False
+        self.__awaiting_sync_last_updated = datetime.now()
+
     #################
     # Async methods #
     #################
@@ -209,32 +226,15 @@ class Overlord(discord.Client):
             await self.error_channel.send(res.get("messages.error").format(msg))
         return
 
-    async def set_awaiting_sync(self):
-        if self.__awaiting_role_sync and self.__awaiting_user_sync:
-            return
-        self.__awaiting_role_sync = True
-        self.__awaiting_user_sync = True
-        await self.send_warning('Awaiting role syncronization')
-
     async def send_warning(self, msg: str):
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.warning").format(msg))
         return
 
-    async def sync_roles(self):
-        log.info('Syncing roles')
-        # Update role service
-        self.s_roles.load(self.guild.roles)
-        # Drop awaiting flag
-        self.__awaiting_role_sync = False
-        log.info('Syncing roles done')
-
     async def sync_users(self):
-        # Check awaiting flag
-        if self.__awaiting_role_sync:
-            log.error(f'Cannot sync users: awaiting role sync')
-            await self.send_error(f'Cannot sync users: awaiting role sync')
-            return
+        log.info('Syncing roles')
+        self.s_roles.load(self.guild.roles)
+
         log.info(f'Syncing users')
         # Mark everyone absent
         self.s_users.mark_everyone_absent()
@@ -250,21 +250,20 @@ class Overlord(discord.Client):
         # Remove effectively absent
         if not self.config["user.leave.keep"]:
             self.s_users.remove_absent()
-        self.__awaiting_user_sync = False
+        self.unset_awaiting_sync()
         log.info(f'Syncing users done')
 
     async def update_user_rank(self, member: discord.Member):
-        if self.__awaiting_role_sync:
-            log.error("Cannot update user rank: awaiting role sync")
-            await self.send_error(f'Cannot update user rank: awaiting role sync')
-            return
+        if self.awaiting_sync():
+            log.warn("Cannot update user rank: awaiting role sync")
+            return False
         # Resolve user
         user = self.s_users.get(member)
         # Skip non-existing users
         if user is None:
             log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
             return
-        # Ignore special roles
+        # Ignore inappropriate members
         if self.s_ranking.ignore_member(member):
             return
         # Resolve roles to move
@@ -279,9 +278,10 @@ class Overlord(discord.Client):
             await member.add_roles(*roles_add)
         # Update user in db
         self.s_users.update_member(member)
+        return True
 
     async def update_user_ranks(self):
-        if self.__awaiting_role_sync:
+        if self.awaiting_sync():
             log.error("Cannot update user ranks: awaiting role sync")
             await self.send_error(f'Cannot update user ranks: awaiting role sync')
             return
@@ -310,8 +310,23 @@ class Overlord(discord.Client):
 
     async def logout(self):
         for task in self.tasks:
-            task.cancel()
+            task.stop()
         await super().logout()
+
+    #############
+    # Own tasks #
+    #############
+
+    def get_user_sync_task(self, **kwargs) -> asyncio.AbstractEventLoop:
+        @tasks.loop(**kwargs)
+        async def user_sync_task():
+            if self.awaiting_sync_elapsed() < 30:
+                return
+            log.info("Scheduled user sync update")
+            async with self.sync():
+                await self.sync_users()
+            log.info("Done scheduled stat update")
+        return user_sync_task
 
     #########
     # Hooks #
@@ -377,7 +392,6 @@ class Overlord(discord.Client):
                 self.error_channel = channel
 
             # Sync roles and users
-            await self.sync_roles()
             await self.sync_users()
 
             # Check config value
@@ -385,6 +399,9 @@ class Overlord(discord.Client):
 
             # Schedule tasks
             self.tasks.append(self.s_stats.get_stat_update_task(self.sync(), hours=24, loop=asyncio.get_running_loop()))
+            self.tasks.append(self.get_user_sync_task(minutes=1, loop=asyncio.get_running_loop()))
+
+            # Start tasks
             for task in self.tasks:
                 task.start()
             
@@ -458,7 +475,7 @@ class Overlord(discord.Client):
             await message.channel.send(res.get("messages.unknown_command"))
             return
 
-        if self.__awaiting_role_sync or self.__awaiting_user_sync:
+        if self.awaiting_sync():
             await self.send_warning('Awaiting role syncronization')
         
         hook = get_module_element(control_hooks[cmd_name])
@@ -526,7 +543,7 @@ class Overlord(discord.Client):
 
             Saves user in database
         """
-        if self.__awaiting_user_sync:
+        if self.awaiting_sync():
             return
         # Sync code part
         async with self.sync():
@@ -546,7 +563,7 @@ class Overlord(discord.Client):
 
             Removes user from database (or keep it, depends on config)
         """
-        if self.__awaiting_user_sync:
+        if self.awaiting_sync():
             return
         # track only role/nickname change
         if not (before.roles != after.roles or \
@@ -652,24 +669,21 @@ class Overlord(discord.Client):
             await self.update_user_rank(member)
 
     async def on_guild_role_create(self, role: discord.Role):
-        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+        if self.awaiting_sync():
             return
-        self.__awaiting_role_sync = True
-        self.__awaiting_user_sync = True
+        self.set_awaiting_sync()
         await self.send_warning('New role detected. Awaiting role syncronization.')
 
     async def on_guild_role_delete(self, role: discord.Role):
-        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+        if self.awaiting_sync():
             return
-        self.__awaiting_role_sync = True
-        self.__awaiting_user_sync = True
+        self.set_awaiting_sync()
         await self.send_warning('Role remove detected. Awaiting role syncronization.')
 
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role):
-        if self.__awaiting_role_sync and self.__awaiting_user_sync:
+        if self.awaiting_sync():
             return
-        self.__awaiting_role_sync = True
-        self.__awaiting_user_sync = True
+        self.set_awaiting_sync()
         await self.send_warning('Role change detected. Awaiting role syncronization.')
 
 

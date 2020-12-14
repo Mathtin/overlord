@@ -284,8 +284,14 @@ class StatService(object):
 
     def reload_stat(self, name: str):
         self.check_stat_name(name)
-        hook = getattr(self, f'reload_{name}_stat')
-        hook()
+        if hasattr(self, f'reload_{name}_stat'):
+            hook = getattr(self, f'reload_{name}_stat')
+            hook()
+        else:
+            self.reload_stat_default()
+
+    def reload_stat_default(self):
+        pass
 
     def reload_membership_stat(self):
         self.__reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
@@ -301,15 +307,6 @@ class StatService(object):
 
     def reload_vc_time_stat(self):
         self.__reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
-
-    def reload_min_weight_stat(self):
-        pass
-
-    def reload_max_weight_stat(self):
-        pass
-
-    def reload_exact_weight_stat(self):
-        pass
 
 
 class RankingService(object):

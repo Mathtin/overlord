@@ -41,6 +41,7 @@
 
    <!-- control.py: ping -->
    <string name="pong">🏓 Pong!</string>
+   <string name="busy">Sorry, I'm very busy right now</string>
 
    <!-- control.py: calc_channel_stats -->
    <string name="channel_history_drop">🗑 Clearing {0} message history</string>
