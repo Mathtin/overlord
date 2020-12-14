@@ -44,6 +44,7 @@ class DBSession(object):
         Base.metadata.create_all(self.db_engine)
         self.session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
         self.__last_connection = None
+        self.__session = None
         self.__check_connection()
 
     def __check_connection(self):
