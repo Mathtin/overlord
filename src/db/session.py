@@ -48,7 +48,9 @@ class DBSession(object):
 
     def __check_connection(self):
         now = datetime.now()
-        if self.__last_connection is None or (now - self.__last_connection).total_seconds() > 4:
+        if self.__last_connection is None or (now - self.__last_connection).total_seconds() > 10:
+            if self.__session is not None:
+                self.__session.close()
             self.__session = self.session_factory()
             self.__last_connection = now
 
