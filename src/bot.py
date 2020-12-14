@@ -201,16 +201,12 @@ class Overlord(discord.Client):
         self.check_config()
 
     def set_awaiting_sync(self):
-        if self.__awaiting_sync:
-            return
-        self.__awaiting_sync = True
         self.__awaiting_sync_last_updated = datetime.now()
+        self.__awaiting_sync = True
 
     def unset_awaiting_sync(self):
-        if not self.__awaiting_sync:
-            return
-        self.__awaiting_sync = False
         self.__awaiting_sync_last_updated = datetime.now()
+        self.__awaiting_sync = False
 
     #################
     # Async methods #
