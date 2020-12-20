@@ -321,7 +321,7 @@ class Overlord(discord.Client):
             log.info("Scheduled user sync update")
             async with self.sync():
                 await self.sync_users()
-            log.info("Done scheduled stat update")
+            log.info("Done scheduled user sync update")
         return user_sync_task
 
     #########
@@ -500,6 +500,8 @@ class Overlord(discord.Client):
             inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
             self.s_stats.set(msg.user, 'edit_message_count', inc_value)
             # Update user rank
+            if self.s_users.is_absent(msg.user):
+                return
             member = await self.guild.fetch_member(msg.user.did)
             await self.update_user_rank(member)
 
@@ -525,6 +527,8 @@ class Overlord(discord.Client):
             inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
             self.s_stats.set(msg.user, 'delete_message_count', inc_value)
             # Update user rank
+            if self.s_users.is_absent(msg.user):
+                return
             member = await self.guild.fetch_member(msg.user.did)
             await self.update_user_rank(member)
 

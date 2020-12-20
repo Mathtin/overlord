@@ -92,6 +92,9 @@ class UserService(object):
         self.db.query(DB.User).filter_by(roles=None).delete()
         self.db.commit()
 
+    def is_absent(self, user: DB.User):
+        return user.roles is None
+
     def remove(self, member: discord.Member) -> bool:
         user = self.get(member)
         if user is None:
