@@ -14,17 +14,22 @@
 __author__ = 'Mathtin'
 
 import logging
-import discord, db as DB
-from bot import Overlord, BotExtension
-from util import *
+import discord
+from bot import BotExtension
+from util import qualified_name, member_mention_arg
+from ovtype import *
 import util.resources as res
+
+log = logging.getLogger('ranking-extension')
 
 #####################
 # Ranking Extension #
 #####################
-
-log = logging.getLogger('ranking-extension')
 class RankingExtension(BotExtension):
+            
+    ###########
+    # Methods #
+    ###########
 
     async def update_rank(self, member: discord.Member) -> None:
         if self.bot.awaiting_sync():
@@ -63,28 +68,32 @@ class RankingExtension(BotExtension):
                 continue
             await self.update_rank(member)
         log.info(f'Done updating user ranks')
+            
+    #########
+    # Hooks #
+    #########
 
-    async def on_message(self, message: discord.Message) -> None:
+    async def on_message(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            await self.update_rank(message.author)
+            await self.update_rank(msg.discord.author)
 
-    async def on_message_edit(self, msg: DB.MessageEvent) -> None:
+    async def on_message_edit(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            if self.bot.s_users.is_absent(msg.user):
+            if self.bot.s_users.is_absent(msg.db.user):
                 return
-            member = await self.bot.guild.fetch_member(msg.user.did)
+            member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)
 
-    async def on_message_delete(self, msg: DB.MessageEvent) -> None:
+    async def on_message_delete(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            if self.bot.s_users.is_absent(msg.user):
+            if self.bot.s_users.is_absent(msg.db.user):
                 return
-            member = await self.bot.guild.fetch_member(msg.user.did)
+            member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)
             
-    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
+    async def on_vc_leave(self, user: OverlordUser, join: OverlordVCState, leave: OverlordVCState) -> None:
         async with self.sync():
-            await self.update_rank(member)
+            await self.update_rank(user.discord.member)
             
     ############
     # Commands #

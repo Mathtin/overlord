@@ -22,7 +22,7 @@ import logging
 
 import discord
 from discord.errors import InvalidArgument
-from discord.ext import tasks
+from ovtype import *
 import db as DB
 
 from util import *
@@ -241,7 +241,6 @@ class OverlordBase(discord.Client):
         async for member in self.guild.fetch_members(limit=None):
             # Cache and skip bots
             if member.bot:
-                self.s_users.cache_bot(member)
                 continue
             # Update and repair
             user = self.s_users.update_member(member)
@@ -355,57 +354,6 @@ class OverlordBase(discord.Client):
 
         self.__initialized = True
 
-#################################
-# Bot Extension Utility Classes #
-#################################
-
-class BotExtensionTask(object):
-
-    def __init__(self, func, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> None:
-        super().__init__()
-        self.func = func
-        self.kwargs = {
-            'seconds': seconds,
-            'minutes': minutes,
-            'hours': hours,
-            'count': count,
-            'reconnect': reconnect
-        }
-
-    def task(self, ext) -> asyncio.AbstractEventLoop:
-        self.kwargs['loop'] = asyncio.get_running_loop()
-        async def method(*args, **kwargs):
-            try:
-                await self.func(ext, *args, **kwargs)
-            except:
-                await ext.on_error(self.func.__name__, *args, **kwargs)
-        return tasks.loop(**self.kwargs)(method)
-    
-class BotExtensionCommand(object):
-
-    def __init__(self, func, name, desciption='') -> None:
-        super().__init__()
-        check_coroutine(func)
-        self.func = func
-        self.name = name
-        self.desciption = desciption
-        f_args = func.__code__.co_varnames[:func.__code__.co_argcount]
-        assert len(f_args) >= 2
-        self.f_args = f_args[2:]
-        self.args_str = ' '.join(["{%s}" % arg for arg in self.f_args])
-
-    def usage(self, prefix: str, cmdname: str) -> str:
-        return f'{prefix}{cmdname} {self.args_str}'
-
-    def handler(self, ext):
-        async def wrapped_func(message, prefix, argv):
-            if len(self.f_args) != len(argv) - 1:
-                usage_str = 'Usage: ' + self.usage(prefix, argv[0])
-                await message.channel.send(usage_str)
-            else:
-                await self.func(ext, message, *argv[1:])
-        return wrapped_func
-
 ############################
 # Bot Extension Base Class #
 ############################
@@ -419,8 +367,8 @@ class BotExtension(object):
 
     # State members
     __enabled: bool
-    __tasks: List[BotExtensionTask]
-    __commands: Dict[str, BotExtensionCommand]
+    __tasks: List[OverlordTask]
+    __commands: Dict[str, OverlordCommand]
     __command_handlers: Dict[str, Callable[..., Awaitable[None]]]
     __task_instances: List[asyncio.AbstractEventLoop]
     __async_lock: asyncio.Lock
@@ -434,11 +382,11 @@ class BotExtension(object):
         attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
 
         # Gather tasks
-        self.__tasks =  [t for t in attrs if isinstance(t, BotExtensionTask)]
+        self.__tasks =  [t for t in attrs if isinstance(t, OverlordTask)]
         self.__task_instances =  []
 
         # Gather commands
-        self.__commands =  {c.name:c for c in attrs if isinstance(c, BotExtensionCommand)}
+        self.__commands =  {c.name:c for c in attrs if isinstance(c, OverlordCommand)}
         self.__command_handlers =  {name:c.handler(self) for name, c in self.__commands.items()}
 
         # Reattach implemented handlers
@@ -458,13 +406,13 @@ class BotExtension(object):
             async def wrapped(self, *args, **kwargs):
                 await self.bot.init_lock()
                 await func(self, *args, **kwargs)
-            return BotExtensionTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count, reconnect=reconnect)
+            return OverlordTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count, reconnect=reconnect)
         return decorator
 
     @staticmethod
     def command(name, desciption='') -> Callable[..., Callable[..., Awaitable[None]]]:
         def decorator(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
-            return BotExtensionCommand(func, name=name, desciption=desciption)
+            return OverlordCommand(func, name=name, desciption=desciption)
         return decorator
 
     @staticmethod
@@ -497,7 +445,7 @@ class BotExtension(object):
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
 
-    def cmd(self, name: str) -> Optional[BotExtensionCommand]:
+    def cmd(self, name: str) -> Optional[OverlordCommand]:
         if name in self.__commands:
             return self.__commands[name]
         return None
@@ -577,17 +525,13 @@ class Overlord(OverlordBase):
             if not hasattr(extension, handler_name):
                 continue
             call_plan[extension.priority].append(getattr(extension, handler_name))
-        self.__call_plan_map[handler_name] = call_plan
+        self.__call_plan_map[handler_name] = [call for call in call_plan if call]
 
     async def __run_call_plan(self, name: str, *args, **kwargs):
         call_plan = self.__call_plan_map[name]
         for handlers in call_plan:
             calls = [h(*args, **kwargs) for h in handlers]
-            if calls:
-                await asyncio.wait(calls)
-
-    def run(self) -> None:
-        return super().run()
+            await asyncio.wait(calls)
 
     def logout(self) -> None:
         for ext in self.__extensions:
@@ -621,24 +565,14 @@ class Overlord(OverlordBase):
     #########
 
     async def on_ready(self) -> None:
-        """
-            Async ready event handler
-
-            Completly initialize bot state
-        """
-        # Lock current async context
         async with self.sync():
-
             await super().on_ready()
             self.update_command_cache()
-
             # Start extensions
             for ext in self.__extensions:
                 ext.start()
-
-            # Call extension 'on_ready' handlers
+            # Call 'on_ready' extension handlers
             await self.__run_call_plan('on_ready')
-            
             # Message for pterodactyl panel
             print(self.config["egg_done"])
             await self.maintainer.send('Started!')
@@ -659,20 +593,15 @@ class Overlord(OverlordBase):
             return
         if not self.is_guild_member_message(message):
             return
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(message.author)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
-                return
-            # Save event
-            self.s_events.create_new_message_event(user, message)
-            # Update stats
-            inc_value = self.s_stats.get(user, 'new_message_count') + 1
-            self.s_stats.set(user, 'new_message_count', inc_value)
+        user = self.s_users.get(message.author)
+        # Skip non-existing users
+        if user is None:
+            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
+            return
+        # Save event
+        msg = self.s_events.create_new_message_event(user, message)
         # Call extension 'on_message' handlers
-        await self.__run_call_plan('on_message', message)
+        await self.__run_call_plan('on_message', OverlordMessage(message, msg))
 
 
     async def _on_control_message(self, message: discord.Message) -> None:
@@ -681,43 +610,22 @@ class Overlord(OverlordBase):
 
             Calls appropriate control callback
         """
+        # Filter non-admins
         if not self.is_admin(message.author):
             return
-
+        # Parse argv
         prefix = self.config["control.prefix"]
         argv = parse_control_message(prefix, message)
-
         if argv is None or len(argv) == 0:
             return
-            
+        # Resolve cmd handler
         cmd_name = argv[0]
-
         if cmd_name not in self.__cmd_cache:
             await message.channel.send(res.get("messages.unknown_command"))
             return
-
         handler = self.__cmd_cache[cmd_name]
+        # Call handler
         await handler(message, prefix, argv)
-
-        '''
-        if cmd_name == "help":
-            help_lines = []
-            line_fmt = res.get("messages.commands_list_entry")
-            for cmd in control_hooks:
-                hook = get_module_element(control_hooks[cmd])
-                base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
-                help_lines.append(line_fmt.format(base_line))
-            help_header = res.get("messages.commands_list_head")
-            help_msg = '\n'.join(help_lines)
-            await message.channel.send(f'{help_header}\n{help_msg}\n')
-            return
-        
-        hook = get_module_element(control_hooks[cmd_name])
-        check_coroutine(hook)
-        await hook(self, message, prefix, argv)
-        # Call extension 'on_control_message' handlers
-        await self.__run_call_plan('on_control_message', message)
-        '''
 
     
     @after_initialized
@@ -737,11 +645,8 @@ class Overlord(OverlordBase):
         # Sync code part
         async with self.sync():
             self.s_events.create_message_edit_event(msg)
-            # Update stats
-            inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
-            self.s_stats.set(msg.user, 'edit_message_count', inc_value)
-        # Call extension 'on_raw_message_edit' handlers
-        await self.__run_call_plan('on_message_edit', msg)
+        # Call extension 'on_message_edit' handlers
+        await self.__run_call_plan('on_message_edit', OverlordMessageEdit(payload, msg))
 
     
     @after_initialized
@@ -761,12 +666,10 @@ class Overlord(OverlordBase):
         # Sync code part
         async with self.sync():
             self.s_events.create_message_delete_event(msg)
-            # Update stats
-            inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
-            self.s_stats.set(msg.user, 'delete_message_count', inc_value)
-        # Call extension 'on_raw_message_delete' handlers
-        await self.__run_call_plan('on_message_delete', msg)
+        # Call extension 'on_message_delete' handlers
+        await self.__run_call_plan('on_message_delete', OverlordMessageDelete(payload, msg))
     
+
     @after_initialized
     @event_config("user.join")
     @skip_bots
@@ -779,14 +682,12 @@ class Overlord(OverlordBase):
         """
         if self.awaiting_sync():
             return
-        # Sync code part
-        async with self.sync():
-            # Add/update user
-            user = self.s_users.update_member(member)
-            # Add event
-            self.s_events.create_member_join_event(user, member)
+        # Add/update user
+        user = self.s_users.update_member(member)
+        # Add event
+        self.s_events.create_member_join_event(user, member)
         # Call extension 'on_member_join' handlers
-        await self.__run_call_plan('on_member_join', member)
+        await self.__run_call_plan('on_member_join', OverlordMember(member, user))
 
     
     @after_initialized
@@ -808,15 +709,14 @@ class Overlord(OverlordBase):
                 before.discriminator != after.discriminator):
             return
         # Skip absent
-        if self.s_users.get(before) is None:
+        user = self.s_users.get(before)
+        if user is None:
             log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
             return
-        # Sync code part
-        async with self.sync():
-            # Update user
-            self.s_users.update_member(after)
+        # Update user
+        self.s_users.update_member(after)
         # Call extension 'on_member_update' handlers
-        await self.__run_call_plan('on_member_update', before, after)
+        await self.__run_call_plan('on_member_update', OverlordMember(before, user), OverlordMember(after, user))
 
     
     @after_initialized
@@ -829,27 +729,25 @@ class Overlord(OverlordBase):
 
             Removes user from database (or keep it, depends on config)
         """
-        # Sync code part
-        async with self.sync():
-            if self.config["user.leave.keep"]:
-                user = self.s_users.mark_absent(member)
-                if user is None:
-                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                    return
-                self.s_events.create_user_leave_event(user)
-            else:
-                user = self.s_users.remove(member)
-                if user is None:
-                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                    return
+        if self.config["user.leave.keep"]:
+            user = self.s_users.mark_absent(member)
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                return
+            self.s_events.create_user_leave_event(user)
+        else:
+            user = self.s_users.remove(member)
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                return
         # Call extension 'on_member_remove' handlers
-        await self.__run_call_plan('on_member_remove', member)
+        await self.__run_call_plan('on_member_remove', OverlordMember(member, user))
 
     
     @after_initialized
     @skip_bots
     @guild_member_event
-    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
         """
             Async vc state change event handler
 
@@ -858,57 +756,50 @@ class Overlord(OverlordBase):
         if before.channel == after.channel:
             return
         if before.channel is not None and self.check_afk_state(before):
-            await self.on_vc_leave(user, before.channel)
+            await self.on_vc_leave(member, before)
         if after.channel is not None and self.check_afk_state(after):
-            await self.on_vc_join(user, after.channel)
+            await self.on_vc_join(member, after)
             
     
     @event_config("voice.join")
-    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
+    async def on_vc_join(self, member: discord.Member, state: discord.VoiceState) -> None:
         """
             Async vc join event handler
 
             Saves event in database
         """
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(member)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
-                return
-            # Apply constraints
-            self.s_events.repair_vc_leave_event(user, channel)
-            # Save event
-            self.s_events.create_vc_join_event(user, channel)
+        user = self.s_users.get(member)
+        # Skip non-existing users
+        if user is None:
+            log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
+            return
+        # Apply constraints
+        self.s_events.repair_vc_leave_event(user, state.channel)
+        # Save event
+        event = self.s_events.create_vc_join_event(user, state.channel)
         # Call extension 'on_vc_join' handlers
-        await self.__run_call_plan('on_vc_join', member, channel)
+        await self.__run_call_plan('on_vc_join', OverlordUser(member, user), OverlordVCState(state, event))
             
     
     @event_config("voice.leave")
-    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
+    async def on_vc_leave(self, member: discord.Member, state: discord.VoiceState) -> None:
         """
             Async vc join event handler
 
             Saves event in database
         """
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(member)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
-                return
-            # Close event
-            join_event = self.s_events.close_vc_join_event(user, channel)
-            if join_event is None:
-                return
-            # Update stats
-            stat_val = self.s_stats.get(user, 'vc_time')
-            stat_val += (join_event.updated_at - join_event.created_at).total_seconds()
-            self.s_stats.set(user, 'vc_time', stat_val)
+        user = self.s_users.get(member)
+        # Skip non-existing users
+        if user is None:
+            log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
+            return
+        # Close event
+        events = self.s_events.close_vc_join_event(user, state.channel)
+        if events is None:
+            return
+        join_event, leave_event = events
         # Call extension 'on_vc_leave' handlers
-        await self.__run_call_plan('on_vc_leave', member, channel)
+        await self.__run_call_plan('on_vc_leave', OverlordUser(member, user), OverlordVCState(state, join_event), OverlordVCState(state, leave_event))
 
     async def on_guild_role_create(self, role: discord.Role) -> None:
         if role.guild != self.guild:
@@ -918,7 +809,7 @@ class Overlord(OverlordBase):
         self.set_awaiting_sync()
         await self.send_warning('New role detected. Awaiting role syncronization.')
         # Call extension 'on_guild_role_create' handlers
-        await self.__run_call_plan('on_guild_role_create', role)
+        await self.__run_call_plan('on_guild_role_create', OverlordRole(role, self.s_roles.get(role.name)))
 
     async def on_guild_role_delete(self, role: discord.Role) -> None:
         if role.guild != self.guild:
@@ -928,7 +819,7 @@ class Overlord(OverlordBase):
         self.set_awaiting_sync()
         await self.send_warning('Role remove detected. Awaiting role syncronization.')
         # Call extension 'on_guild_role_delete' handlers
-        await self.__run_call_plan('on_guild_role_delete', role)
+        await self.__run_call_plan('on_guild_role_delete', OverlordRole(role, self.s_roles.get(role.name)))
 
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
         if before.guild != self.guild:
@@ -937,8 +828,9 @@ class Overlord(OverlordBase):
             return
         self.set_awaiting_sync()
         await self.send_warning('Role change detected. Awaiting role syncronization.')
+        role = self.s_roles.get(before.name)
         # Call extension 'on_guild_role_update' handlers
-        await self.__run_call_plan('on_guild_role_update', before, after)
+        await self.__run_call_plan('on_guild_role_update', OverlordRole(before, role), OverlordRole(after, role))
 
 ##################
 # Sync Extension #

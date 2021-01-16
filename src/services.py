@@ -17,32 +17,32 @@ import asyncio
 import logging
 
 import discord
-from discord.ext import tasks
 import db as DB
 import db.queries as q
 import db.converters as conv
 
 from util import *
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+log = logging.getLogger('db-service')
 
 ############
 # Services #
 ############
 
 class RoleService(object):
-
-    log = logging.getLogger('role-service')
     
+    # State
     role_map: Dict[str, discord.Role]
     role_rows_did_map: Dict[int, DB.Role]
 
     # Members passed via constructor
-    db:         DB.DBSession
+    db: DB.DBSession
 
-    def __init__(self, db: DB.DBSession):
+    def __init__(self, db: DB.DBSession) -> None:
         self.db = db
 
-    def load(self, roles: List[discord.Role]):
+    def load(self, roles: List[discord.Role]) -> None:
         self.role_map = { role.name: role for role in roles }
         roles = conv.roles_to_rows(roles)
         self.role_rows_did_map = { role['did']: role for role in roles }
@@ -56,25 +56,18 @@ class RoleService(object):
 
 class UserService(object):
 
-    log = logging.getLogger('user-service')
-
     # Members passed via constructor
-    db:             DB.DBSession
-    roles:          RoleService
-    bot_cache:      Dict[int, discord.User]
+    db:    DB.DBSession
+    roles: RoleService
 
-    def __init__(self, db: DB.DBSession, roles: RoleService):
+    def __init__(self, db: DB.DBSession, roles: RoleService) -> None:
         self.db = db
         self.roles = roles
         self.bot_cache = {}
         
-    def mark_everyone_absent(self):
+    def mark_everyone_absent(self) -> None:
         self.db.query(DB.User).update({'roles': None, 'display_name': None})
         self.db.commit()
-
-    def cache_bot(self, duser: discord.User):
-        if duser.bot:
-            self.bot_cache[duser.id] = duser
             
     def update_member(self, member: discord.Member) -> DB.User:
         u_row = conv.member_row(member, self.roles.role_rows_did_map)
@@ -88,14 +81,14 @@ class UserService(object):
         self.db.commit()
         return user
 
-    def remove_absent(self):
+    def remove_absent(self) -> None:
         self.db.query(DB.User).filter_by(roles=None).delete()
         self.db.commit()
 
-    def is_absent(self, user: DB.User):
+    def is_absent(self, user: DB.User) -> bool:
         return user.roles is None
 
-    def remove(self, member: discord.Member) -> bool:
+    def remove(self, member: discord.Member) -> Optional[DB.User]:
         user = self.get(member)
         if user is None:
             return None
@@ -103,7 +96,7 @@ class UserService(object):
         self.db.commit()
         return user
         
-    def mark_absent(self, member: discord.Member) -> bool:
+    def mark_absent(self, member: discord.Member) -> Optional[DB.User]:
         user = self.get(member)
         if user is None:
             return None
@@ -112,13 +105,13 @@ class UserService(object):
         self.db.commit()
         return user
 
-    def get(self, member: discord.User) -> DB.User:
+    def get(self, member: discord.User) -> Optional[DB.User]:
         return q.get_user_by_did(self.db, member.id)
 
-    def get_by_display_name(self, display_name: str) -> DB.User:
+    def get_by_display_name(self, display_name: str) -> Optional[DB.User]:
         return self.db.query(DB.User).filter_by(display_name=display_name).first()
 
-    def get_by_qualified_name(self, qualified_name: str) -> DB.User:
+    def get_by_qualified_name(self, qualified_name: str) -> Optional[DB.User]:
         if '#' not in qualified_name:
             raise ValueError(f"Invalid qualified name: {qualified_name}")
         [name, disc] = qualified_name.split('#')
@@ -128,38 +121,39 @@ class UserService(object):
 
 class EventService(object):
 
-    log = logging.getLogger('event-service')
-
-    # Members passed via constructor
-    db:         DB.DBSession
-
-    # Maps
+    # State
     event_type_map: Dict[str, int]
 
-    def __init__(self, db: DB.DBSession):
+    # Members passed via constructor
+    db: DB.DBSession
+
+    def __init__(self, db: DB.DBSession) -> None:
         self.db = db
         self.event_type_map = {row.name:row.id for row in self.db.query(DB.EventType)}
 
-    def check_event_name(self, name: str):
+    def check_event_name(self, name: str) -> None:
         if name not in self.event_type_map:
             raise NameError(f"No such event name: {name}")
 
-    def get_last_vc_event(self, user: DB.User, channel: discord.VoiceChannel) -> int:
+    def get_last_vc_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
         return q.get_last_vc_event_by_id(self.db, user.id, channel.id)
 
-    def get_last_member_event(self, member: discord.Member) -> int:
+    def get_last_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
+        return q.get_last_vc_event_by_id_and_type_id(self.db, user.id, channel.id, self.type_id("vc_join"))
+
+    def get_last_member_event(self, member: discord.Member) -> Optional[DB.MemberEvent]:
         return q.get_last_member_event_by_did(self.db, member.id)
 
-    def get_last_user_member_event(self, user: DB.User) -> int:
+    def get_last_user_member_event(self, user: DB.User) -> Optional[DB.MemberEvent]:
         return q.get_last_member_event_by_id(self.db, user.id)
 
-    def get_message(self, did: int):
+    def get_message(self, did: int) -> Optional[DB.MessageEvent]:
         return q.get_msg_by_did(self.db, did)
 
     def type_id(self, event_name: str) -> int:
         return self.event_type_map[event_name]
 
-    def repair_member_joined_event(self, member: discord.Member, user: DB.User):
+    def repair_member_joined_event(self, member: discord.Member, user: DB.User) -> None:
         last_event = self.get_last_user_member_event(user)
         if last_event is None or last_event.type_id != self.type_id("member_join"):
             e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
@@ -167,62 +161,68 @@ class EventService(object):
         last_event.created_at = member.joined_at
         self.db.commit()
 
-    def repair_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel):
+    def repair_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> None:
         last_event = self.get_last_vc_event(user, channel)
         if last_event is not None and last_event.type_id == self.type_id("vc_join"):
-            EventService.log.warn(f'VC leave event is absent for last vc_join event for {user} in <{channel.name}! Removing last vc_join event!')
+            log.warn(f'VC leave event is absent for last vc_join event for {user} in <{channel.name}! Removing last vc_join event!')
             self.db.delete_model(last_event)
             self.db.commit()
 
-    def create_member_join_event(self, user: DB.User, member: discord.Member):
+    def create_member_join_event(self, user: DB.User, member: discord.Member) -> DB.MemberEvent:
         e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-        self.db.add(DB.MemberEvent, e_row)
+        res = self.db.add(DB.MemberEvent, e_row)
         self.db.commit()
+        return res
 
-    def create_user_leave_event(self, user: DB.User):
+    def create_user_leave_event(self, user: DB.User) -> DB.MemberEvent:
         e_row = conv.user_leave_row(user, self.event_type_map)
-        self.db.add(DB.MemberEvent, e_row)
+        res = self.db.add(DB.MemberEvent, e_row)
         self.db.commit()
+        return res
 
-    def create_new_message_event(self, user: DB.User, message: discord.Message):
+    def create_new_message_event(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
         row = conv.new_message_to_row(user.id, message, self.event_type_map)
-        self.db.add(DB.MessageEvent, row)
+        res = self.db.add(DB.MessageEvent, row)
         self.db.commit()
+        return res
 
-    def create_message_edit_event(self, msg: DB.MessageEvent):
+    def create_message_edit_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
         row = conv.message_edit_row(msg, self.event_type_map)
-        self.db.add(DB.MessageEvent, row)
+        res = self.db.add(DB.MessageEvent, row)
         self.db.commit()
+        return res
 
-    def create_message_delete_event(self, msg: DB.MessageEvent):
+    def create_message_delete_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
         row = conv.message_delete_row(msg, self.event_type_map)
-        self.db.add(DB.MessageEvent, row)
+        res = self.db.add(DB.MessageEvent, row)
         self.db.commit()
+        return res
 
-    def create_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel):
+    def create_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
         e_row = conv.vc_join_row(user, channel, self.event_type_map)
-        self.db.add(DB.VoiceChatEvent, e_row)
+        res = self.db.add(DB.VoiceChatEvent, e_row)
         self.db.commit()
+        return res
 
-    def create_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel):
+    def create_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
         e_row = conv.vc_leave_row(user, channel, self.event_type_map)
-        self.db.add(DB.VoiceChatEvent, e_row)
+        res = self.db.add(DB.VoiceChatEvent, e_row)
         self.db.commit()
+        return res
 
-    def close_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
-        last_event = self.get_last_vc_event(user, channel)
-        if last_event is None or last_event.type_id != self.type_id("vc_join"):
+    def close_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[Tuple[DB.VoiceChatEvent, DB.VoiceChatEvent]]:
+        join_event = self.get_last_vc_event(user, channel)
+        if join_event is None or join_event.type_id != self.type_id("vc_join"):
             # Skip absent vc join
-            EventService.log.warn(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
+            log.warn(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
             return None
         # Save event + update previous
         e_row = conv.vc_leave_row(user, channel, self.event_type_map)
-        self.db.add(DB.VoiceChatEvent, e_row)
-        self.db.touch(DB.VoiceChatEvent, last_event.id)
+        leave_event = self.db.add(DB.VoiceChatEvent, e_row)
         self.db.commit()
-        return last_event
+        return join_event, leave_event
 
-    def clear_text_channel_history(self, channel: discord.TextChannel):
+    def clear_text_channel_history(self, channel: discord.TextChannel) -> None:
         self.db.query(DB.MessageEvent).filter_by(channel_id=channel.id).delete()
         self.db.commit()
 
@@ -230,45 +230,23 @@ class EventService(object):
 
 class StatService(object):
 
-    log = logging.getLogger('stat-service')
-
-    # Members passed via constructor
-    events:     EventService
-    db:         DB.DBSession
-
-    # Maps
+    # State
     user_stat_type_map: Dict[str, int]
 
-    def __init__(self, db: DB.DBSession, events: EventService):
+    # Members passed via constructor
+    events: EventService
+    db:     DB.DBSession
+
+    def __init__(self, db: DB.DBSession, events: EventService) -> None:
         self.db = db
         self.events = events
         self.user_stat_type_map = {row.name:row.id for row in self.db.query(DB.UserStatType)}
 
-    def get_stat_update_task(self, mtx: asyncio.Lock, **kwargs) -> asyncio.AbstractEventLoop:
-        @tasks.loop(**kwargs)
-        async def stat_update_task():
-            StatService.log.info("Scheduled stat update")
-            async with mtx:
-                for stat_name in self.user_stat_type_map:
-                    self.reload_stat(stat_name)
-            StatService.log.info("Done scheduled stat update")
-        return stat_update_task
-
-    def check_stat_name(self, name: str):
+    def check_stat_name(self, name: str) -> None:
         if name not in self.user_stat_type_map:
             raise NameError(f"No such stat name: {name}")
 
-    def __reload_stat(self, query, stat: str, event: str):
-        stat_id = self.user_stat_type_map[stat]
-        event_id = self.events.type_id(event)
-        self.db.query(DB.UserStat).filter_by(type_id=stat_id).delete()
-        self.db.commit()
-        select_query = query(event_id, [('type_id',stat_id)])
-        insert_query = q.insert_user_stat_from_select(select_query)
-        self.db.execute(insert_query)
-        self.db.commit()
-
-    def type_id(self, stat_name):
+    def type_id(self, stat_name) -> int:
         return self.user_stat_type_map[stat_name]
 
     def get(self, user: DB.User, stat_name: str) -> int:
@@ -276,13 +254,23 @@ class StatService(object):
         stat = q.get_user_stat_by_id(self.db, user.id, self.type_id(stat_name))
         return stat.value if stat is not None else 0
 
-    def set(self, user: DB.User, stat_name: str, value: int):
+    def set(self, user: DB.User, stat_name: str, value: int) -> None:
         type_id = self.type_id(stat_name)
         stat = q.get_user_stat_by_id(self.db, user.id, type_id)
         if stat is None:
             empty_stat_row = conv.empty_user_stat_row(user.id, type_id)
             stat = self.db.add(DB.UserStat, empty_stat_row)
         stat.value = value
+        self.db.commit()
+
+    def __reload_stat(self, query, stat: str, event: str) -> None:
+        stat_id = self.user_stat_type_map[stat]
+        event_id = self.events.type_id(event)
+        self.db.query(DB.UserStat).filter_by(type_id=stat_id).delete()
+        self.db.commit()
+        select_query = query(event_id, [('type_id',stat_id)])
+        insert_query = q.insert_user_stat_from_select(select_query)
+        self.db.execute(insert_query)
         self.db.commit()
 
     def reload_stat(self, name: str):
@@ -314,8 +302,6 @@ class StatService(object):
 
 class RankingService(object):
 
-    log = logging.getLogger('ranking-service')
-
     # Members passed via constructor
     stats:      StatService
     roles:      RoleService
@@ -323,7 +309,7 @@ class RankingService(object):
     config:     ConfigView
     mtx:        asyncio.Lock
 
-    def __init__(self, stats: StatService, roles: RoleService, config: ConfigView):
+    def __init__(self, stats: StatService, roles: RoleService, config: ConfigView) -> None:
         self.stats = stats
         self.roles = roles
         self.config = config
@@ -332,7 +318,7 @@ class RankingService(object):
     # Methods #
     ###########
 
-    def check_config(self):
+    def check_config(self) -> None:
         # Check ranks config
         ignore_roles = self.config["ignore"]
         for role_name in ignore_roles:
@@ -399,7 +385,7 @@ class RankingService(object):
     def ignore_member(self, member: discord.Member) -> bool:
         return len(filter_roles(member, self.config["ignore"])) > 0 or len(filter_roles(member, self.config["require"])) == 0
 
-    def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> List[discord.Role]:
+    def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> Tuple[List[discord.Role], List[discord.Role]]:
         rank_roles = [self.roles.get(r) for r in self.config['role']]
         applied_rank_roles = filter_roles(member, rank_roles)
         effective_rank_name = self.find_user_rank_name(user)

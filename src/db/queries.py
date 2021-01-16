@@ -62,6 +62,11 @@ def get_last_vc_event_by_id(db: DBSession, id: int, channel_id: int) -> VoiceCha
             .filter(and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id))\
             .order_by(VoiceChatEvent.created_at.desc()).first()
 
+def get_last_vc_event_by_id_and_type_id(db: DBSession, id: int, channel_id: int, type_id: int) -> VoiceChatEvent:
+    return db.query(VoiceChatEvent)\
+            .filter(and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id, VoiceChatEvent.type_id == type_id))\
+            .order_by(VoiceChatEvent.created_at.desc()).first()
+
 def get_user_stat_by_id(db: DBSession, id: int, type_id: int) -> UserStat:
     return db.query(UserStat)\
             .filter(and_(UserStat.user_id == id, UserStat.type_id == type_id)).first()
