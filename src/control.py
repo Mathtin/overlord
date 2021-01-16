@@ -38,23 +38,6 @@ def __build_stat_line(client: bot.Overlord, user: db.User, stat: str, formatter=
 # Control command Handlers #
 ############################
 
-
-@cmdcoro
-async def ping(client: bot.Overlord, msg: discord.Message):
-    if client.sync().locked():
-        await msg.channel.send(res.get("messages.busy"))
-    else:
-        await msg.channel.send(res.get("messages.pong"))
-
-
-@cmdcoro
-async def sync_roles(client: bot.Overlord, msg: discord.Message):
-    async with client.sync():
-        await msg.channel.send(res.get("messages.sync_users_begin"))
-        await client.sync_users()
-        await msg.channel.send(res.get("messages.done"))
-
-
 @cmdcoro
 @text_channel_mention_arg
 async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: discord.TextChannel):

@@ -954,3 +954,22 @@ class UserSyncExtension(BotExtension):
         async with self.bot.sync():
             await self.bot.sync_users()
         log.info("Done scheduled user sync update")
+            
+    ############
+    # Commands #
+    ############
+
+    @BotExtension.command("ping", desciption="Checks bot state")
+    async def cmd_ping(self, msg: discord.Message):
+        if self.bot.sync().locked():
+            await msg.channel.send(res.get("messages.busy"))
+        else:
+            await msg.channel.send(res.get("messages.pong"))
+
+    @BotExtension.command("sync", desciption="Syncronize db data with guild data in terms of users and roles")
+    async def cmd_sync_roles(self, msg: discord.Message):
+        async with self.bot.sync():
+            await msg.channel.send(res.get("messages.sync_users_begin"))
+            await self.bot.sync_users()
+            await msg.channel.send(res.get("messages.done"))
+
