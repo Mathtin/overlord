@@ -108,15 +108,11 @@ class OverlordBase(discord.Client):
     s_stats: StatService
     s_ranking: RankingService
 
-    # Scheduled tasks
-    tasks: List[asyncio.AbstractEventLoop]
-
     def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
         self.__awaiting_sync = True
         self.__awaiting_sync_last_updated = datetime.now()
-        self.tasks = []
 
         self.config = config
         self.db = db_session
@@ -309,8 +305,6 @@ class OverlordBase(discord.Client):
                 return None
 
     async def logout(self) -> None:
-        for task in self.tasks:
-            task.stop()
         await super().logout()
 
     #########
@@ -345,355 +339,8 @@ class OverlordBase(discord.Client):
             await self.logout()
         if ex_type is NotCoroutineException:
             await self.logout()
-
-    async def on_ready(self) -> None:
-        """
-            Async ready event handler
-
-            Completly initialize bot state
-        """
-        # Lock current async context
-        async with self.sync():
-            # Find guild
-            self.guild = self.get_guild(self.guild_id)
-            if self.guild is None:
-                raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
-            log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
-
-            self.me = await self.guild.fetch_member(self.user.id)
-
-            # Attach control channel
-            channel = self.get_channel(self.control_channel_id)
-            if channel is None:
-                raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
-            if not is_text_channel(channel):
-                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_CONTROL_CHANNEL')
-            log.info(f'Attached to {channel.name} as control channel ({channel.id})')
-            self.control_channel = channel
-
-            # Attach error channel
-            if self.error_channel_id:
-                channel = self.get_channel(self.error_channel_id)
-                if channel is None:
-                    raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
-                if not is_text_channel(channel):
-                    raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_ERROR_CHANNEL')
-                log.info(f'Attached to {channel.name} as error channel ({channel.id})')
-                self.error_channel = channel
-
-            # Resolve maintainer
-            try:
-                self.maintainer = await self.fetch_user(self.maintainer_id)
-                await self.maintainer.send('Starting instance')
-            except discord.NotFound:
-                raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
-            except discord.Forbidden:
-                raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
-
-            # Sync roles and users
-            await self.sync_users()
-
-            # Check config value
-            self.check_config()
-
-            # Schedule tasks
-            #self.tasks.append(self.s_stats.get_stat_update_task(self.sync(), hours=24, loop=asyncio.get_running_loop()))
-            #self.tasks.append(self.get_user_sync_task(minutes=1, loop=asyncio.get_running_loop()))
-
-            # Start tasks
-            for task in self.tasks:
-                task.start()
-            
-            # Message for pterodactyl panel
-            print(self.config["egg_done"])
-            self.__initialized = True
-
-
-    @after_initialized
-    @event_config("message.new")
-    @skip_bots
-    @guild_member_event
-    async def on_message(self, message: discord.Message) -> None:
-        """
-            Async new message event handler
-
-            Saves event in database
-        """
-        # handle control commands seperately
-        if message.channel == self.control_channel:
-            await self.on_control_message(message)
-            return
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(message.author)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
-                return
-            # Save event
-            self.s_events.create_new_message_event(user, message)
-            # Update stats
-            inc_value = self.s_stats.get(user, 'new_message_count') + 1
-            self.s_stats.set(user, 'new_message_count', inc_value)
-            # Update user rank
-            await self.update_user_rank(message.author)
-
-
-    async def on_control_message(self, message: discord.Message) -> None:
-        """
-            Async new control message event handler
-
-            Calls appropriate control callback
-        """
-        if not self.is_admin(message.author):
-            return
-
-        prefix = self.config["control.prefix"]
-        argv = parse_control_message(prefix, message)
-
-        if argv is None or len(argv) == 0:
-            return
-            
-        cmd_name = argv[0]
-
-        control_hooks = self.config["commands"]
-
-        if cmd_name == "help":
-            help_lines = []
-            line_fmt = res.get("messages.commands_list_entry")
-            for cmd in control_hooks:
-                hook = get_module_element(control_hooks[cmd])
-                base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
-                help_lines.append(line_fmt.format(base_line))
-            help_header = res.get("messages.commands_list_head")
-            help_msg = '\n'.join(help_lines)
-            await message.channel.send(f'{help_header}\n{help_msg}\n')
-            return
-
-        if cmd_name not in control_hooks:
-            await message.channel.send(res.get("messages.unknown_command"))
-            return
-
-        if self.awaiting_sync():
-            await self.send_warning('Awaiting role syncronization')
-        
-        hook = get_module_element(control_hooks[cmd_name])
-        check_coroutine(hook)
-        await hook(self, message, prefix, argv)
-
-    
-    @after_initialized
-    @event_config("message.edit")
-    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
-        """
-            Async message edit event handler
-
-            Saves event in database
-        """
-        if self.is_special_channel_id(payload.channel_id):
-            return
-        # ingore absent
-        msg = self.s_events.get_message(payload.message_id)
-        if msg is None:
-            return
-        # Sync code part
-        async with self.sync():
-            self.s_events.create_message_edit_event(msg)
-            # Update stats
-            inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
-            self.s_stats.set(msg.user, 'edit_message_count', inc_value)
-            # Update user rank
-            if self.s_users.is_absent(msg.user):
-                return
-            member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(member)
-
-    
-    @after_initialized
-    @event_config("message.delete")
-    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
-        """
-            Async message delete event handler
-
-            Saves event in database
-        """
-        if self.is_special_channel_id(payload.channel_id):
-            return
-        # ingore absent
-        msg = self.s_events.get_message(payload.message_id)
-        if msg is None:
-            return
-        # Sync code part
-        async with self.sync():
-            self.s_events.create_message_delete_event(msg)
-            # Update stats
-            inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
-            self.s_stats.set(msg.user, 'delete_message_count', inc_value)
-            # Update user rank
-            if self.s_users.is_absent(msg.user):
-                return
-            member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(member)
-
-    
-    @after_initialized
-    @event_config("user.join")
-    @skip_bots
-    @guild_member_event
-    async def on_member_join(self, member: discord.Member) -> None:
-        """
-            Async member join event handler
-
-            Saves user in database
-        """
-        if self.awaiting_sync():
-            return
-        # Sync code part
-        async with self.sync():
-            # Add/update user
-            user = self.s_users.update_member(member)
-            # Add event
-            self.s_events.create_member_join_event(user, member)
-
-    
-    @after_initialized
-    @event_config("user.update")
-    @skip_bots
-    @guild_member_event
-    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
-        """
-            Async member remove event handler
-
-            Removes user from database (or keep it, depends on config)
-        """
-        if self.awaiting_sync():
-            return
-        # track only role/nickname change
-        if not (before.roles != after.roles or \
-                before.display_name != after.display_name or \
-                before.name != after.name or \
-                before.discriminator != after.discriminator):
-            return
-        # Skip absent
-        if self.s_users.get(before) is None:
-            log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
-            return
-        # Sync code part
-        async with self.sync():
-            # Update user
-            self.s_users.update_member(after)
-
-    
-    @after_initialized
-    @event_config("user.leave")
-    @skip_bots
-    @guild_member_event
-    async def on_member_remove(self, member: discord.Member) -> None:
-        """
-            Async member remove event handler
-
-            Removes user from database (or keep it, depends on config)
-        """
-        # Sync code part
-        async with self.sync():
-            if self.config["user.leave.keep"]:
-                user = self.s_users.mark_absent(member)
-                if user is None:
-                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                    return
-                self.s_events.create_user_leave_event(user)
-            else:
-                user = self.s_users.remove(member)
-                if user is None:
-                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                    return
-
-    
-    @after_initialized
-    @skip_bots
-    @guild_member_event
-    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
-        """
-            Async vc state change event handler
-
-            Saves event in database
-        """
-        if before.channel == after.channel:
-            return
-        if before.channel is not None and self.check_afk_state(before):
-            await self.on_vc_leave(user, before.channel)
-        if after.channel is not None and self.check_afk_state(after):
-            await self.on_vc_join(user, after.channel)
-            
-    
-    @event_config("voice.join")
-    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
-        """
-            Async vc join event handler
-
-            Saves event in database
-        """
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(member)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
-                return
-            # Apply constraints
-            self.s_events.repair_vc_leave_event(user, channel)
-            # Save event
-            self.s_events.create_vc_join_event(user, channel)
-            
-    
-    @event_config("voice.leave")
-    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
-        """
-            Async vc join event handler
-
-            Saves event in database
-        """
-        # Sync code part
-        async with self.sync():
-            user = self.s_users.get(member)
-            # Skip non-existing users
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
-                return
-            # Close event
-            join_event = self.s_events.close_vc_join_event(user, channel)
-            if join_event is None:
-                return
-            # Update stats
-            stat_val = self.s_stats.get(user, 'vc_time')
-            stat_val += (join_event.updated_at - join_event.created_at).total_seconds()
-            self.s_stats.set(user, 'vc_time', stat_val)
-            # Update user rank
-            await self.update_user_rank(member)
-
-    async def on_guild_role_create(self, role: discord.Role) -> None:
-        if role.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('New role detected. Awaiting role syncronization.')
-
-    async def on_guild_role_delete(self, role: discord.Role) -> None:
-        if role.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('Role remove detected. Awaiting role syncronization.')
-
-    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
-        if before.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('Role change detected. Awaiting role syncronization.')
+        if event == 'on_ready':
+            await self.logout()
 
 ############################
 # Bot Extension Base Class #
@@ -834,53 +481,37 @@ class Overlord(OverlordBase):
     # Extensions
     __extensions: List[BotExtension]
     __handlers: Dict[str, Callable[..., Awaitable[None]]]
+    __call_plan_map: Dict[str, List[Callable[..., Awaitable[None]]]]
 
     def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
         super().__init__(config, db_session)
         self.__extensions = []
         self.__handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
+        self.__call_plan_map = {}
         for h in self.__handlers:
-            self.__reattach_handler(h)
+            self.__build_call_plan(h)
 
     def extend(self, extension: BotExtension) -> None:
         self.__extensions.append(extension)
         self.__extensions.sort(key=lambda e: e.priority)
 
-    def __reattach_handler(self, handler_name) -> None:
+    def __build_call_plan(self, handler_name) -> None:
         if handler_name == 'on_error':
             return
-        root_handler = self.__handlers[handler_name]
         # Build call plan
         call_plan = [[] for i in range(64)]
         for extension in self.__extensions:
             if not hasattr(extension, handler_name):
                 continue
             call_plan[extension.priority].append(getattr(extension, handler_name))
-        # Define chain handler
-        if handler_name == 'on_ready':
-            async def chain_handler(*args, **kwargs):
-                await root_handler(*args, **kwargs)
-                for handlers in call_plan:
-                    calls = [h(*args, **kwargs) for h in handlers]
-                    if calls:
-                        await asyncio.wait(calls)
-                await self.maintainer.send('Started!')
-        else:
-            async def chain_handler(*args, **kwargs):
-                await root_handler(*args, **kwargs)
-                for handlers in call_plan:
-                    calls = [h(*args, **kwargs) for h in handlers]
-                    if calls:
-                        await asyncio.wait(calls)
-        # Attach
-        setattr(self, handler_name, chain_handler)
+        self.__call_plan_map[handler_name] = call_plan
 
-    async def on_ready(self) -> None:
-        # Start extensions
-        for ext in self.__extensions:
-            ext.start()
-        # Handle on_ready
-        await super().on_ready()
+    async def __run_call_plan(self, name: str, *args, **kwargs):
+        call_plan = self.__call_plan_map[name]
+        for handlers in call_plan:
+            calls = [h(*args, **kwargs) for h in handlers]
+            if calls:
+                await asyncio.wait(calls)
 
     def run(self) -> None:
         return super().run()
@@ -889,6 +520,384 @@ class Overlord(OverlordBase):
         for ext in self.__extensions:
             ext.stop()
         return super().logout()
+
+    #########
+    # Hooks #
+    #########
+
+    async def on_ready(self) -> None:
+        """
+            Async ready event handler
+
+            Completly initialize bot state
+        """
+        # Lock current async context
+        async with self.sync():
+            # Find guild
+            self.guild = self.get_guild(self.guild_id)
+            if self.guild is None:
+                raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
+            log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
+
+            self.me = await self.guild.fetch_member(self.user.id)
+
+            # Attach control channel
+            channel = self.get_channel(self.control_channel_id)
+            if channel is None:
+                raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
+            if not is_text_channel(channel):
+                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_CONTROL_CHANNEL')
+            log.info(f'Attached to {channel.name} as control channel ({channel.id})')
+            self.control_channel = channel
+
+            # Attach error channel
+            if self.error_channel_id:
+                channel = self.get_channel(self.error_channel_id)
+                if channel is None:
+                    raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
+                if not is_text_channel(channel):
+                    raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_ERROR_CHANNEL')
+                log.info(f'Attached to {channel.name} as error channel ({channel.id})')
+                self.error_channel = channel
+
+            # Resolve maintainer
+            try:
+                self.maintainer = await self.fetch_user(self.maintainer_id)
+                await self.maintainer.send('Starting instance')
+            except discord.NotFound:
+                raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
+            except discord.Forbidden:
+                raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
+            log.info(f'Maintainer is {qualified_name(self.maintainer)} ({self.maintainer.id})')
+
+            # Sync roles and users
+            await self.sync_users()
+
+            # Check config value
+            self.check_config()
+
+            # Start extensions
+            for ext in self.__extensions:
+                ext.start()
+
+            # Call extension 'on_ready' handlers
+            await self.__run_call_plan('on_ready')
+            
+            # Message for pterodactyl panel
+            print(self.config["egg_done"])
+            self.__initialized = True
+            await self.maintainer.send('Started!')
+
+
+    @after_initialized
+    @event_config("message.new")
+    @skip_bots
+    @guild_member_event
+    async def on_message(self, message: discord.Message) -> None:
+        """
+            Async new message event handler
+
+            Saves event in database
+        """
+        # handle control commands seperately
+        if message.channel == self.control_channel:
+            await self.on_control_message(message)
+            return
+        # Sync code part
+        async with self.sync():
+            user = self.s_users.get(message.author)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
+                return
+            # Save event
+            self.s_events.create_new_message_event(user, message)
+            # Update stats
+            inc_value = self.s_stats.get(user, 'new_message_count') + 1
+            self.s_stats.set(user, 'new_message_count', inc_value)
+            # Update user rank
+            await self.update_user_rank(message.author)
+        # Call extension 'on_message' handlers
+        await self.__run_call_plan('on_message', message)
+
+
+    async def on_control_message(self, message: discord.Message) -> None:
+        """
+            Async new control message event handler
+
+            Calls appropriate control callback
+        """
+        if not self.is_admin(message.author):
+            return
+
+        prefix = self.config["control.prefix"]
+        argv = parse_control_message(prefix, message)
+
+        if argv is None or len(argv) == 0:
+            return
+            
+        cmd_name = argv[0]
+
+        control_hooks = self.config["commands"]
+
+        if cmd_name == "help":
+            help_lines = []
+            line_fmt = res.get("messages.commands_list_entry")
+            for cmd in control_hooks:
+                hook = get_module_element(control_hooks[cmd])
+                base_line = build_cmdcoro_usage(prefix, cmd, hook.or_cmdcoro)
+                help_lines.append(line_fmt.format(base_line))
+            help_header = res.get("messages.commands_list_head")
+            help_msg = '\n'.join(help_lines)
+            await message.channel.send(f'{help_header}\n{help_msg}\n')
+            return
+
+        if cmd_name not in control_hooks:
+            await message.channel.send(res.get("messages.unknown_command"))
+            return
+
+        if self.awaiting_sync():
+            await self.send_warning('Awaiting role syncronization')
+        
+        hook = get_module_element(control_hooks[cmd_name])
+        check_coroutine(hook)
+        await hook(self, message, prefix, argv)
+        # Call extension 'on_control_message' handlers
+        await self.__run_call_plan('on_control_message', message)
+
+    
+    @after_initialized
+    @event_config("message.edit")
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
+        """
+            Async message edit event handler
+
+            Saves event in database
+        """
+        if self.is_special_channel_id(payload.channel_id):
+            return
+        # ingore absent
+        msg = self.s_events.get_message(payload.message_id)
+        if msg is None:
+            return
+        # Sync code part
+        async with self.sync():
+            self.s_events.create_message_edit_event(msg)
+            # Update stats
+            inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
+            self.s_stats.set(msg.user, 'edit_message_count', inc_value)
+            # Update user rank
+            if self.s_users.is_absent(msg.user):
+                return
+            member = await self.guild.fetch_member(msg.user.did)
+            await self.update_user_rank(member)
+        # Call extension 'on_raw_message_edit' handlers
+        await self.__run_call_plan('on_raw_message_edit', payload)
+
+    
+    @after_initialized
+    @event_config("message.delete")
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
+        """
+            Async message delete event handler
+
+            Saves event in database
+        """
+        if self.is_special_channel_id(payload.channel_id):
+            return
+        # ingore absent
+        msg = self.s_events.get_message(payload.message_id)
+        if msg is None:
+            return
+        # Sync code part
+        async with self.sync():
+            self.s_events.create_message_delete_event(msg)
+            # Update stats
+            inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
+            self.s_stats.set(msg.user, 'delete_message_count', inc_value)
+            # Update user rank
+            if self.s_users.is_absent(msg.user):
+                return
+            member = await self.guild.fetch_member(msg.user.did)
+            await self.update_user_rank(member)
+        # Call extension 'on_raw_message_delete' handlers
+        await self.__run_call_plan('on_raw_message_delete', payload)
+
+    
+    @after_initialized
+    @event_config("user.join")
+    @skip_bots
+    @guild_member_event
+    async def on_member_join(self, member: discord.Member) -> None:
+        """
+            Async member join event handler
+
+            Saves user in database
+        """
+        if self.awaiting_sync():
+            return
+        # Sync code part
+        async with self.sync():
+            # Add/update user
+            user = self.s_users.update_member(member)
+            # Add event
+            self.s_events.create_member_join_event(user, member)
+        # Call extension 'on_member_join' handlers
+        await self.__run_call_plan('on_member_join', member)
+
+    
+    @after_initialized
+    @event_config("user.update")
+    @skip_bots
+    @guild_member_event
+    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
+        """
+            Async member remove event handler
+
+            Removes user from database (or keep it, depends on config)
+        """
+        if self.awaiting_sync():
+            return
+        # track only role/nickname change
+        if not (before.roles != after.roles or \
+                before.display_name != after.display_name or \
+                before.name != after.name or \
+                before.discriminator != after.discriminator):
+            return
+        # Skip absent
+        if self.s_users.get(before) is None:
+            log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
+            return
+        # Sync code part
+        async with self.sync():
+            # Update user
+            self.s_users.update_member(after)
+        # Call extension 'on_member_update' handlers
+        await self.__run_call_plan('on_member_update', before, after)
+
+    
+    @after_initialized
+    @event_config("user.leave")
+    @skip_bots
+    @guild_member_event
+    async def on_member_remove(self, member: discord.Member) -> None:
+        """
+            Async member remove event handler
+
+            Removes user from database (or keep it, depends on config)
+        """
+        # Sync code part
+        async with self.sync():
+            if self.config["user.leave.keep"]:
+                user = self.s_users.mark_absent(member)
+                if user is None:
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                    return
+                self.s_events.create_user_leave_event(user)
+            else:
+                user = self.s_users.remove(member)
+                if user is None:
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                    return
+        # Call extension 'on_member_remove' handlers
+        await self.__run_call_plan('on_member_remove', member)
+
+    
+    @after_initialized
+    @skip_bots
+    @guild_member_event
+    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+        """
+            Async vc state change event handler
+
+            Saves event in database
+        """
+        if before.channel == after.channel:
+            return
+        if before.channel is not None and self.check_afk_state(before):
+            await self.on_vc_leave(user, before.channel)
+        if after.channel is not None and self.check_afk_state(after):
+            await self.on_vc_join(user, after.channel)
+            
+    
+    @event_config("voice.join")
+    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
+        """
+            Async vc join event handler
+
+            Saves event in database
+        """
+        # Sync code part
+        async with self.sync():
+            user = self.s_users.get(member)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
+                return
+            # Apply constraints
+            self.s_events.repair_vc_leave_event(user, channel)
+            # Save event
+            self.s_events.create_vc_join_event(user, channel)
+        # Call extension 'on_vc_join' handlers
+        await self.__run_call_plan('on_vc_join', member, channel)
+            
+    
+    @event_config("voice.leave")
+    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
+        """
+            Async vc join event handler
+
+            Saves event in database
+        """
+        # Sync code part
+        async with self.sync():
+            user = self.s_users.get(member)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
+                return
+            # Close event
+            join_event = self.s_events.close_vc_join_event(user, channel)
+            if join_event is None:
+                return
+            # Update stats
+            stat_val = self.s_stats.get(user, 'vc_time')
+            stat_val += (join_event.updated_at - join_event.created_at).total_seconds()
+            self.s_stats.set(user, 'vc_time', stat_val)
+            # Update user rank
+            await self.update_user_rank(member)
+        # Call extension 'on_vc_leave' handlers
+        await self.__run_call_plan('on_vc_leave', member, channel)
+
+    async def on_guild_role_create(self, role: discord.Role) -> None:
+        if role.guild != self.guild:
+            return
+        if self.awaiting_sync():
+            return
+        self.set_awaiting_sync()
+        await self.send_warning('New role detected. Awaiting role syncronization.')
+        # Call extension 'on_guild_role_create' handlers
+        await self.__run_call_plan('on_guild_role_create', role)
+
+    async def on_guild_role_delete(self, role: discord.Role) -> None:
+        if role.guild != self.guild:
+            return
+        if self.awaiting_sync():
+            return
+        self.set_awaiting_sync()
+        await self.send_warning('Role remove detected. Awaiting role syncronization.')
+        # Call extension 'on_guild_role_delete' handlers
+        await self.__run_call_plan('on_guild_role_delete', role)
+
+    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+        if before.guild != self.guild:
+            return
+        if self.awaiting_sync():
+            return
+        self.set_awaiting_sync()
+        await self.send_warning('Role change detected. Awaiting role syncronization.')
+        # Call extension 'on_guild_role_update' handlers
+        await self.__run_call_plan('on_guild_role_update', before, after)
 
 ##################
 # Sync Extension #
