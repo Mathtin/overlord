@@ -715,7 +715,10 @@ class BotExtensionTask(object):
     def task(self, ext) -> asyncio.AbstractEventLoop:
         self.kwargs['loop'] = asyncio.get_running_loop()
         async def method(*args, **kwargs):
-            await self.func(ext, *args, **kwargs)
+            try:
+                await self.func(ext, *args, **kwargs)
+            except:
+                await ext.on_error(self.func.__name__, *args, **kwargs)
         return tasks.loop(**self.kwargs)(method)
     
 
@@ -861,13 +864,14 @@ class Overlord(OverlordBase):
                     calls = [h(*args, **kwargs) for h in handlers]
                     if calls:
                         await asyncio.wait(calls)
-                await self.maintainer.send('Started')
+                await self.maintainer.send('Started!')
         else:
             async def chain_handler(*args, **kwargs):
                 await root_handler(*args, **kwargs)
                 for handlers in call_plan:
                     calls = [h(*args, **kwargs) for h in handlers]
-                    await asyncio.wait(calls)
+                    if calls:
+                        await asyncio.wait(calls)
         # Attach
         setattr(self, handler_name, chain_handler)
 
@@ -892,9 +896,8 @@ class Overlord(OverlordBase):
 
 class UserSyncExtension(BotExtension):
 
-    @BotExtension.task(minutes=1)
+    @BotExtension.task(seconds=1)
     async def user_sync_task(self):
-        raise RuntimeError('Test Exception')
         if self.bot.awaiting_sync_elapsed() < 30:
             return
         log.info("Scheduled user sync update")
