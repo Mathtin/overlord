@@ -342,6 +342,57 @@ class OverlordBase(discord.Client):
         if event == 'on_ready':
             await self.logout()
 
+    async def on_ready(self) -> None:
+        """
+            Async ready event handler
+
+            Completly initialize bot state
+        """
+        # Find guild
+        self.guild = self.get_guild(self.guild_id)
+        if self.guild is None:
+            raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
+        log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
+
+        self.me = await self.guild.fetch_member(self.user.id)
+
+        # Attach control channel
+        channel = self.get_channel(self.control_channel_id)
+        if channel is None:
+            raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
+        if not is_text_channel(channel):
+            raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_CONTROL_CHANNEL')
+        log.info(f'Attached to {channel.name} as control channel ({channel.id})')
+        self.control_channel = channel
+
+        # Attach error channel
+        if self.error_channel_id:
+            channel = self.get_channel(self.error_channel_id)
+            if channel is None:
+                raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
+            if not is_text_channel(channel):
+                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_ERROR_CHANNEL')
+            log.info(f'Attached to {channel.name} as error channel ({channel.id})')
+            self.error_channel = channel
+
+        # Resolve maintainer
+        try:
+            self.maintainer = await self.fetch_user(self.maintainer_id)
+            await self.maintainer.send('Starting instance')
+        except discord.NotFound:
+            raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
+        except discord.Forbidden:
+            raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
+        log.info(f'Maintainer is {qualified_name(self.maintainer)} ({self.maintainer.id})')
+
+        # Sync roles and users
+        await self.sync_users()
+
+        # Check config value
+        self.check_config()
+
+        self.__initialized = True
+
 ############################
 # Bot Extension Base Class #
 ############################
@@ -380,11 +431,13 @@ class BotExtension(object):
     __enabled: bool
     __tasks: List[BotExtensionTask]
     __task_instances: List[asyncio.AbstractEventLoop]
+    __async_lock: asyncio.Lock
 
     def __init__(self, bot: OverlordBase, priority=None) -> None:
         super().__init__()
         self.bot = bot
         self.__enabled = False
+        self.__async_lock = asyncio.Lock()
         # Gather tasks (coroutines wrapped with BotExtension.task decorator)
         attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
         self.__tasks =  [t for t in attrs if isinstance(t, BotExtensionTask)]
@@ -434,6 +487,9 @@ class BotExtension(object):
         self.__enabled = False
         for task in self.__task_instances:
             task.stop()
+
+    def sync(self) -> asyncio.Lock:
+        return self.__async_lock
 
     @property
     def priority(self):
@@ -487,13 +543,13 @@ class Overlord(OverlordBase):
         super().__init__(config, db_session)
         self.__extensions = []
         self.__handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
-        self.__call_plan_map = {}
-        for h in self.__handlers:
-            self.__build_call_plan(h)
 
     def extend(self, extension: BotExtension) -> None:
         self.__extensions.append(extension)
         self.__extensions.sort(key=lambda e: e.priority)
+        self.__call_plan_map = {}
+        for h in self.__handlers:
+            self.__build_call_plan(h)
 
     def __build_call_plan(self, handler_name) -> None:
         if handler_name == 'on_error':
@@ -533,48 +589,8 @@ class Overlord(OverlordBase):
         """
         # Lock current async context
         async with self.sync():
-            # Find guild
-            self.guild = self.get_guild(self.guild_id)
-            if self.guild is None:
-                raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
-            log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
 
-            self.me = await self.guild.fetch_member(self.user.id)
-
-            # Attach control channel
-            channel = self.get_channel(self.control_channel_id)
-            if channel is None:
-                raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
-            if not is_text_channel(channel):
-                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_CONTROL_CHANNEL')
-            log.info(f'Attached to {channel.name} as control channel ({channel.id})')
-            self.control_channel = channel
-
-            # Attach error channel
-            if self.error_channel_id:
-                channel = self.get_channel(self.error_channel_id)
-                if channel is None:
-                    raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
-                if not is_text_channel(channel):
-                    raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_ERROR_CHANNEL')
-                log.info(f'Attached to {channel.name} as error channel ({channel.id})')
-                self.error_channel = channel
-
-            # Resolve maintainer
-            try:
-                self.maintainer = await self.fetch_user(self.maintainer_id)
-                await self.maintainer.send('Starting instance')
-            except discord.NotFound:
-                raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
-            except discord.Forbidden:
-                raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
-            log.info(f'Maintainer is {qualified_name(self.maintainer)} ({self.maintainer.id})')
-
-            # Sync roles and users
-            await self.sync_users()
-
-            # Check config value
-            self.check_config()
+            await super().on_ready()
 
             # Start extensions
             for ext in self.__extensions:
@@ -585,7 +601,6 @@ class Overlord(OverlordBase):
             
             # Message for pterodactyl panel
             print(self.config["egg_done"])
-            self.__initialized = True
             await self.maintainer.send('Started!')
 
 
@@ -615,8 +630,6 @@ class Overlord(OverlordBase):
             # Update stats
             inc_value = self.s_stats.get(user, 'new_message_count') + 1
             self.s_stats.set(user, 'new_message_count', inc_value)
-            # Update user rank
-            await self.update_user_rank(message.author)
         # Call extension 'on_message' handlers
         await self.__run_call_plan('on_message', message)
 

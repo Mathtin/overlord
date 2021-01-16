@@ -21,6 +21,7 @@ import logging.config
 from dotenv import load_dotenv
 
 from bot import Overlord, UserSyncExtension
+from ranking import RankingExtension
 from db.models.stat import UserStatType
 from util import ConfigView
 from db import DBSession, EventType
@@ -56,9 +57,11 @@ def main(argv):
 
     # Init extensions
     user_sync_ext = UserSyncExtension(bot=discord_bot)
+    ranking_ext = RankingExtension(bot=discord_bot, priority=1)
 
     # Attach extensions
     discord_bot.extend(user_sync_ext)
+    discord_bot.extend(ranking_ext)
 
     # Start bot
     discord_bot.run()

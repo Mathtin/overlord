@@ -21,4 +21,8 @@ from bot import Overlord, BotExtension
 #####################
 
 class RankingExtension(BotExtension):
-    pass
+
+    async def on_message(self, message: discord.Message) -> None:
+        async with self.sync():
+            # Update user rank
+            await self.bot.update_user_rank(message.author)
