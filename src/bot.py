@@ -169,6 +169,8 @@ class OverlordBase(discord.Client):
         return self.s_roles.get(role_name)
 
     def is_admin(self, user: discord.Member) -> bool:
+        if user == self.maintainer:
+            return True
         roles = self.config["control.roles"]
         return len(filter_roles(user, roles)) > 0
 
@@ -220,6 +222,7 @@ class OverlordBase(discord.Client):
     async def send_error(self, msg: str) -> None:
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.error").format(msg))
+        await self.maintainer.send(res.get("messages.error").format(msg))
         return
 
     async def send_warning(self, msg: str) -> None:
@@ -248,47 +251,6 @@ class OverlordBase(discord.Client):
             self.s_users.remove_absent()
         self.unset_awaiting_sync()
         log.info(f'Syncing users done')
-
-    async def update_user_rank(self, member: discord.Member) -> None:
-        if self.awaiting_sync():
-            log.warn("Cannot update user rank: awaiting role sync")
-            return False
-        # Resolve user
-        user = self.s_users.get(member)
-        # Skip non-existing users
-        if user is None:
-            log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
-            return
-        # Ignore inappropriate members
-        if self.s_ranking.ignore_member(member):
-            return
-        # Resolve roles to move
-        roles_add, roles_del = self.s_ranking.roles_to_add_and_remove(member, user)
-        # Remove old roles
-        if roles_del:
-            log.info(f"Removing {qualified_name(member)}'s rank roles: {roles_del}")
-            await member.remove_roles(*roles_del)
-        # Add new roles
-        if roles_add:
-            log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
-            await member.add_roles(*roles_add)
-        # Update user in db
-        self.s_users.update_member(member)
-        return True
-
-    async def update_user_ranks(self) -> None:
-        if self.awaiting_sync():
-            log.error("Cannot update user ranks: awaiting role sync")
-            await self.send_error(f'Cannot update user ranks: awaiting role sync')
-            return
-        log.info(f'Updating user ranks')
-        async for member in self.guild.fetch_members(limit=None):
-            # Cache and skip bots
-            if member.bot:
-                self.s_users.cache_bot(member)
-                continue
-            await self.update_user_rank(member)
-        log.info(f'Done updating user ranks')
 
     async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
             try:
@@ -393,9 +355,9 @@ class OverlordBase(discord.Client):
 
         self.__initialized = True
 
-############################
-# Bot Extension Base Class #
-############################
+#################################
+# Bot Extension Utility Classes #
+#################################
 
 class BotExtensionTask(object):
 
@@ -419,6 +381,34 @@ class BotExtensionTask(object):
                 await ext.on_error(self.func.__name__, *args, **kwargs)
         return tasks.loop(**self.kwargs)(method)
     
+class BotExtensionCommand(object):
+
+    def __init__(self, func, name, desciption='') -> None:
+        super().__init__()
+        check_coroutine(func)
+        self.func = func
+        self.name = name
+        self.desciption = desciption
+        f_args = func.__code__.co_varnames[:func.__code__.co_argcount]
+        assert len(f_args) >= 2
+        self.f_args = f_args[2:]
+        self.args_str = ' '.join(["{%s}" % arg for arg in self.f_args])
+
+    def usage(self, prefix: str, cmdname: str) -> str:
+        return f'{prefix}{cmdname} {self.args_str}'
+
+    def handler(self, ext):
+        async def wrapped_func(message, prefix, argv):
+            if len(self.f_args) != len(argv) - 1:
+                usage_str = 'Usage: ' + self.usage(prefix, argv[0])
+                await message.channel.send(usage_str)
+            else:
+                await self.func(ext, message, *argv[1:])
+        return wrapped_func
+
+############################
+# Bot Extension Base Class #
+############################
 
 class BotExtension(object):
 
@@ -430,6 +420,8 @@ class BotExtension(object):
     # State members
     __enabled: bool
     __tasks: List[BotExtensionTask]
+    __commands: Dict[str, BotExtensionCommand]
+    __command_handlers: Dict[str, Callable[..., Awaitable[None]]]
     __task_instances: List[asyncio.AbstractEventLoop]
     __async_lock: asyncio.Lock
 
@@ -438,14 +430,22 @@ class BotExtension(object):
         self.bot = bot
         self.__enabled = False
         self.__async_lock = asyncio.Lock()
-        # Gather tasks (coroutines wrapped with BotExtension.task decorator)
+
         attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
+
+        # Gather tasks
         self.__tasks =  [t for t in attrs if isinstance(t, BotExtensionTask)]
         self.__task_instances =  []
+
+        # Gather commands
+        self.__commands =  {c.name:c for c in attrs if isinstance(c, BotExtensionCommand)}
+        self.__command_handlers =  {name:c.handler(self) for name, c in self.__commands.items()}
+
         # Reattach implemented handlers
         handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
         for h_name, h in handlers.items():
             setattr(self, h_name, self.__handler(h))
+
         # Prioritize
         if priority is not None:
             self.__priority__ = priority
@@ -459,6 +459,12 @@ class BotExtension(object):
                 await self.bot.init_lock()
                 await func(self, *args, **kwargs)
             return BotExtensionTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count, reconnect=reconnect)
+        return decorator
+
+    @staticmethod
+    def command(name, desciption='') -> Callable[..., Callable[..., Awaitable[None]]]:
+        def decorator(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+            return BotExtensionCommand(func, name=name, desciption=desciption)
         return decorator
 
     @staticmethod
@@ -481,7 +487,7 @@ class BotExtension(object):
         for task in self.__task_instances:
             task.start()
 
-    def stop(self):
+    def stop(self) -> None:
         if not self.__enabled:
             return
         self.__enabled = False
@@ -491,8 +497,18 @@ class BotExtension(object):
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
 
+    def cmd(self, name: str) -> Optional[BotExtensionCommand]:
+        if name in self.__commands:
+            return self.__commands[name]
+        return None
+
+    def cmd_handler(self, name: str) -> Optional[Callable[..., Awaitable[None]]]:
+        if name in self.__command_handlers:
+            return self.__command_handlers[name]
+        return None
+
     @property
-    def priority(self):
+    def priority(self) -> int:
         return self.__priority__
 
     ####################
@@ -516,10 +532,10 @@ class BotExtension(object):
 
         exception_msg = res.get("messages.dm_ext_exception").format(ext_name, str(ex)) + '\n' + exception_tb_quoted
 
-        exception_msg_short = f'`{str(ex)}` Reported to {self.bot.maintainer.mention}'
+        #exception_msg_short = f'`{str(ex)}` Reported to {self.bot.maintainer.mention}'
 
-        if self.bot.error_channel is not None:
-            await self.bot.send_error(exception_msg_short)
+        #if self.bot.error_channel is not None:
+        #    await self.bot.send_error(exception_msg_short)
         
         await self.bot.maintainer.send(exception_msg)
         self.stop()
@@ -538,6 +554,7 @@ class Overlord(OverlordBase):
     __extensions: List[BotExtension]
     __handlers: Dict[str, Callable[..., Awaitable[None]]]
     __call_plan_map: Dict[str, List[Callable[..., Awaitable[None]]]]
+    __cmd_cache: Dict[str, Callable[..., Awaitable[None]]]
 
     def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
         super().__init__(config, db_session)
@@ -577,6 +594,28 @@ class Overlord(OverlordBase):
             ext.stop()
         return super().logout()
 
+    def __find_cmd_handler(self, name: str) -> Callable[..., Awaitable[None]]:
+        for ext in self.__extensions:
+            handler = ext.cmd_handler(name)
+            if handler is not None:
+                return handler
+        raise InvalidConfigException(f"Command handler not found for {name}", "bot.commands")
+
+    def update_command_cache(self) -> None:
+        commands = self.config["commands"]
+        self.__cmd_cache = {}
+        for cmd, aliases in commands.items():
+            handler = self.__find_cmd_handler(cmd)
+            self.__cmd_cache[cmd] = handler
+            for alias in aliases:
+                if alias in self.__cmd_cache:
+                    raise InvalidConfigException(f"Command alias collision for {alias}: {cmd} <-> {self.__cmd_cache[alias]}", "bot.commands")
+                self.__cmd_cache[alias] = handler
+        
+    def update_config(self, config: ConfigView) -> None:
+        super().update_config(config)
+        self.update_command_cache()
+
     #########
     # Hooks #
     #########
@@ -591,6 +630,7 @@ class Overlord(OverlordBase):
         async with self.sync():
 
             await super().on_ready()
+            self.update_command_cache()
 
             # Start extensions
             for ext in self.__extensions:
@@ -607,7 +647,6 @@ class Overlord(OverlordBase):
     @after_initialized
     @event_config("message.new")
     @skip_bots
-    @guild_member_event
     async def on_message(self, message: discord.Message) -> None:
         """
             Async new message event handler
@@ -615,8 +654,10 @@ class Overlord(OverlordBase):
             Saves event in database
         """
         # handle control commands seperately
-        if message.channel == self.control_channel:
-            await self.on_control_message(message)
+        if message.channel == self.control_channel or (message.author == self.maintainer and is_dm_message(message)):
+            await self._on_control_message(message)
+            return
+        if not self.is_guild_member_message(message):
             return
         # Sync code part
         async with self.sync():
@@ -634,7 +675,7 @@ class Overlord(OverlordBase):
         await self.__run_call_plan('on_message', message)
 
 
-    async def on_control_message(self, message: discord.Message) -> None:
+    async def _on_control_message(self, message: discord.Message) -> None:
         """
             Async new control message event handler
 
@@ -651,8 +692,14 @@ class Overlord(OverlordBase):
             
         cmd_name = argv[0]
 
-        control_hooks = self.config["commands"]
+        if cmd_name not in self.__cmd_cache:
+            await message.channel.send(res.get("messages.unknown_command"))
+            return
 
+        handler = self.__cmd_cache[cmd_name]
+        await handler(message, prefix, argv)
+
+        '''
         if cmd_name == "help":
             help_lines = []
             line_fmt = res.get("messages.commands_list_entry")
@@ -664,19 +711,13 @@ class Overlord(OverlordBase):
             help_msg = '\n'.join(help_lines)
             await message.channel.send(f'{help_header}\n{help_msg}\n')
             return
-
-        if cmd_name not in control_hooks:
-            await message.channel.send(res.get("messages.unknown_command"))
-            return
-
-        if self.awaiting_sync():
-            await self.send_warning('Awaiting role syncronization')
         
         hook = get_module_element(control_hooks[cmd_name])
         check_coroutine(hook)
         await hook(self, message, prefix, argv)
         # Call extension 'on_control_message' handlers
         await self.__run_call_plan('on_control_message', message)
+        '''
 
     
     @after_initialized
@@ -699,13 +740,8 @@ class Overlord(OverlordBase):
             # Update stats
             inc_value = self.s_stats.get(msg.user, 'edit_message_count') + 1
             self.s_stats.set(msg.user, 'edit_message_count', inc_value)
-            # Update user rank
-            if self.s_users.is_absent(msg.user):
-                return
-            member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(member)
         # Call extension 'on_raw_message_edit' handlers
-        await self.__run_call_plan('on_raw_message_edit', payload)
+        await self.__run_call_plan('on_message_edit', msg)
 
     
     @after_initialized
@@ -728,14 +764,8 @@ class Overlord(OverlordBase):
             # Update stats
             inc_value = self.s_stats.get(msg.user, 'delete_message_count') + 1
             self.s_stats.set(msg.user, 'delete_message_count', inc_value)
-            # Update user rank
-            if self.s_users.is_absent(msg.user):
-                return
-            member = await self.guild.fetch_member(msg.user.did)
-            await self.update_user_rank(member)
         # Call extension 'on_raw_message_delete' handlers
-        await self.__run_call_plan('on_raw_message_delete', payload)
-
+        await self.__run_call_plan('on_message_delete', msg)
     
     @after_initialized
     @event_config("user.join")
@@ -877,8 +907,6 @@ class Overlord(OverlordBase):
             stat_val = self.s_stats.get(user, 'vc_time')
             stat_val += (join_event.updated_at - join_event.created_at).total_seconds()
             self.s_stats.set(user, 'vc_time', stat_val)
-            # Update user rank
-            await self.update_user_rank(member)
         # Call extension 'on_vc_leave' handlers
         await self.__run_call_plan('on_vc_leave', member, channel)
 

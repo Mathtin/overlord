@@ -56,23 +56,6 @@ async def sync_roles(client: bot.Overlord, msg: discord.Message):
 
 
 @cmdcoro
-async def update_user_ranks(client: bot.Overlord, msg: discord.Message):
-    async with client.sync():
-        await msg.channel.send(res.get("messages.update_ranks_begin"))
-        await client.update_user_ranks()
-        await msg.channel.send(res.get("messages.done"))
-
-
-@cmdcoro
-@member_mention_arg
-async def update_user_rank(client: bot.Overlord, msg: discord.Message, member: discord.Member):
-    async with client.sync():
-        await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
-        await client.update_user_rank(member)
-        await msg.channel.send(res.get("messages.done"))
-
-
-@cmdcoro
 @text_channel_mention_arg
 async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: discord.TextChannel):
     permissions = channel.permissions_for(client.me)
