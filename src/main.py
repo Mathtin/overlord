@@ -20,7 +20,7 @@ import logging.config
 
 from dotenv import load_dotenv
 
-from bot import Overlord
+from bot import Overlord, UserSyncExtension
 from db.models.stat import UserStatType
 from util import ConfigView
 from db import DBSession, EventType
@@ -53,6 +53,14 @@ def main(argv):
 
     # Init bot
     discord_bot = Overlord(config.bot, session)
+
+    # Init extensions
+    user_sync_ext = UserSyncExtension(bot=discord_bot)
+
+    # Attach extensions
+    discord_bot.extend(user_sync_ext)
+
+    # Start bot
     discord_bot.run()
 
     return 0

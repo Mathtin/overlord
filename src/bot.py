@@ -21,6 +21,7 @@ import asyncio
 import logging
 
 import discord
+from discord.errors import InvalidArgument
 from discord.ext import tasks
 import db as DB
 
@@ -73,10 +74,10 @@ def event_config(name: str):
     return wrapper
 
 #############################
-# Main class implementation #
+# Base class implementation #
 #############################
 
-class Overlord(discord.Client):
+class OverlordBase(discord.Client):
     __async_lock: asyncio.Lock
     __initialized: bool
     __awaiting_sync: bool
@@ -87,6 +88,7 @@ class Overlord(discord.Client):
     guild_id: int
     control_channel_id: int
     error_channel_id: int
+    maintainer_id: int
 
     # Members passed via constructor
     config: ConfigView
@@ -96,6 +98,7 @@ class Overlord(discord.Client):
     guild: discord.Guild
     control_channel: discord.TextChannel
     error_channel: discord.TextChannel
+    maintainer: discord.User
     me: discord.Member
 
     # Services
@@ -108,7 +111,7 @@ class Overlord(discord.Client):
     # Scheduled tasks
     tasks: List[asyncio.AbstractEventLoop]
 
-    def __init__(self, config: ConfigView, db_session: DB.DBSession):
+    def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
         self.__awaiting_sync = True
@@ -132,6 +135,7 @@ class Overlord(discord.Client):
         self.guild_id = int(os.getenv('DISCORD_GUILD'))
         self.control_channel_id = int(os.getenv('DISCORD_CONTROL_CHANNEL'))
         self.error_channel_id = int(os.getenv('DISCORD_ERROR_CHANNEL'))
+        self.maintainer_id = int(os.getenv('MAINTAINER_DISCORD_ID'))
 
         # Preset values initiated on_ready
         self.guild = None
@@ -172,10 +176,10 @@ class Overlord(discord.Client):
         roles = self.config["control.roles"]
         return len(filter_roles(user, roles)) > 0
 
-    def awaiting_sync(self):
+    def awaiting_sync(self) -> bool:
         return self.__awaiting_sync
 
-    def awaiting_sync_elapsed(self):
+    def awaiting_sync_elapsed(self) -> int:
         if not self.__awaiting_sync:
             return 0
         return (datetime.now() - self.__awaiting_sync_last_updated).total_seconds()
@@ -184,10 +188,10 @@ class Overlord(discord.Client):
     # Sync methods #
     ################
 
-    def run(self):
+    def run(self) -> None:
         super().run(self.token)
 
-    def check_config(self):
+    def check_config(self) -> None:
         admin_roles = self.config["control.roles"]
         for role_name in admin_roles:
             if self.get_role(role_name) is None:
@@ -195,16 +199,16 @@ class Overlord(discord.Client):
         # Check ranks config
         self.s_ranking.check_config()
 
-    def update_config(self, config: ConfigView):
+    def update_config(self, config: ConfigView) -> None:
         self.config = config
         self.s_ranking.config = config.ranks
         self.check_config()
 
-    def set_awaiting_sync(self):
+    def set_awaiting_sync(self) -> None:
         self.__awaiting_sync_last_updated = datetime.now()
         self.__awaiting_sync = True
 
-    def unset_awaiting_sync(self):
+    def unset_awaiting_sync(self) -> None:
         self.__awaiting_sync_last_updated = datetime.now()
         self.__awaiting_sync = False
 
@@ -212,22 +216,22 @@ class Overlord(discord.Client):
     # Async methods #
     #################
 
-    async def init_lock(self):
+    async def init_lock(self) -> None:
         while not self.__initialized:
             await asyncio.sleep(0.1)
         return
 
-    async def send_error(self, msg: str):
+    async def send_error(self, msg: str) -> None:
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.error").format(msg))
         return
 
-    async def send_warning(self, msg: str):
+    async def send_warning(self, msg: str) -> None:
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.warning").format(msg))
         return
 
-    async def sync_users(self):
+    async def sync_users(self) -> None:
         log.info('Syncing roles')
         self.s_roles.load(self.guild.roles)
 
@@ -249,7 +253,7 @@ class Overlord(discord.Client):
         self.unset_awaiting_sync()
         log.info(f'Syncing users done')
 
-    async def update_user_rank(self, member: discord.Member):
+    async def update_user_rank(self, member: discord.Member) -> None:
         if self.awaiting_sync():
             log.warn("Cannot update user rank: awaiting role sync")
             return False
@@ -276,7 +280,7 @@ class Overlord(discord.Client):
         self.s_users.update_member(member)
         return True
 
-    async def update_user_ranks(self):
+    async def update_user_ranks(self) -> None:
         if self.awaiting_sync():
             log.error("Cannot update user ranks: awaiting role sync")
             await self.send_error(f'Cannot update user ranks: awaiting role sync')
@@ -304,31 +308,16 @@ class Overlord(discord.Client):
             except ValueError:
                 return None
 
-    async def logout(self):
+    async def logout(self) -> None:
         for task in self.tasks:
             task.stop()
         await super().logout()
-
-    #############
-    # Own tasks #
-    #############
-
-    def get_user_sync_task(self, **kwargs) -> asyncio.AbstractEventLoop:
-        @tasks.loop(**kwargs)
-        async def user_sync_task():
-            if self.awaiting_sync_elapsed() < 30:
-                return
-            log.info("Scheduled user sync update")
-            async with self.sync():
-                await self.sync_users()
-            log.info("Done scheduled user sync update")
-        return user_sync_task
 
     #########
     # Hooks #
     #########
 
-    async def on_error(self, event, *args, **kwargs):
+    async def on_error(self, event, *args, **kwargs) -> None:
         """
             Async error event handler
 
@@ -339,20 +328,25 @@ class Overlord(discord.Client):
 
         logging.exception(f'Error on event: {event}')
 
-        # exception_lines = traceback.format_exception(*sys.exc_info())
-        # exception_msg = '`' + ''.join(exception_lines).replace('`', '\'')[:1800] + '`'
-        exception_msg_short = f'`{str(ex)}`\nBlame <@281130377488236554>'
+        exception_tb = traceback.format_exception(*sys.exc_info())
+        exception_tb_limited = limit_traceback(exception_tb, "bot.py", 6)
+        exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
+
+        exception_msg = res.get("messages.dm_bot_exception").format(str(ex)) + '\n' + exception_tb_quoted
+
+        exception_msg_short = f'`{str(ex)}` Reported to {self.maintainer.mention}'
 
         if self.error_channel is not None:
             await self.send_error(exception_msg_short)
+        
+        await self.maintainer.send(exception_msg)
 
         if ex_type is InvalidConfigException:
             await self.logout()
         if ex_type is NotCoroutineException:
             await self.logout()
 
-
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         """
             Async ready event handler
 
@@ -387,6 +381,15 @@ class Overlord(discord.Client):
                 log.info(f'Attached to {channel.name} as error channel ({channel.id})')
                 self.error_channel = channel
 
+            # Resolve maintainer
+            try:
+                self.maintainer = await self.fetch_user(self.maintainer_id)
+                await self.maintainer.send('Starting instance')
+            except discord.NotFound:
+                raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
+            except discord.Forbidden:
+                raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
+
             # Sync roles and users
             await self.sync_users()
 
@@ -394,8 +397,8 @@ class Overlord(discord.Client):
             self.check_config()
 
             # Schedule tasks
-            self.tasks.append(self.s_stats.get_stat_update_task(self.sync(), hours=24, loop=asyncio.get_running_loop()))
-            self.tasks.append(self.get_user_sync_task(minutes=1, loop=asyncio.get_running_loop()))
+            #self.tasks.append(self.s_stats.get_stat_update_task(self.sync(), hours=24, loop=asyncio.get_running_loop()))
+            #self.tasks.append(self.get_user_sync_task(minutes=1, loop=asyncio.get_running_loop()))
 
             # Start tasks
             for task in self.tasks:
@@ -410,7 +413,7 @@ class Overlord(discord.Client):
     @event_config("message.new")
     @skip_bots
     @guild_member_event
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: discord.Message) -> None:
         """
             Async new message event handler
 
@@ -436,7 +439,7 @@ class Overlord(discord.Client):
             await self.update_user_rank(message.author)
 
 
-    async def on_control_message(self, message: discord.Message):
+    async def on_control_message(self, message: discord.Message) -> None:
         """
             Async new control message event handler
 
@@ -481,7 +484,7 @@ class Overlord(discord.Client):
     
     @after_initialized
     @event_config("message.edit")
-    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
         """
             Async message edit event handler
 
@@ -508,7 +511,7 @@ class Overlord(discord.Client):
     
     @after_initialized
     @event_config("message.delete")
-    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
         """
             Async message delete event handler
 
@@ -537,7 +540,7 @@ class Overlord(discord.Client):
     @event_config("user.join")
     @skip_bots
     @guild_member_event
-    async def on_member_join(self, member: discord.Member):
+    async def on_member_join(self, member: discord.Member) -> None:
         """
             Async member join event handler
 
@@ -557,7 +560,7 @@ class Overlord(discord.Client):
     @event_config("user.update")
     @skip_bots
     @guild_member_event
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
+    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
         """
             Async member remove event handler
 
@@ -585,7 +588,7 @@ class Overlord(discord.Client):
     @event_config("user.leave")
     @skip_bots
     @guild_member_event
-    async def on_member_remove(self, member: discord.Member):
+    async def on_member_remove(self, member: discord.Member) -> None:
         """
             Async member remove event handler
 
@@ -609,7 +612,7 @@ class Overlord(discord.Client):
     @after_initialized
     @skip_bots
     @guild_member_event
-    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    async def on_voice_state_update(self, user: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
         """
             Async vc state change event handler
 
@@ -624,7 +627,7 @@ class Overlord(discord.Client):
             
     
     @event_config("voice.join")
-    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel):
+    async def on_vc_join(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
         """
             Async vc join event handler
 
@@ -644,7 +647,7 @@ class Overlord(discord.Client):
             
     
     @event_config("voice.leave")
-    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel):
+    async def on_vc_leave(self, member: discord.Member, channel: discord.VoiceChannel) -> None:
         """
             Async vc join event handler
 
@@ -668,22 +671,233 @@ class Overlord(discord.Client):
             # Update user rank
             await self.update_user_rank(member)
 
-    async def on_guild_role_create(self, role: discord.Role):
+    async def on_guild_role_create(self, role: discord.Role) -> None:
+        if role.guild != self.guild:
+            return
         if self.awaiting_sync():
             return
         self.set_awaiting_sync()
         await self.send_warning('New role detected. Awaiting role syncronization.')
 
-    async def on_guild_role_delete(self, role: discord.Role):
+    async def on_guild_role_delete(self, role: discord.Role) -> None:
+        if role.guild != self.guild:
+            return
         if self.awaiting_sync():
             return
         self.set_awaiting_sync()
         await self.send_warning('Role remove detected. Awaiting role syncronization.')
 
-    async def on_guild_role_update(self, before: discord.Role, after: discord.Role):
+    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+        if before.guild != self.guild:
+            return
         if self.awaiting_sync():
             return
         self.set_awaiting_sync()
         await self.send_warning('Role change detected. Awaiting role syncronization.')
 
+############################
+# Bot Extension Base Class #
+############################
 
+class BotExtensionTask(object):
+
+    def __init__(self, func, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> None:
+        super().__init__()
+        self.func = func
+        self.kwargs = {
+            'seconds': seconds,
+            'minutes': minutes,
+            'hours': hours,
+            'count': count,
+            'reconnect': reconnect
+        }
+
+    def task(self, ext) -> asyncio.AbstractEventLoop:
+        self.kwargs['loop'] = asyncio.get_running_loop()
+        async def method(*args, **kwargs):
+            await self.func(ext, *args, **kwargs)
+        return tasks.loop(**self.kwargs)(method)
+    
+
+class BotExtension(object):
+
+    __priority__ = 0
+
+    # Members passed via constructor
+    bot: OverlordBase
+
+    # State members
+    __enabled: bool
+    __tasks: List[BotExtensionTask]
+    __task_instances: List[asyncio.AbstractEventLoop]
+
+    def __init__(self, bot: OverlordBase, priority=None) -> None:
+        super().__init__()
+        self.bot = bot
+        self.__enabled = False
+        # Gather tasks (coroutines wrapped with BotExtension.task decorator)
+        attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
+        self.__tasks =  [t for t in attrs if isinstance(t, BotExtensionTask)]
+        self.__task_instances =  []
+        # Reattach implemented handlers
+        handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
+        for h_name, h in handlers.items():
+            setattr(self, h_name, self.__handler(h))
+        # Prioritize
+        if priority is not None:
+            self.__priority__ = priority
+        if self.priority > 63 or self.priority < 0:
+            raise InvalidArgument(f'priority should be less then 63 and bigger or equal then 0, got: {priority}')
+
+    @staticmethod
+    def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> Callable[..., Callable[..., Awaitable[None]]]:
+        def decorator(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+            async def wrapped(self, *args, **kwargs):
+                await self.bot.init_lock()
+                await func(self, *args, **kwargs)
+            return BotExtensionTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count, reconnect=reconnect)
+        return decorator
+
+    @staticmethod
+    def __handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+        async def wrapped(*args, **kwargs):
+            if not func.__self__.__enabled:
+                return
+            await func.__self__.bot.init_lock()
+            try:
+                await func(*args, **kwargs)
+            except:
+                await func.__self__.on_error(func.__name__, *args, **kwargs)
+        return wrapped
+
+    def start(self) -> None:
+        if self.__enabled:
+            return
+        self.__enabled = True
+        self.__task_instances =  [t.task(self) for t in self.__tasks]
+        for task in self.__task_instances:
+            task.start()
+
+    def stop(self):
+        if not self.__enabled:
+            return
+        self.__enabled = False
+        for task in self.__task_instances:
+            task.stop()
+
+    @property
+    def priority(self):
+        return self.__priority__
+
+    ####################
+    # Default Handlers #
+    ####################
+
+    async def on_error(self, event, *args, **kwargs) -> None:
+        """
+            Async error event handler
+
+            Sends stacktrace to error channel
+        """
+        ext_name = type(self).__name__
+        ex = sys.exc_info()[1]
+
+        logging.exception(f'Error from {ext_name} extension on event: {event}')
+
+        exception_tb = traceback.format_exception(*sys.exc_info())
+        exception_tb_limited = limit_traceback(exception_tb, "bot.py", 4)
+        exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
+
+        exception_msg = res.get("messages.dm_ext_exception").format(ext_name, str(ex)) + '\n' + exception_tb_quoted
+
+        exception_msg_short = f'`{str(ex)}` Reported to {self.bot.maintainer.mention}'
+
+        if self.bot.error_channel is not None:
+            await self.bot.send_error(exception_msg_short)
+        
+        await self.bot.maintainer.send(exception_msg)
+        self.stop()
+
+    async def on_ready(self) -> None:
+        pass
+    
+
+#############################
+# Main class implementation #
+#############################
+
+class Overlord(OverlordBase):
+    
+    # Extensions
+    __extensions: List[BotExtension]
+    __handlers: Dict[str, Callable[..., Awaitable[None]]]
+
+    def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
+        super().__init__(config, db_session)
+        self.__extensions = []
+        self.__handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
+        for h in self.__handlers:
+            self.__reattach_handler(h)
+
+    def extend(self, extension: BotExtension) -> None:
+        self.__extensions.append(extension)
+        self.__extensions.sort(key=lambda e: e.priority)
+
+    def __reattach_handler(self, handler_name) -> None:
+        if handler_name == 'on_error':
+            return
+        root_handler = self.__handlers[handler_name]
+        # Build call plan
+        call_plan = [[] for i in range(64)]
+        for extension in self.__extensions:
+            if not hasattr(extension, handler_name):
+                continue
+            call_plan[extension.priority].append(getattr(extension, handler_name))
+        # Define chain handler
+        if handler_name == 'on_ready':
+            async def chain_handler(*args, **kwargs):
+                await root_handler(*args, **kwargs)
+                for handlers in call_plan:
+                    calls = [h(*args, **kwargs) for h in handlers]
+                    if calls:
+                        await asyncio.wait(calls)
+                await self.maintainer.send('Started')
+        else:
+            async def chain_handler(*args, **kwargs):
+                await root_handler(*args, **kwargs)
+                for handlers in call_plan:
+                    calls = [h(*args, **kwargs) for h in handlers]
+                    await asyncio.wait(calls)
+        # Attach
+        setattr(self, handler_name, chain_handler)
+
+    async def on_ready(self) -> None:
+        # Start extensions
+        for ext in self.__extensions:
+            ext.start()
+        # Handle on_ready
+        await super().on_ready()
+
+    def run(self) -> None:
+        return super().run()
+
+    def logout(self) -> None:
+        for ext in self.__extensions:
+            ext.stop()
+        return super().logout()
+
+##################
+# Sync Extension #
+##################
+
+class UserSyncExtension(BotExtension):
+
+    @BotExtension.task(minutes=1)
+    async def user_sync_task(self):
+        raise RuntimeError('Test Exception')
+        if self.bot.awaiting_sync_elapsed() < 30:
+            return
+        log.info("Scheduled user sync update")
+        async with self.bot.sync():
+            await self.bot.sync_users()
+        log.info("Done scheduled user sync update")

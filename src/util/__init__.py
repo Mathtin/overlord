@@ -27,7 +27,7 @@ import discord
 #################
 
 __module_cache = {}
-def get_module_element(path: str):
+def get_module_element(path: str) -> Any:
     splited_path = path.split('.')
     module_name = '.'.join(splited_path[:-1])
     object_name = splited_path[-1]
@@ -36,7 +36,7 @@ def get_module_element(path: str):
     module = __module_cache[module_name]
     return getattr(module, object_name)
 
-def dict_fancy_table(values: dict, key_name='name'):
+def dict_fancy_table(values: dict, key_name='name') -> str:
     if not values:
         return '++\n'*2
 
@@ -58,7 +58,7 @@ def dict_fancy_table(values: dict, key_name='name'):
     lines = [format_line(i) for i in range(row_count)]
     return separator + separator.join(lines) + separator
 
-def pretty_days(days: int):
+def pretty_days(days: int) -> str:
     _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
     if days == 0:
         return '0 days'
@@ -75,7 +75,7 @@ def pretty_days(days: int):
         res += f'{days} day{_s(days)} '
     return res.strip()
 
-def pretty_seconds(seconds: int):
+def pretty_seconds(seconds: int) -> str:
     _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
     if seconds == 0:
         return '0 seconds'
@@ -96,7 +96,7 @@ def pretty_seconds(seconds: int):
         res += f'{seconds} second{_s(seconds)} '
     return res.strip()
 
-def parse_control_message(prefix: str, message: discord.Message):
+def parse_control_message(prefix: str, message: discord.Message) -> List[str]:
     prefix_len = len(prefix)
     msg = message.content.strip()
 
@@ -127,4 +127,18 @@ def parse_control_message(prefix: str, message: discord.Message):
     if merging:
         res.append(merging_val)
 
+    return res
+
+def limit_traceback(traceback: List[str], from_file: str, offset: int) -> List[str]:
+    res = []
+    found = False
+    effective_offset = 0
+    for line in traceback:
+        if not found and from_file in line and line.strip().startswith("File"):
+            found = True
+            res.append(line)
+        elif found and line.strip().startswith("File"):
+            effective_offset += 1
+        if found and effective_offset < offset:
+            res.append(line)
     return res
