@@ -107,8 +107,10 @@ class RankingExtension(BotExtension):
             await msg.channel.send(res.get("messages.done"))
 
     @BotExtension.command("update_rank", desciption="Update specified user rank")
-    @member_mention_arg
-    async def cmd_update_rank(self, msg: discord.Message, member: discord.Member):
+    async def cmd_update_rank(self, msg: discord.Message, user_mention: str):
+        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
+        if member is None:
+            return
         async with self.sync():
             await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
             await self.update_rank(member)

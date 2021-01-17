@@ -255,6 +255,9 @@ class OverlordBase(discord.Client):
             try:
                 if '#' in user_mention:
                     user = self.s_users.get_by_qualified_name(user_mention)
+                elif user_mention.startswith('<@'):
+                    id = int(user_mention[2:-1])
+                    return await self.fetch_user(id)
                 else:
                     user = self.s_users.get_by_display_name(user_mention)
                 if user is None:
@@ -264,6 +267,18 @@ class OverlordBase(discord.Client):
                 return None
             except ValueError:
                 return None
+
+    async def resolve_member_w_fb(self, user_mention: str, fb_channel: discord.TextChannel) -> Optional[discord.Member]:
+        user = await self.resolve_user(user_mention)
+        if user is None:
+            await fb_channel.send(get_resource("messages.unknown_user"))
+            return
+        try:
+            member = await self.guild.fetch_member(user.id)
+        except discord.NotFound:
+            await fb_channel.send(get_resource("messages.not_member_user"))
+            return
+        return member
 
     async def logout(self) -> None:
         await super().logout()
@@ -475,7 +490,7 @@ class BotExtension(object):
         logging.exception(f'Error from {ext_name} extension on event: {event}')
 
         exception_tb = traceback.format_exception(*sys.exc_info())
-        exception_tb_limited = limit_traceback(exception_tb, "bot.py", 4)
+        exception_tb_limited = limit_traceback(exception_tb, "src/", 4)
         exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
 
         exception_msg = res.get("messages.dm_ext_exception").format(ext_name, str(ex)) + '\n' + exception_tb_quoted
@@ -527,7 +542,7 @@ class Overlord(OverlordBase):
             call_plan[extension.priority].append(getattr(extension, handler_name))
         self.__call_plan_map[handler_name] = [call for call in call_plan if call]
 
-    async def __run_call_plan(self, name: str, *args, **kwargs):
+    async def __run_call_plan(self, name: str, *args, **kwargs) -> None:
         call_plan = self.__call_plan_map[name]
         for handlers in call_plan:
             calls = [h(*args, **kwargs) for h in handlers]
@@ -863,5 +878,21 @@ class UserSyncExtension(BotExtension):
         async with self.bot.sync():
             await msg.channel.send(res.get("messages.sync_users_begin"))
             await self.bot.sync_users()
+            await msg.channel.send(res.get("messages.done"))
+            
+    @BotExtension.command("clear_all", desciption="Clears db data")
+    async def clear_data(self, msg: discord.Message):
+        models = [DB.MemberEvent, DB.MessageEvent, DB.VoiceChatEvent, DB.UserStat, DB.User, DB.Role]
+        table_data_drop = res.get("messages.table_data_drop")
+        async with self.bot.sync():
+            log.warn("Clearing database")
+            await self.bot.send_warning("Clearing database")
+            for model in models:
+                log.warn(f"Clearing table `{model.table_name()}`")
+                await msg.channel.send(table_data_drop.format(model.table_name()))
+                self.bot.db.query(model).delete()
+                self.bot.db.commit()
+            self.bot.set_awaiting_sync()
+            log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
 

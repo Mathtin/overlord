@@ -24,16 +24,6 @@ import util.resources as res
 
 log = logging.getLogger('control')
 
-#################
-# Utility funcs #
-#################
-
-def __build_stat_line(client: bot.Overlord, user: db.User, stat: str, formatter=lambda x:str(x)):
-    stat_name = res.get(f"messages.{stat}_stat")
-    stat_val = client.s_stats.get(user, stat)
-    stat_val_f = formatter(stat_val)
-    return res.get("messages.user_stats_entry").format(stat_name, stat_val_f)
-
 ############################
 # Control command Handlers #
 ############################
@@ -80,66 +70,6 @@ async def reload_channel_history(client: bot.Overlord, msg: discord.Message, cha
 
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
-
-
-@cmdcoro
-async def recalculate_stats(client: bot.Overlord, msg: discord.Message):
-    # Tranaction begins
-    async with client.sync():
-        log.info(f"Recalculating all stats")
-        answer = res.get("messages.user_stat_calc")
-        await msg.channel.send(answer.format('all'))
-
-        for stat_type in client.s_stats.user_stat_type_map:
-            client.s_stats.reload_stat(stat_type)
-
-        log.info(f'Done')
-        await msg.channel.send(res.get("messages.done"))
-
-
-@cmdcoro
-@member_mention_arg
-async def get_user_stats(client: bot.Overlord, msg: discord.Message, member: discord.Member):
-    # Resolve user
-    user = client.s_users.get(member)
-    if user is None:
-        await msg.channel.send(res.get("messages.unknown_user"))
-        return
-
-    answer = res.get("messages.user_stats_head").format(member.mention) + '\n'
-    answer += __build_stat_line(client, user, "membership", formatter=pretty_days) + '\n'
-    answer += __build_stat_line(client, user, "new_message_count") + '\n'
-    answer += __build_stat_line(client, user, "delete_message_count") + '\n'
-    answer += __build_stat_line(client, user, "edit_message_count") + '\n'
-    answer += __build_stat_line(client, user, "vc_time", formatter=pretty_seconds) + '\n'
-
-    if client.s_stats.get(user, "min_weight") > 0:
-        answer += __build_stat_line(client, user, "min_weight") + '\n'
-    if client.s_stats.get(user, "max_weight") > 0:
-        answer += __build_stat_line(client, user, "max_weight") + '\n'
-    if client.s_stats.get(user, "exact_weight") > 0:
-        answer += __build_stat_line(client, user, "exact_weight") + '\n'
-
-    await msg.channel.send(answer)
-    
-@cmdcoro
-async def clear_data(client: bot.Overlord, msg: discord.Message):
-
-    models = [db.MemberEvent, db.MessageEvent, db.VoiceChatEvent, db.UserStat, db.User, db.Role]
-    table_data_drop = res.get("messages.table_data_drop")
-
-    # Tranaction begins
-    async with client.sync():
-        log.warn("Clearing database")
-        await client.send_warning("Clearing database")
-        for model in models:
-            log.warn(f"Clearing table `{model.table_name()}`")
-            await client.control_channel.send(table_data_drop.format(model.table_name()))
-            client.db.query(model).delete()
-            client.db.commit()
-        client.set_awaiting_sync()
-        log.info(f'Done')
-        await client.control_channel.send(res.get("messages.done"))
 
 @cmdcoro
 async def reload_config(client: bot.Overlord, msg: discord.Message):
@@ -313,48 +243,3 @@ async def edit_rank(client: bot.Overlord, msg: discord.Message, role_name: str, 
         log.info(f'Done')
         await client.control_channel.send(res.get("messages.done"))
 
-
-@cmdcoro
-async def get_stat_names(client: bot.Overlord, msg: discord.Message):
-    names = [res.get("messages.stats_name_entry").format(s) for s in client.s_stats.user_stat_type_map]
-    answer = res.get("messages.stats_name_head") + '\n' + '\n'.join(names)
-    await msg.channel.send(answer)
-
-@cmdcoro
-@member_mention_arg
-async def get_user_stat(client: bot.Overlord, msg: discord.Message, member: discord.Member, stat_name: str):
-    user = client.s_users.get(member)
-    if user is None:
-        await msg.channel.send(res.get("messages.unknown_user"))
-        return
-
-    try:
-        answer = __build_stat_line(client, user, stat_name)
-        await msg.channel.send(answer)
-    except NameError:
-        await msg.channel.send(res.get("messages.error").format("Invalid stat name"))
-        return
-
-@cmdcoro
-@member_mention_arg
-async def set_user_stat(client: bot.Overlord, msg: discord.Message, member: discord.Member, stat_name: str, value: str):
-    try:
-        value = int(value)
-    except ValueError:
-        await msg.channel.send(res.get("messages.error").format("integer expected"))
-        return
-    
-    if value < 0:
-        await msg.channel.send(res.get("messages.warning").format("negative stat value!"))
-
-    user = client.s_users.get(member)
-    if user is None:
-        await msg.channel.send(res.get("messages.unknown_user"))
-        return
-
-    try:
-        client.s_stats.set(user, stat_name, value)
-        await client.control_channel.send(res.get("messages.done"))
-    except NameError:
-        await msg.channel.send(res.get("messages.error").format("Invalid stat name"))
-        return

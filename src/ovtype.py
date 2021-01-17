@@ -107,5 +107,8 @@ class OverlordCommand(object):
                 usage_str = 'Usage: ' + self.usage(prefix, argv[0])
                 await message.channel.send(usage_str)
             else:
-                await self.func(ext, message, *argv[1:])
+                try:
+                    await self.func(ext, message, *argv[1:])
+                except:
+                    await ext.on_error(self.func.__name__, message, *argv[1:])
         return wrapped_func

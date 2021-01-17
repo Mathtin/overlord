@@ -72,14 +72,14 @@ def cmdcoro(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]
 
 @saving_original
 def member_mention_arg(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
-    async def wrapped_func(client, msg, user_mention, *argv):
+    async def wrapped_func(ext, msg, user_mention, *argv):
         if len(msg.mentions) == 0:
-            user = await client.resolve_user(user_mention)
+            user = await ext.bot.resolve_user(user_mention)
             if user is None:
                 await msg.channel.send(get_resource("messages.unknown_user"))
                 return
             try:
-                member = await client.guild.fetch_member(user.id)
+                member = await ext.bot.guild.fetch_member(user.id)
             except discord.NotFound:
                 await msg.channel.send(get_resource("messages.not_member_user"))
                 return
@@ -88,7 +88,7 @@ def member_mention_arg(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awa
         if not is_user_member(member):
             await msg.channel.send(get_resource("messages.not_member_user"))
             return
-        await func(client, msg, member, *argv)
+        await func(ext, msg, member, *argv)
     return wrapped_func
 
 @saving_original
