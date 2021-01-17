@@ -20,8 +20,9 @@ import logging.config
 
 from dotenv import load_dotenv
 
-from bot import Overlord, UserSyncExtension
+from bot import Overlord, OverlordExtras
 from ranking import RankingExtension
+from config import ConfigExtension
 from stats import StatsExtension
 from db.models.stat import UserStatType
 from util import ConfigView
@@ -57,12 +58,14 @@ def main(argv):
     discord_bot = Overlord(config.bot, session)
 
     # Init extensions
-    user_sync_ext = UserSyncExtension(bot=discord_bot)
+    extras_ext = OverlordExtras(bot=discord_bot)
+    conf_ext = ConfigExtension(bot=discord_bot)
     stats_ext = StatsExtension(bot=discord_bot)
     ranking_ext = RankingExtension(bot=discord_bot, priority=1)
 
     # Attach extensions
-    discord_bot.extend(user_sync_ext)
+    discord_bot.extend(extras_ext)
+    discord_bot.extend(conf_ext)
     discord_bot.extend(stats_ext)
     discord_bot.extend(ranking_ext)
 

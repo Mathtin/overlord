@@ -246,6 +246,7 @@ class OverlordBase(discord.Client):
     async def send_warning(self, msg: str) -> None:
         if self.error_channel is not None:
             await self.error_channel.send(res.get("messages.warning").format(msg))
+        await self.maintainer.send(res.get("messages.error").format(msg))
         return
 
     async def sync_users(self) -> None:
@@ -286,6 +287,28 @@ class OverlordBase(discord.Client):
             except ValueError:
                 return None
 
+    async def resolve_text_channel(self, channel_mention: str) -> Optional[discord.TextChannel]:
+            if '<' in channel_mention:
+                channel = [c for c in self.guild.text_channels if c.mention == channel_mention]
+                return channel[0] if channel else NoneType
+            if '#' in channel_mention:
+                channel_name = channel_mention[1:]
+            else:
+                channel_name = channel_mention
+            channel = [c for c in self.guild.text_channels if c.name == channel_name]
+            return channel[0] if channel else None
+
+    async def resolve_voice_channel(self, channel_mention: str) -> Optional[discord.VoiceChannel]:
+            if '<' in channel_mention:
+                channel = [c for c in self.guild.voice_channels if c.mention == channel_mention]
+                return channel[0] if channel else NoneType
+            if '#' in channel_mention:
+                channel_name = channel_mention[1:]
+            else:
+                channel_name = channel_mention
+            channel = [c for c in self.guild.voice_channels if c.name == channel_name]
+            return channel[0] if channel else None
+
     async def resolve_member_w_fb(self, user_mention: str, fb_channel: discord.TextChannel) -> Optional[discord.Member]:
         user = await self.resolve_user(user_mention)
         if user is None:
@@ -320,12 +343,12 @@ class OverlordBase(discord.Client):
         exception_tb_limited = limit_traceback(exception_tb, "bot.py", 6)
         exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
 
-        exception_msg = res.get("messages.dm_bot_exception").format(str(ex)) + '\n' + exception_tb_quoted
+        exception_msg = res.get("messages.dm_bot_exception").format(event, ('`'+str(ex).replace("`","\\`")+'`')) + '\n' + exception_tb_quoted
 
         exception_msg_short = f'`{str(ex)}` Reported to {self.maintainer.mention}'
 
-        if self.error_channel is not None:
-            await self.send_error(exception_msg_short)
+        if self.error_channel is not None and event != 'on_ready':
+            await self.error_channel.send(res.get("messages.error").format(exception_msg_short))
         
         await self.maintainer.send(exception_msg)
 
@@ -511,7 +534,7 @@ class BotExtension(object):
         exception_tb_limited = limit_traceback(exception_tb, "src/", 4)
         exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
 
-        exception_msg = res.get("messages.dm_ext_exception").format(ext_name, str(ex)) + '\n' + exception_tb_quoted
+        exception_msg = res.get("messages.dm_ext_exception").format(ext_name, event, str(ex)) + '\n' + exception_tb_quoted
 
         #exception_msg_short = f'`{str(ex)}` Reported to {self.bot.maintainer.mention}'
 
@@ -869,7 +892,7 @@ class Overlord(OverlordBase):
 # Sync Extension #
 ##################
 
-class UserSyncExtension(BotExtension):
+class OverlordExtras(BotExtension):
 
     @BotExtension.task(seconds=1)
     async def user_sync_task(self):
@@ -915,8 +938,15 @@ class UserSyncExtension(BotExtension):
             await msg.channel.send(res.get("messages.done"))
 
     @BotExtension.command("dump_channel", desciption="Fetches whole channel data into db (overwriting)")
-    @text_channel_mention_arg
-    async def cmd_dump_channel(self, msg: discord.Message, channel: discord.TextChannel):
+    async def cmd_dump_channel(self, msg: discord.Message, channel_mention: str):
+        channel = await self.bot.resolve_text_channel(channel_mention)
+        vc_channel = await self.bot.resolve_voice_channel(channel_mention)
+        if channel is None and vc_channel is not None:
+            await msg.channel.send(get_resource("messages.invalid_channel_type_text"))
+            return
+        elif channel is None:
+            await msg.channel.send(get_resource("messages.invalid_channel_mention"))
+            return
         permissions = channel.permissions_for(self.bot.me)
         if not permissions.read_message_history:
             answer = res.get("messages.missing_access").format(channel.mention) + ' (can\'t read message history)'

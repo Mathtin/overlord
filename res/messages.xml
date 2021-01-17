@@ -17,8 +17,8 @@
    <string name="missing_access">❌ Missing access for {0}</string>
 
    <!-- Maintainer messages -->
-   <string name="dm_bot_exception">We have a situation here. Bot failed :(&#xA;Error: {0}&#xA;Traceback:</string>
-   <string name="dm_ext_exception">We have a situation here. Extension {0} failed and will be stopped!&#xA;Error: {1}&#xA;Traceback:</string>
+   <string name="dm_bot_exception">We have a situation here. Bot failed :(&#xA;Event: {0}&#xA;Error: {1}&#xA;Traceback:</string>
+   <string name="dm_ext_exception">We have a situation here. Extension {0} failed and will be stopped!&#xA;Event: {1}&#xA;Error: {2}&#xA;Traceback:</string>
    
    <!-- User stat names -->
    <string name="membership_stat">Membership period</string>

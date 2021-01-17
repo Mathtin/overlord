@@ -17,7 +17,7 @@ import logging
 import discord
 from bot import BotExtension
 from services import StatService
-from util import member_mention_arg, pretty_days, pretty_seconds
+from util import pretty_days, pretty_seconds
 from ovtype import *
 import util.resources as res
 
@@ -106,8 +106,10 @@ class StatsExtension(BotExtension):
             await msg.channel.send(res.get("messages.done"))
 
     @BotExtension.command("get_user_stats", desciption="Fetches user stats from db")
-    @member_mention_arg
-    async def cmd_get_user_stats(self, msg: discord.Message, member: discord.Member):
+    async def cmd_get_user_stats(self, msg: discord.Message, user_mention: str):
+        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
+        if member is None:
+            return
         # Resolve user
         user = self.s_users.get(member)
         if user is None:
