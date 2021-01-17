@@ -202,6 +202,24 @@ class OverlordBase(discord.Client):
         self.s_ranking.config = config.ranks
         self.check_config()
 
+    def safe_alter_config(self, path: str, value) -> Optional[Exception]:
+        parent_config = self.config.parent()
+        old_value = parent_config[path]
+        try:
+            log.warn(f'Altering raw config path {path}')
+            parent_config.alter(path, value)
+            if parent_config['logger']:
+                logging.config.dictConfig(parent_config['logger'])
+            self.update_config(parent_config.bot)
+        except (InvalidConfigException, TypeError) as e:
+            log.warn(f'Invalid config value provided: {value}, reason: {e}. Reverting.')
+            parent_config.alter(path, old_value)
+            if parent_config['logger']:
+                logging.config.dictConfig(parent_config['logger'])
+            self.update_config(parent_config.bot)
+            return e
+        return None
+
     def set_awaiting_sync(self) -> None:
         self.__awaiting_sync_last_updated = datetime.now()
         self.__awaiting_sync = True
