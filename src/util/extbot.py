@@ -90,6 +90,9 @@ def qualified_name(user: discord.User) -> str:
 def quote_msg(msg: str) -> str:
     return '\n'.join([f'> `{l}`' for l in msg.replace("`","\\`").splitlines()])
 
+def code_msg(msg: str) -> str:
+    return '\n'.join([f'`{l}`' for l in msg.replace("`","\\`").splitlines()])
+
 def get_channel_env_var_name(n) -> str:
     return f'DISCORD_CHANNEL_{n}'
 
@@ -137,12 +140,14 @@ async def send_long_message(channel: discord.TextChannel, message: str):
     for line in lines:
         if not cur:
             if len(line) > 2000:
-                await send_long_line(channel, message)
+                await send_long_line(channel, line)
             else:
                 cur = line
         else: # if smth in cur
             if len(line) > 2000:
-                await send_long_line(channel, message)
+                await channel.send(channel, cur)
+                cur = ''
+                await send_long_line(channel, line)
             elif len(cur) + len(line) < 2000:
                 cur += '\n' + line
             else: # if len(cur) + len(line) > 2000
@@ -150,7 +155,44 @@ async def send_long_message(channel: discord.TextChannel, message: str):
                 cur = line
     if cur:
         await channel.send(cur)
+
+SEP='-------------------------------------------------------------------------------------------------'
+def embed_long_line(embed: discord.Embed, line: str):
+    chunk = 1000
+    parts = [ line[i:i+chunk] for i in range(0, len(len), chunk) ]
+    for part in parts:
+        embed.add_field(name=SEP, value=part, inline=False)
         
+def embed_long_message(embed: discord.Embed, message: str):
+    message = message[:5000]
+    f_p = message[:2000]
+    i = f_p.rfind('\n')
+    if i == -1:
+        message = message[2000:]
+    else:
+        f_p = message[:i]
+        message = message[i+1:]
+    embed.description = f_p
+    lines = message.splitlines()
+    cur = ''
+    for line in lines:
+        if not cur:
+            if len(line) > 1000:
+                embed_long_line(embed, line)
+            else:
+                cur = line
+        else: # if smth in cur
+            if len(line) > 1000:
+                embed.add_field(name=SEP, value=cur, inline=False)
+                cur = ''
+                embed_long_line(embed, line)
+            elif len(cur) + len(line) < 1000:
+                cur += '\n' + line
+            else: # if len(cur) + len(line) > 1000
+                embed.add_field(name=SEP, value=cur, inline=False)
+                cur = line
+    if cur:
+        embed.add_field(name=SEP, value=cur, inline=False)
             
 
     

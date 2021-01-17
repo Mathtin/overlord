@@ -16,8 +16,10 @@ __author__ = 'Mathtin'
 import logging
 import discord
 import json
+
+from util.extbot import embed_long_message
 from .base import BotExtension
-from util import ConfigView, quote_msg, send_long_message
+from util import ConfigView, code_msg, send_long_message
 import util.resources as res
 
 log = logging.getLogger('config-extension')
@@ -57,12 +59,13 @@ class ConfigExtension(BotExtension):
 
     @BotExtension.command("get_config_value", desciption="Print config value (in json)")
     async def cmd_get_config_value(self, msg: discord.Message, path: str):
+        embed = self.bot.base_embed("Overlord Configuration", f"⚙ {path} value", '', self.__color__)
         parent_config = self.bot.config.parent()
         try:
             value = parent_config[path]
-            value_s = quote_msg(json.dumps(value, indent=4))
-            header = res.get("messages.config_value_header")
-            await send_long_message(msg.channel, f'{header}\n{value_s}')
+            value_s = code_msg(json.dumps(value, indent=4))
+            embed_long_message(embed, value_s)
+            await msg.channel.send(embed=embed)
         except KeyError:
             await msg.channel.send(res.get("messages.invalid_config_path"))
 
