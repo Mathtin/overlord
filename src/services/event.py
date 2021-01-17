@@ -107,6 +107,18 @@ class EventService(object):
         self.db.commit()
         return res
 
+    def create_new_reaction_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        row = conv.new_reaction_to_row(user, msg, self.event_type_map)
+        res = self.db.add(DB.ReactionEvent, row)
+        self.db.commit()
+        return res
+
+    def create_reaction_delete_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        row = conv.reaction_delete_row(user, msg, self.event_type_map)
+        res = self.db.add(DB.ReactionEvent, row)
+        self.db.commit()
+        return res
+
     def create_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
         e_row = conv.vc_join_row(user, channel, self.event_type_map)
         res = self.db.add(DB.VoiceChatEvent, e_row)

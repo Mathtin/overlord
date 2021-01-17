@@ -13,9 +13,11 @@
 
 __author__ = 'Mathtin'
 
+import re
 import logging
 import discord
 import db as DB
+import util
 from .base import BotExtension
 import util.resources as res
 
@@ -30,6 +32,52 @@ class UtilityExtension(BotExtension):
     __extname__ = '🛠 Utility Extension'
     __description__ = 'Basic utility commands collection'
     __color__ = 0xa83fc8
+
+    PAGE_NUM_REGEX = re.compile(r'\[(\d+)/(\d+)\]')
+            
+    ###########
+    # Methods #
+    ###########
+
+    async def switch_help_page(self, emoji, msg: discord.Message):
+        embed = msg.embeds[0]
+        page = int(re.search(UtilityExtension.PAGE_NUM_REGEX, embed.author.name).group(1))
+        if emoji == u'⏮':
+            page = 1
+        elif emoji == u'⏭':
+            page = len(self.bot.extensions)
+        elif emoji == u'◀':
+            page -= 1
+        else: # if emoji == u'▶'
+            page += 1
+        ext = self.bot.resolve_extension(page)
+        if ext is not None:
+            i = self.bot.extension_idx(ext)
+            l = len(self.bot.extensions)
+            await msg.edit(embed=ext.help_embed(f"Overlord Help page [{i+1}/{l}]"))
+        if util.is_dm_message(msg):
+            return
+        for reaction in msg.reactions:
+            users = await reaction.users().flatten()
+            for user in users:
+                if user == self.bot.me:
+                    continue
+                await reaction.remove(user)
+
+
+    #########
+    # Hooks #
+    #########
+
+    async def on_control_reaction_add(self, member: discord.Member, message: discord.Message, emoji: discord.PartialEmoji):
+        if not message.embeds or message.author != self.bot.me or not emoji.is_unicode_emoji():
+            return
+
+        emoji = emoji.name
+        embed = message.embeds[0]
+        
+        if 'Overlord Help page' in embed.author.name:
+            await self.switch_help_page(emoji, message)
             
     #########
     # Tasks #
@@ -47,6 +95,22 @@ class UtilityExtension(BotExtension):
     ############
     # Commands #
     ############
+
+    @BotExtension.command("help", desciption="Help pages")
+    async def cmd_help(self, msg: discord.Message, optional_page: str='1'):
+        ext = self.bot.resolve_extension(optional_page)
+        if ext is None:
+            await msg.channel.send("No such help page")
+            return
+        i = self.bot.extension_idx(ext)
+        l = len(self.bot.extensions)
+        help_msg = await msg.channel.send(embed=ext.help_embed(f"Overlord Help page [{i+1}/{l}]"))
+        await help_msg.add_reaction(u'⏮')
+        await help_msg.add_reaction(u'◀')
+        await help_msg.add_reaction(u'▶')
+        await help_msg.add_reaction(u'⏭')
+        return
+
 
     @BotExtension.command("ping", desciption="Checks bot state")
     async def cmd_ping(self, msg: discord.Message):

@@ -126,6 +126,25 @@ def vc_leave_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str,
     }
 
 #
+# Reaction
+#
+
+def new_reaction_to_row(user: User, msg: MessageEvent, events: dict) -> Dict[str, Any]:
+    return {
+        'type_id': events["new_reaction"],
+        'user_id': user.id,
+        'message_event_id': msg.id
+    }
+
+def reaction_delete_row(user: User, msg: MessageEvent, events: dict) -> Dict[str, Any]:
+    return {
+        'type_id': events["reaction_delete"],
+        'user_id': user.id,
+        'message_event_id': msg.id
+    }
+
+
+#
 # User Stat
 #
 

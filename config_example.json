@@ -33,6 +33,7 @@
     },
     "bot": {
         "commands": {
+            "help": ["h", "man", "manual"],
             "ping": [],
             "sync": [
                 "sync-roles",
@@ -157,6 +158,14 @@
                     "track": true
                 },
                 "edit": {
+                    "track": true
+                },
+                "delete": {
+                    "track": true
+                }
+            },
+            "reaction": {
+                "new": {
                     "track": true
                 },
                 "delete": {

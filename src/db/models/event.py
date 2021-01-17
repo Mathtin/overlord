@@ -85,3 +85,17 @@ class VoiceChatEvent(Event, BaseModel):
         s = super().__repr__()[:-2]
         f = ",channel_id={0.channel_id!r}".format(self)
         return s + f + ")>"
+
+class ReactionEvent(Event, BaseModel):
+    __tablename__ = 'reaction_events'
+
+    message_event_id = Column(Integer, ForeignKey('message_events.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    message_event = relationship("MessageEvent", lazy="select")
+
+    __table_args__ = (Index('cix_reaction_events', "message_event_id"), )
+
+    def __repr__(self):
+        s = super().__repr__()[:-2]
+        f = ",message_event_id={0.message_event_id!r}".format(self)
+        return s + f + ")>"

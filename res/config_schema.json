@@ -129,6 +129,39 @@
                 "edit"
               ]
             },
+            "reaction": {
+              "type": "object",
+              "properties": {
+                "new": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "track"
+                  ]
+                },
+                "delete": {
+                  "type": "object",
+                  "properties": {
+                    "track": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "track"
+                  ]
+                }
+              },
+              "required": [
+                "new",
+                "delete"
+              ]
+            },
             "voice": {
               "type": "object",
               "properties": {
@@ -179,6 +212,7 @@
           "required": [
             "user",
             "message",
+            "reaction",
             "voice"
           ]
         },

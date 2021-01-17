@@ -85,6 +85,12 @@ def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
     select_columns = [value_column, MessageEvent.user_id] + lit_columns
     return select(select_columns).where(MessageEvent.type_id == type_id).group_by(MessageEvent.user_id)
 
+def select_reaction_count_per_user(type_id: int, lit_values: list) -> Select:
+    value_column = func.count(ReactionEvent.id).label('value')
+    lit_columns = [literal_column(str(v)).label(l) for (l,v) in lit_values]
+    select_columns = [value_column, ReactionEvent.user_id] + lit_columns
+    return select(select_columns).where(ReactionEvent.type_id == type_id).group_by(ReactionEvent.user_id)
+
 def select_vc_time_per_user(type_id: int, lit_values: list) -> Select:
     join_time = date_to_secs(VoiceChatEvent.created_at)
     left_time = date_to_secs(VoiceChatEvent.updated_at)

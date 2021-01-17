@@ -96,6 +96,12 @@ class StatService(object):
     def reload_edit_message_count_stat(self):
         self.__reload_stat(q.select_message_count_per_user, 'edit_message_count', 'message_edit')
 
+    def reload_new_reaction_count_stat(self):
+        self.__reload_stat(q.select_reaction_count_per_user, 'new_reaction_count', 'new_reaction')
+
+    def reload_delete_reaction_count_stat(self):
+        self.__reload_stat(q.select_reaction_count_per_user, 'delete_reaction_count', 'reaction_delete')
+
     def reload_vc_time_stat(self):
         self.__reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
 

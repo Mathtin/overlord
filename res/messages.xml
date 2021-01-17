@@ -26,6 +26,8 @@
    <string name="new_message_count_stat">New message count</string>
    <string name="delete_message_count_stat">Message deleted count</string>
    <string name="edit_message_count_stat">Message edited count</string>
+   <string name="new_reaction_count_stat">Reactions count</string>
+   <string name="delete_reaction_count_stat">Reaction remove count</string>
    <string name="vc_time_stat">VC time</string>
    <string name="min_weight_stat">Mimimal weight (rank)</string>
    <string name="max_weight_stat">Maximal weight (rank)</string>

@@ -28,7 +28,7 @@ from util import ConfigView, limit_traceback
 from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import is_dm_message, filter_roles, quote_msg, is_text_channel, qualified_name
 import util.resources as res
-from typing import Optional
+from typing import Any, Optional, Union
 from services import EventService, RoleService, StatService, UserService
 
 log = logging.getLogger('overlord-bot')
@@ -82,6 +82,7 @@ class OverlordBase(discord.Client):
         intents.members = True
         intents.messages = True
         intents.voice_states = True
+        intents.reactions = True
 
         super().__init__(intents=intents)
 
@@ -111,6 +112,10 @@ class OverlordBase(discord.Client):
     @property
     def prefix(self) -> str:
         return self.config["control.prefix"]
+
+    @property
+    def extensions(self) -> None:
+        return None
 
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
@@ -176,6 +181,12 @@ class OverlordBase(discord.Client):
     def unset_awaiting_sync(self) -> None:
         self.__awaiting_sync_last_updated = datetime.now()
         self.__awaiting_sync = False
+
+    def resolve_extension(self, page: Union[int, str]) -> None:
+        pass
+
+    def extension_idx(self, ext: Any) -> None:
+        pass
 
     #################
     # Async methods #
@@ -364,7 +375,7 @@ class OverlordBase(discord.Client):
 
         # Resolve maintainer
         try:
-            self.maintainer = await self.fetch_user(self.maintainer_id)
+            self.maintainer = await self.guild.fetch_member(self.maintainer_id)
             await self.maintainer.send('Starting instance')
         except discord.NotFound:
             raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')

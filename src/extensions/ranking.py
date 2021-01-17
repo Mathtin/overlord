@@ -18,6 +18,7 @@ import logging
 
 import discord
 import db as DB
+from overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit
 from services.role import RoleService
 from services.stat import StatService
 import util.resources as res
@@ -28,7 +29,7 @@ from util import qualified_name, dict_fancy_table, quote_msg
 from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
 from util.extbot import filter_roles, is_role_applied
-from overlord import OverlordMessage, OverlordUser, OverlordVCState
+from overlord import OverlordMessage, OverlordVCState
 
 log = logging.getLogger('ranking-extension')
 
@@ -181,23 +182,23 @@ class RankingExtension(BotExtension):
         async with self.sync():
             await self.update_rank(msg.discord.author)
 
-    async def on_message_edit(self, msg: OverlordMessage) -> None:
+    async def on_message_edit(self, msg: OverlordMessageEdit) -> None:
         async with self.sync():
             if self.bot.s_users.is_absent(msg.db.user):
                 return
             member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)
 
-    async def on_message_delete(self, msg: OverlordMessage) -> None:
+    async def on_message_delete(self, msg: OverlordMessageDelete) -> None:
         async with self.sync():
             if self.bot.s_users.is_absent(msg.db.user):
                 return
             member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)
             
-    async def on_vc_leave(self, user: OverlordUser, join: OverlordVCState, leave: OverlordVCState) -> None:
+    async def on_vc_leave(self, user: OverlordMember, join: OverlordVCState, leave: OverlordVCState) -> None:
         async with self.sync():
-            await self.update_rank(user.discord.member)
+            await self.update_rank(user.discord)
             
     ############
     # Commands #

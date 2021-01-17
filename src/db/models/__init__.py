@@ -13,7 +13,7 @@
 
 __author__ = 'Mathtin'
 
-from .event import EventType, MemberEvent, MessageEvent, VoiceChatEvent
+from .event import EventType, MemberEvent, MessageEvent, VoiceChatEvent, ReactionEvent
 from .role import Role
 from .user import User
 from .stat import UserStatType, UserStat

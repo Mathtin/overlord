@@ -18,7 +18,7 @@ import discord
 import db as DB
 from util.extbot import qualified_name
 from .base import BotExtension
-from overlord import OverlordMessage, OverlordUser, OverlordVCState
+from overlord import OverlordMessage, OverlordVCState, OverlordMember, OverlordReaction
 from services import StatService
 from util import FORMATTERS
 import util.resources as res
@@ -69,7 +69,7 @@ class StatsExtension(BotExtension):
     
     async def on_message(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            user = self.s_users.get(msg.discord.author)
+            user = msg.db.user
             inc_value = self.s_stats.get(user, 'new_message_count') + 1
             self.s_stats.set(user, 'new_message_count', inc_value)
 
@@ -83,11 +83,21 @@ class StatsExtension(BotExtension):
             inc_value = self.s_stats.get(msg.db.user, 'delete_message_count') + 1
             self.s_stats.set(msg.db.user, 'delete_message_count', inc_value)
 
-    async def on_vc_leave(self, user: OverlordUser, join: OverlordVCState, leave: OverlordVCState) -> None:
+    async def on_vc_leave(self, user: OverlordMember, join: OverlordVCState, leave: OverlordVCState) -> None:
         async with self.sync():
             stat_val = self.s_stats.get(user.db, 'vc_time')
             stat_val += (leave.db.created_at - join.db.created_at).total_seconds()
-            self.s_stats.set(user, 'vc_time', stat_val)
+            self.s_stats.set(user.db, 'vc_time', stat_val)
+    
+    async def on_reaction_add(self, member: OverlordMember, msg: OverlordMessage, reaction: OverlordReaction) -> None:
+        async with self.sync():
+            inc_value = self.s_stats.get(member.db, 'new_reaction_count') + 1
+            self.s_stats.set(member.db, 'new_reaction_count', inc_value)
+
+    async def on_reaction_remove(self, member: OverlordMember, msg: OverlordMessage, reaction: OverlordReaction) -> None:
+        async with self.sync():
+            inc_value = self.s_stats.get(member.db, 'delete_reaction_count') + 1
+            self.s_stats.set(member.db, 'delete_reaction_count', inc_value)
             
     #########
     # Tasks #
@@ -136,6 +146,8 @@ class StatsExtension(BotExtension):
         _add_stat_field(embed, self.s_stats, user, "new_message_count")
         _add_stat_field(embed, self.s_stats, user, "delete_message_count")
         _add_stat_field(embed, self.s_stats, user, "edit_message_count")
+        _add_stat_field(embed, self.s_stats, user, "new_reaction_count")
+        _add_stat_field(embed, self.s_stats, user, "delete_reaction_count")
         _add_stat_field(embed, self.s_stats, user, "vc_time")
 
         if self.s_stats.get(user, "min_weight") > 0:

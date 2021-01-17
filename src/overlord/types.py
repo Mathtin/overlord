@@ -59,6 +59,10 @@ class OverlordVCState(OverlordGenericObject):
     db: DB.VoiceChatEvent
     discord: DIS.VoiceState
 
+class OverlordReaction(OverlordGenericObject):
+    db: DB.ReactionEvent
+    discord: DIS.PartialEmoji
+
 #################################
 # Bot Extension Utility Classes #
 #################################
@@ -96,6 +100,7 @@ class OverlordCommand(object):
         f_args = func.__code__.co_varnames[:func.__code__.co_argcount]
         assert len(f_args) >= 2
         self.f_args = f_args[2:]
+        self.req_f_args = [a for a in self.f_args if not a.lower().startswith('optional')]
         self.args_str = ' '.join(["{%s}" % arg for arg in self.f_args])
 
     def usage(self, prefix: str, cmdname: str) -> str:
@@ -109,12 +114,14 @@ class OverlordCommand(object):
 
     def handler(self, ext):
         async def wrapped_func(message, prefix, argv):
-            if len(self.f_args) != len(argv) - 1:
-                usage_str = 'Usage: ' + self.usage(prefix, argv[0])
+            cmd = argv[0]
+            argv = argv[1:]
+            if len(self.req_f_args) > len(argv) or len(argv) > len(self.f_args):
+                usage_str = 'Usage: ' + self.usage(prefix, cmd)
                 await message.channel.send(usage_str)
             else:
                 try:
-                    await self.func(ext, message, *argv[1:])
+                    await self.func(ext, message, *argv)
                 except:
-                    await ext.on_error(self.func.__name__, message, *argv[1:])
+                    await ext.on_error(self.func.__name__, message, prefix, argv)
         return wrapped_func
