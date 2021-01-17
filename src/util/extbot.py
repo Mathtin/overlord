@@ -93,7 +93,7 @@ def member_mention_arg(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awa
 
 @saving_original
 def text_channel_mention_arg(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
-    async def wrapped_func(client, msg, channel_mention, *argv):
+    async def wrapped_func(ext, msg, channel_mention, *argv):
         if len(msg.channel_mentions) == 0:
             await msg.channel.send(get_resource("messages.invalid_channel_mention"))
             return
@@ -101,7 +101,7 @@ def text_channel_mention_arg(func: Callable[..., Awaitable[Any]]) -> Callable[..
         if not is_text_channel(channel):
             await msg.channel.send(get_resource("messages.invalid_channel_type_text"))
             return
-        await func(client, msg, channel, *argv)
+        await func(ext, msg, channel, *argv)
     return wrapped_func
 
 ###########################

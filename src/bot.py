@@ -914,3 +914,46 @@ class UserSyncExtension(BotExtension):
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
 
+    @BotExtension.command("dump_channel", desciption="Fetches whole channel data into db (overwriting)")
+    @text_channel_mention_arg
+    async def cmd_dump_channel(self, msg: discord.Message, channel: discord.TextChannel):
+        permissions = channel.permissions_for(self.bot.me)
+        if not permissions.read_message_history:
+            answer = res.get("messages.missing_access").format(channel.mention) + ' (can\'t read message history)'
+            await msg.channel.send(answer)
+            return
+
+        # Tranaction begins
+        async with self.bot.sync():
+
+            # Drop full channel message history
+            log.warn(f'Dropping #{channel.name}({channel.id}) history')
+            answer = res.get("messages.channel_history_drop").format(channel.mention)
+            await msg.channel.send(answer)
+            self.bot.s_events.clear_text_channel_history(channel)
+
+            # Load all messages
+            log.warn(f'Loading #{channel.name}({channel.id}) history')
+            answer = res.get("messages.channel_history_load").format(channel.mention)
+            await msg.channel.send(answer)
+            async for message in channel.history(limit=None,oldest_first=True):
+
+                # Skip bot messages
+                if message.author.bot:
+                    continue
+
+                # Resolve user
+                user = self.bot.s_users.get(message.author)
+                if user is None and self.bot.config["user.leave.keep"]:
+                    user = self.bot.s_users.add_user(message.author)
+
+                # Skip users not in db
+                if user is None:
+                    continue
+
+                # Insert new message event
+                self.bot.s_events.create_new_message_event(user, message)
+
+            log.info(f'Done')
+            await msg.channel.send(res.get("messages.done"))
+

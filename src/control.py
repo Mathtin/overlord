@@ -28,48 +28,6 @@ log = logging.getLogger('control')
 # Control command Handlers #
 ############################
 
-@cmdcoro
-@text_channel_mention_arg
-async def reload_channel_history(client: bot.Overlord, msg: discord.Message, channel: discord.TextChannel):
-    permissions = channel.permissions_for(client.me)
-    if not permissions.read_message_history:
-        answer = res.get("messages.missing_access").format(channel.mention) + ' (can\'t read message history)'
-        await msg.channel.send(answer)
-        return
-
-    # Tranaction begins
-    async with client.sync():
-
-        # Drop full channel message history
-        log.warn(f'Dropping #{channel.name}({channel.id}) history')
-        answer = res.get("messages.channel_history_drop").format(channel.mention)
-        await msg.channel.send(answer)
-        client.s_events.clear_text_channel_history(channel)
-
-        # Load all messages
-        log.warn(f'Loading #{channel.name}({channel.id}) history')
-        answer = res.get("messages.channel_history_load").format(channel.mention)
-        await msg.channel.send(answer)
-        async for message in channel.history(limit=None,oldest_first=True):
-
-            # Skip bot messages
-            if message.author.bot:
-                continue
-
-            # Resolve user
-            user = client.s_users.get(message.author)
-            if user is None and client.config["user.leave.keep"]:
-                user = client.s_users.add_user(message.author)
-
-            # Skip users not in db
-            if user is None:
-                continue
-
-            # Insert new message event
-            client.s_events.create_new_message_event(user, message)
-
-        log.info(f'Done')
-        await msg.channel.send(res.get("messages.done"))
 
 @cmdcoro
 async def reload_config(client: bot.Overlord, msg: discord.Message):

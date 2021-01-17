@@ -33,25 +33,77 @@
     },
     "bot": {
         "commands": {
-            "ping": "control.ping",
-            "sync-roles": "control.sync_roles",
-            "update-ranks": "control.update_user_ranks",
-            "update-rank": "control.update_user_rank",
-            "reload-channel": "control.reload_channel_history",
-            "reload-stats": "control.recalculate_stats",
-            "user-stats": "control.get_user_stats",
-            "clear-data": "control.clear_data",
-            "conf-reload": "control.reload_config",
-            "conf-save": "control.save_config",
-            "conf-get": "control.get_config_value",
-            "conf-set": "control.alter_config",
-            "stats": "control.get_stat_names",
-            "stats-get": "control.get_user_stat",
-            "stats-set": "control.set_user_stat",
-            "ranks": "control.get_ranks",
-            "ranks-add": "control.add_rank",
-            "ranks-remove": "control.remove_rank",
-            "ranks-edit": "control.edit_rank"
+            "ping": [],
+            "sync": [
+                "sync-roles",
+                "sync-users",
+                "sync_users"
+            ],
+            "clear_all": [
+                "clear-all",
+                "drop-db",
+                "i-know-what-i-am-doing"
+            ],
+            "recalculate_stats": [
+                "reload-stats",
+                "sync-stats",
+                "stats-reload"
+            ],
+            "get_user_stats": [
+                "get-user-stats",
+                "stats-get-all"
+            ],
+            "get_stat_names": [
+                "list-stats",
+                "stats",
+                "stats-list"
+            ],
+            "get_user_stat": [
+                "get-user-stat",
+                "stats-get"
+            ],
+            "set_user_stat": [
+                "set-user-stat",
+                "stats-set"
+            ],
+            "update_all_ranks": [
+                "update-ranks",
+                "update-all-ranks",
+                "ranks-update-all"
+            ],
+            "update_rank": [
+                "update-rank",
+                "ranks-update"
+            ],
+            "list_ranks": [
+                "list-ranks",
+                "ranks",
+                "ranks-list"
+            ],
+            "add_rank": [
+                "add-rank",
+                "new-rank",
+                "ranks-add",
+                "ranks-new"
+            ],
+            "remove_rank": [
+                "remove-rank",
+                "del-rank",
+                "delete-rank",
+                "ranks-remove",
+                "ranks-del",
+                "ranks-delete"
+            ],
+            "edit_rank": [
+                "edit-rank",
+                "alter-rank",
+                "ranks-edit"
+            ],
+            "dump_channel": [
+                "dump-channel",
+                "reload-channel",
+                "sync-channel"
+            ]
         },
         "control": {
             "prefix": "ov/",
