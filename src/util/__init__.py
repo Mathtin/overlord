@@ -142,3 +142,19 @@ def limit_traceback(traceback: List[str], from_file: str, offset: int) -> List[s
         if found and effective_offset < offset:
             res.append(line)
     return res
+
+F_MSGS = lambda m: f'{m} messages'
+F_DEFAULT = lambda m: str(m)
+FORMATTERS = {
+    "membership":           pretty_days,
+    "new_message_count":    F_MSGS,
+    "delete_message_count": F_MSGS,
+    "edit_message_count":   F_MSGS,
+    "vc_time":              pretty_seconds,
+    "min_weight":           F_DEFAULT,
+    "max_weight":           F_DEFAULT,
+    "exact_weight":         F_DEFAULT,
+    "weight":               F_DEFAULT,
+    "messages":             F_DEFAULT,
+    "vc":                   pretty_seconds
+}

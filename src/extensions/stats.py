@@ -20,7 +20,7 @@ from util.extbot import qualified_name
 from .base import BotExtension
 from overlord import OverlordMessage, OverlordUser, OverlordVCState
 from services import StatService
-from util import pretty_days, pretty_seconds
+from util import FORMATTERS
 import util.resources as res
 
 log = logging.getLogger('stats-extension')
@@ -28,15 +28,6 @@ log = logging.getLogger('stats-extension')
 #################
 # Utility funcs #
 #################
-
-F_MSGS = lambda m: f'{m} messages'
-FORMATTERS = {
-    "membership":           pretty_days,
-    "new_message_count":    F_MSGS,
-    "delete_message_count": F_MSGS,
-    "edit_message_count":   F_MSGS,
-    "vc_time":              pretty_seconds
-}
 
 def _build_stat_line(s_stats: StatService, user: DB.User, stat: str) -> str:
     stat_name = res.get(f"messages.{stat}_stat")
@@ -56,7 +47,7 @@ def _add_stat_field(embed: discord.Embed, s_stats: StatService, user: DB.User, s
 
 class StatsExtension(BotExtension):
 
-    __extname__ = 'Stats Extension'
+    __extname__ = '📊 Stats Extension'
     __description__ = 'Gathers member stats (messages, vc, membership and etc.)'
     __color__ = 0x3fbbc8
             
@@ -139,7 +130,7 @@ class StatsExtension(BotExtension):
             return
         
         desc = f'{member.mention} stats gathered so far by me'
-        embed = self.bot.base_embed("Overlord Stats", f"{qualified_name(member)} stats", desc, self.__color__)
+        embed = self.bot.base_embed("Overlord Stats", f"📊 {qualified_name(member)} stats", desc, self.__color__)
 
         _add_stat_field(embed, self.s_stats, user, "membership")
         _add_stat_field(embed, self.s_stats, user, "new_message_count")

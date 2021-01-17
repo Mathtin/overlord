@@ -25,7 +25,7 @@ import util.resources as res
 from typing import Optional, List, Tuple, Dict
 from .base import BotExtension
 from util import qualified_name, dict_fancy_table, quote_msg
-from util import ConfigView
+from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
 from util.extbot import filter_roles, is_role_applied
 from overlord import OverlordMessage, OverlordUser, OverlordVCState
@@ -222,10 +222,16 @@ class RankingExtension(BotExtension):
         
     @BotExtension.command("list_ranks", desciption="List all configured ranks")
     async def cmd_list_ranks(self, msg: discord.Message):
-        ranks = self.bot.config["ranks.role"]
-        table_header = res.get('messages.rank_table_header')
-        table = dict_fancy_table(ranks, key_name='rank')
-        await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
+        desc = f'Configured ranks list'
+        embed = self.bot.base_embed("Overlord Ranking", f"🎖 Ranks", desc, self.__color__)
+        for name, rank in self.ranks.items():
+            lines = [f'{p}: {FORMATTERS[p](v)}' for p,v in rank.items()]
+            rank_s = '\n'.join(lines)
+            embed.add_field(name=name, value=rank_s, inline=True)
+        await msg.channel.send(embed=embed)
+        #table_header = res.get('messages.rank_table_header')
+        #table = dict_fancy_table(self.ranks, key_name='rank')
+        #await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
 
     @BotExtension.command("add_rank", desciption="Creates new user rank")
     async def cmd_add_rank(self, msg: discord.Message, role_name: str, weight: str, membership: str, msg_count: str, vc_time: str):

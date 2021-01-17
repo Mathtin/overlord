@@ -90,8 +90,8 @@ class Overlord(OverlordBase):
 
     def resolve_extension(self, ext: Union[int, str]) -> Optional[BotExtension]:
         if isinstance(ext, int):
-            if 0 <= ext < len(self.__extensions):
-                return self.__extensions[ext]
+            if 0 < ext <= len(self.__extensions):
+                return self.__extensions[ext-1]
             return None
         try:
             return self.resolve_extension(int(ext))

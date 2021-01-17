@@ -170,7 +170,7 @@ class BotExtension(object):
         logging.exception(f'Error from {ext_name} extension on event: {event}')
 
         exception_tb = traceback.format_exception(*sys.exc_info())
-        exception_tb_limited = limit_traceback(exception_tb, "src/", 4)
+        exception_tb_limited = limit_traceback(exception_tb, "src", 4)
         exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
 
         exception_msg = res.get("messages.dm_ext_exception").format(ext_name, event, str(ex)) + '\n' + exception_tb_quoted

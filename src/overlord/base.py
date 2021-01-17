@@ -310,7 +310,7 @@ class OverlordBase(discord.Client):
         logging.exception(f'Error on event: {event}')
 
         exception_tb = traceback.format_exception(*sys.exc_info())
-        exception_tb_limited = limit_traceback(exception_tb, "bot.py", 6)
+        exception_tb_limited = limit_traceback(exception_tb, "src", 6)
         exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
 
         exception_msg = res.get("messages.dm_bot_exception").format(event, ('`'+str(ex).replace("`","\\`")+'`')) + '\n' + exception_tb_quoted
