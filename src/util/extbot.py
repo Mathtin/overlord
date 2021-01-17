@@ -18,8 +18,6 @@ from typing import Any, Callable, Dict, List, Awaitable, Optional, Union
 import discord
 import asyncio
 
-from discord.channel import TextChannel
-from .resources import get as get_resource
 from .exceptions import InvalidConfigException, NotCoroutineException
 
 #############################
@@ -37,6 +35,47 @@ def get_coroutine_attrs(obj: Any, filter=lambda x:True, name_filter=lambda x:Tru
 def get_loop_attrs(obj: Any, filter=lambda x:True, name_filter=lambda x:True) -> List[asyncio.AbstractEventLoop]:
     attrs = [getattr(obj, attr) for attr in dir(obj) if name_filter(attr)]
     return [l for l in attrs if isinstance(l, asyncio.AbstractEventLoop) and filter(l)]
+    
+######################
+# Utility decorators #
+######################
+
+def after_initialized(func):
+    async def _func(self, *args, **kwargs):
+        await self.init_lock()
+        return await func(self, *args, **kwargs)
+    return _func
+
+def skip_bots(func):
+    async def _func(self, obj, *args, **kwargs):
+        if isinstance(obj, discord.User) or isinstance(obj, discord.Member):
+            if obj.bot:
+                return
+        elif isinstance(obj, discord.Message): 
+            if obj.author.bot:
+                return
+        return await func(self, obj, *args, **kwargs)
+    return _func
+
+def guild_member_event(func):
+    async def _func(self, obj, *args, **kwargs):
+        if isinstance(obj, discord.Member):
+            if not self.is_guild_member(obj):
+                return
+        elif isinstance(obj, discord.Message): 
+            if not self.is_guild_member_message(obj):
+                return
+        return await func(self, obj, *args, **kwargs)
+    return _func
+
+def event_config(name: str):
+    def wrapper(func):
+        async def _func(self, *args, **kwargs):
+            if not self.config[f"event.{name}.track"]:
+                return
+            return await func(self, *args, **kwargs)
+        return _func
+    return wrapper
 
 ###########################
 # Bot model utility funcs #

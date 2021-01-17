@@ -15,10 +15,11 @@ __author__ = 'Mathtin'
 
 import logging
 import discord
-from bot import BotExtension
+import db as DB
+from .base import BotExtension
+from overlord import OverlordMessage, OverlordUser, OverlordVCState
 from services import StatService
 from util import pretty_days, pretty_seconds
-from ovtype import *
 import util.resources as res
 
 log = logging.getLogger('stats-extension')

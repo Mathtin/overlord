@@ -13,8 +13,6 @@
 
 __author__ = 'Mathtin'
 
-import os
-
 from logging import getLogger
 from datetime import datetime
 

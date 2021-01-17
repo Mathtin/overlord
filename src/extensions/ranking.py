@@ -15,11 +15,20 @@ __author__ = 'Mathtin'
 
 import json
 import logging
+
 import discord
-from bot import BotExtension
-from util import qualified_name, dict_fancy_table, quote_msg
-from ovtype import *
+import db as DB
+from services.role import RoleService
+from services.stat import StatService
 import util.resources as res
+
+from typing import Optional, List, Tuple, Dict
+from .base import BotExtension
+from util import qualified_name, dict_fancy_table, quote_msg
+from util import ConfigView
+from util.exceptions import InvalidConfigException
+from util.extbot import filter_roles, is_role_applied
+from overlord import OverlordMessage, OverlordUser, OverlordVCState
 
 log = logging.getLogger('ranking-extension')
 
@@ -28,25 +37,98 @@ log = logging.getLogger('ranking-extension')
 #####################
 class RankingExtension(BotExtension):
             
+    #########
+    # Props #
+    #########
+
+    @property
+    def s_stats(self) -> StatService:
+        return self.bot.s_stats
+
+    @property
+    def s_roles(self) -> RoleService:
+        return self.bot.s_roles
+
+    @property
+    def ranks(self) -> Dict[str, Dict[str, int]]:
+        return self.bot.config["ranks.role"]
+
+    @property
+    def required_roles(self) -> List[str]:
+        return self.bot.config["ranks.require"]
+
+    @property
+    def ignored_roles(self) -> List[str]:
+        return self.bot.config["ranks.ignore"]
+            
     ###########
     # Methods #
     ###########
 
-    async def update_rank(self, member: discord.Member) -> None:
+    def find_user_rank_name(self, user: DB.User) -> Optional[str]:
+
+        # Gather stat values
+        exact_weight = self.s_stats.get(user, "exact_weight")
+        min_weight = self.s_stats.get(user, "min_weight")
+        max_weight = self.s_stats.get(user, "max_weight")
+        membership = self.s_stats.get(user, "membership")
+        messages = self.s_stats.get(user, "new_message_count") - self.s_stats.get(user, "delete_message_count")
+        vc_time = self.s_stats.get(user, "vc_time")
+        ranks = self.ranks.items()
+
+        # Search exact
+        if exact_weight > 0:
+            exact_ranks = [(n,r) for n,r in ranks if r['weight'] == exact_weight]
+            return exact_ranks[0] if exact_ranks else None
+
+        # Filter minimal
+        if min_weight > 0:
+            ranks = [(n,r) for n,r in ranks if r['weight'] >= min_weight]
+
+        # Filter maximal
+        if max_weight > 0:
+            ranks = [(n,r) for n,r in ranks if r['weight'] <= max_weight]
+
+        # Filter meeting criteria
+        meet_criteria = lambda n,r: (messages >= r["messages"] or vc_time >= r["vc"]) and membership >= r["membership"]
+        ranks = [(n,r) for n,r in ranks if meet_criteria(n,r)]
+
+        return max(ranks, key=lambda nr: nr[1]["weight"])[0] if ranks else None
+
+    def ignore_member(self, member: discord.Member) -> bool:
+        return len(filter_roles(member, self.ignored_roles)) > 0 or len(filter_roles(member, self.required_roles)) == 0
+
+    def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> Tuple[List[discord.Role], List[discord.Role]]:
+        rank_roles = [self.s_roles.get(r) for r in self.ranks]
+        applied_rank_roles = filter_roles(member, rank_roles)
+        effective_rank_name = self.find_user_rank_name(user)
+        ranks_to_remove = [r for r in applied_rank_roles if r.name != effective_rank_name]
+        ranks_to_apply = []
+        if effective_rank_name is not None and not is_role_applied(member, effective_rank_name):
+            ranks_to_apply.append(self.s_roles.get(effective_rank_name))
+        return ranks_to_apply, ranks_to_remove
+            
+    #################
+    # Async Methods #
+    #################
+
+    async def update_rank(self, member: discord.Member):
         if self.bot.awaiting_sync():
             log.warn("Cannot update user rank: awaiting role sync")
-            return False
+            return
         # Resolve user
+        if member.bot:
+            return
         user = self.bot.s_users.get(member)
         # Skip non-existing users
         if user is None:
             log.warn(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
             return
         # Ignore inappropriate members
-        if self.bot.s_ranking.ignore_member(member):
+        if self.ignore_member(member):
             return
         # Resolve roles to move
-        roles_add, roles_del = self.bot.s_ranking.roles_to_add_and_remove(member, user)
+        roles_add, roles_del = self.roles_to_add_and_remove(member, user)
         # Remove old roles
         if roles_del:
             log.info(f"Removing {qualified_name(member)}'s rank roles: {roles_del}")
@@ -57,7 +139,6 @@ class RankingExtension(BotExtension):
             await member.add_roles(*roles_add)
         # Update user in db
         self.bot.s_users.update_member(member)
-        return True
 
     async def update_all_ranks(self) -> None:
         if self.bot.awaiting_sync():
@@ -69,16 +150,28 @@ class RankingExtension(BotExtension):
                 continue
             await self.update_rank(member)
         log.info(f'Done updating user ranks')
-
-    def __save_config(self):
-        log.warn(f'Dumping raw config')
-        parent_config = self.bot.config.parent()
-        with open(parent_config.fpath(), "w") as f:
-            json.dump(parent_config.value(), f, indent=4)
             
     #########
     # Hooks #
     #########
+
+    async def on_config_update(self) -> None:
+        # Check ranks config
+        for role_name in self.ignored_roles:
+            if self.s_roles.get(role_name) is None:
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.ignore")
+        for role_name in self.required_roles:
+            if self.s_roles.get(role_name) is None:
+                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.require")
+        ranks_weights = {}
+        for rank_name in self.ranks:
+            rank = ConfigView(value=self.ranks[rank_name], schema_name="rank_schema")
+            if self.s_roles.get(rank_name) is None:
+                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.ranks.role")
+            if rank['weight'] in ranks_weights:
+                dup_rank = ranks_weights[rank['weight']]
+                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.ranks.role")
+            ranks_weights[rank['weight']] = rank_name
 
     async def on_message(self, msg: OverlordMessage) -> None:
         async with self.sync():
@@ -161,14 +254,14 @@ class RankingExtension(BotExtension):
         path = 'bot.ranks.role'
 
         try:
-            err = self.bot.safe_alter_config(path, ranks)
+            err = await self.bot.safe_alter_config(path, ranks)
         except KeyError:
             log.info(f'Invalid config path provided: {path}')
             await msg.channel.send(res.get("messages.invalid_config_path"))
             return False
         
         if not err:
-            self.__save_config()
+            self.bot.save_config()
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
         else:
@@ -190,14 +283,14 @@ class RankingExtension(BotExtension):
         path = 'bot.ranks.role'
 
         try:
-            err = self.bot.safe_alter_config(path, ranks)
+            err = await self.bot.safe_alter_config(path, ranks)
         except KeyError:
             log.info(f'Invalid config path provided: {path}')
             await msg.channel.send(res.get("messages.invalid_config_path"))
             return False
         
         if not err:
-            self.__save_config()
+            self.bot.save_config()
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
         else:
@@ -235,14 +328,14 @@ class RankingExtension(BotExtension):
         path = 'bot.ranks.role'
 
         try:
-            err = self.bot.safe_alter_config(path, ranks)
+            err = await self.bot.safe_alter_config(path, ranks)
         except KeyError:
             log.info(f'Invalid config path provided: {path}')
             await msg.channel.send(res.get("messages.invalid_config_path"))
             return False
         
         if not err:
-            self.__save_config()
+            self.bot.save_config()
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
         else:

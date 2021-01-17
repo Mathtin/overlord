@@ -16,9 +16,8 @@ __author__ = 'Mathtin'
 import logging
 import discord
 import json
-from bot import BotExtension
+from .base import BotExtension
 from util import ConfigView, quote_msg, send_long_message
-from ovtype import *
 import util.resources as res
 
 log = logging.getLogger('config-extension')
@@ -28,16 +27,6 @@ log = logging.getLogger('config-extension')
 ##################
 
 class ConfigExtension(BotExtension):
-            
-    ###########
-    # Methods #
-    ###########
-
-    def __save_config(self):
-        log.warn(f'Dumping raw config')
-        parent_config = self.bot.config.parent()
-        with open(parent_config.fpath(), "w") as f:
-            json.dump(parent_config.value(), f, indent=4)
             
     ############
     # Commands #
@@ -51,14 +40,14 @@ class ConfigExtension(BotExtension):
         new_config = ConfigView(path=parent_config.fpath(), schema_name="config_schema")
         if new_config['logger']:
             logging.config.dictConfig(new_config['logger'])
-        self.bot.update_config(new_config.bot)
+        await self.bot.update_config(new_config.bot)
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
 
     @BotExtension.command("save_config", desciption="Save config on disk")
     async def cmd_save_config(self, msg: discord.Message):
         log.info(f'Saving config')
-        self.__save_config()
+        self.bot.save_config()
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
 
@@ -83,8 +72,9 @@ class ConfigExtension(BotExtension):
             return
 
         try:
-            err = self.bot.safe_alter_config(path, value_obj)
-        except KeyError:
+            err = await self.bot.safe_alter_config(path, value_obj)
+        except KeyError as e:
+            print(e)
             log.info(f'Invalid config path provided: {path}')
             await msg.channel.send(res.get("messages.invalid_config_path"))
             return False

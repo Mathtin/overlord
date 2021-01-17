@@ -13,5 +13,8 @@
 
 __author__ = 'Mathtin'
 
-from .session import DBSession
-from .models import *
+from .base import BotExtension
+from .utility import UtilityExtension
+from .config import ConfigExtension
+from .ranking import RankingExtension
+from .stats import StatsExtension

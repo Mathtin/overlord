@@ -13,5 +13,8 @@
 
 __author__ = 'Mathtin'
 
-from .session import DBSession
-from .models import *
+from .types import OverlordVCState, OverlordCommand
+from .types import OverlordGenericObject, OverlordMember, OverlordMessage
+from .types import OverlordMessageDelete, OverlordMessageEdit, OverlordRole
+from .types import OverlordTask, OverlordUser
+from .bot import Overlord

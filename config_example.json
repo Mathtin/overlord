@@ -103,11 +103,35 @@
                 "dump-channel",
                 "reload-channel",
                 "sync-channel"
+            ],
+            "reload_config": [
+                "reload-config",
+                "config-reload"
+            ],
+            "save_config": [
+                "save-config",
+                "config-save"
+            ],
+            "get_config_value": [
+                "get-config-value",
+                "get-config",
+                "config-get"
+            ],
+            "alter_config": [
+                "alter-config",
+                "edit-config",
+                "config-edit",
+                "config-set",
+                "set-config"
             ]
         },
         "control": {
             "prefix": "ov/",
-            "roles": ["CEO", "Director", "Supervisor"]
+            "roles": [
+                "CEO",
+                "Director",
+                "Supervisor"
+            ]
         },
         "user": {
             "leave": {
@@ -150,7 +174,11 @@
             }
         },
         "ranks": {
-            "ignore": ["CEO", "Director", "Supervisor", "Operator", "Visitor"],
+            "ignore": [
+                "CEO",
+                "Supervisor",
+                "Operator"
+            ],
             "require": [
                 "═════════[TAG]══════════"
             ],

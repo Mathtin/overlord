@@ -13,5 +13,8 @@
 
 __author__ = 'Mathtin'
 
-from .session import DBSession
-from .models import *
+from .role import RoleService
+from .user import UserService
+from .event import EventService
+from .stat import StatService
+
