@@ -16,6 +16,7 @@ __author__ = 'Mathtin'
 import logging
 import discord
 import db as DB
+from util.extbot import qualified_name
 from .base import BotExtension
 from overlord import OverlordMessage, OverlordUser, OverlordVCState
 from services import StatService
@@ -28,11 +29,26 @@ log = logging.getLogger('stats-extension')
 # Utility funcs #
 #################
 
-def _build_stat_line(s_stats: StatService, user: DB.User, stat: str, formatter=lambda x:str(x)):
+F_MSGS = lambda m: f'{m} messages'
+FORMATTERS = {
+    "membership":           pretty_days,
+    "new_message_count":    F_MSGS,
+    "delete_message_count": F_MSGS,
+    "edit_message_count":   F_MSGS,
+    "vc_time":              pretty_seconds
+}
+
+def _build_stat_line(s_stats: StatService, user: DB.User, stat: str) -> str:
     stat_name = res.get(f"messages.{stat}_stat")
     stat_val = s_stats.get(user, stat)
-    stat_val_f = formatter(stat_val)
+    stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
     return res.get("messages.user_stats_entry").format(stat_name, stat_val_f)
+
+def _add_stat_field(embed: discord.Embed, s_stats: StatService, user: DB.User, stat: str) -> None:
+    stat_name = res.get(f"messages.{stat}_stat")
+    stat_val = s_stats.get(user, stat)
+    stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
+    embed.add_field(name=stat_name, value=stat_val_f, inline=False)
 
 ##################
 # Stat Extension #
@@ -110,6 +126,7 @@ class StatsExtension(BotExtension):
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
 
+
     @BotExtension.command("get_user_stats", desciption="Fetches user stats from db")
     async def cmd_get_user_stats(self, msg: discord.Message, user_mention: str):
         member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
@@ -120,28 +137,35 @@ class StatsExtension(BotExtension):
         if user is None:
             await msg.channel.send(res.get("messages.unknown_user"))
             return
+        
+        desc = f'{member.mention} stats gathered so far by me'
+        embed = self.bot.base_embed("Overlord Stats", f"{qualified_name(member)} stats", desc, self.__color__)
 
-        answer = res.get("messages.user_stats_head").format(member.mention) + '\n'
-        answer += _build_stat_line(self.s_stats, user, "membership", formatter=pretty_days) + '\n'
-        answer += _build_stat_line(self.s_stats, user, "new_message_count") + '\n'
-        answer += _build_stat_line(self.s_stats, user, "delete_message_count") + '\n'
-        answer += _build_stat_line(self.s_stats, user, "edit_message_count") + '\n'
-        answer += _build_stat_line(self.s_stats, user, "vc_time", formatter=pretty_seconds) + '\n'
+        _add_stat_field(embed, self.s_stats, user, "membership")
+        _add_stat_field(embed, self.s_stats, user, "new_message_count")
+        _add_stat_field(embed, self.s_stats, user, "delete_message_count")
+        _add_stat_field(embed, self.s_stats, user, "edit_message_count")
+        _add_stat_field(embed, self.s_stats, user, "vc_time")
 
         if self.s_stats.get(user, "min_weight") > 0:
-            answer += _build_stat_line(self.s_stats, user, "min_weight") + '\n'
+            _add_stat_field(embed, self.s_stats, user, "min_weight")
         if self.s_stats.get(user, "max_weight") > 0:
-            answer += _build_stat_line(self.s_stats, user, "max_weight") + '\n'
+            _add_stat_field(embed, self.s_stats, user, "max_weight")
         if self.s_stats.get(user, "exact_weight") > 0:
-            answer += _build_stat_line(self.s_stats, user, "exact_weight") + '\n'
+            _add_stat_field(embed, self.s_stats, user, "exact_weight")
 
-        await msg.channel.send(answer)
+        await msg.channel.send(embed=embed)
+
     
     @BotExtension.command("get_stat_names", desciption="Print stat names")
     async def cmd_get_stat_names(self, msg: discord.Message):
-        names = [res.get("messages.stats_name_entry").format(s) for s in self.s_stats.user_stat_type_map]
-        answer = res.get("messages.stats_name_head") + '\n' + '\n'.join(names)
-        await msg.channel.send(answer)
+        desc = f'Stat code names available at the moment'
+        embed = self.bot.base_embed("Overlord Stats", f"Stat names", desc, self.__color__)
+        for stat in self.s_stats.user_stat_type_map:
+            stat_full_name = res.get(f"messages.{stat}_stat")
+            embed.add_field(name=stat_full_name, value=f'`{stat}`', inline=False)
+        await msg.channel.send(embed=embed)
+
 
     @BotExtension.command("get_user_stat", desciption="Fetches user stats from db (for specified user)")
     async def cmd_get_user_stat(self, msg: discord.Message, user_mention: str, stat_name: str):
@@ -158,6 +182,7 @@ class StatsExtension(BotExtension):
         except NameError:
             await msg.channel.send(res.get("messages.error").format("Invalid stat name"))
             return
+
 
     @BotExtension.command("set_user_stat", desciption="Sets user stat value in db")
     async def cmd_set_user_stat(self, msg: discord.Message, user_mention: str, stat_name: str, value: str):

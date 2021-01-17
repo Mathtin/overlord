@@ -51,7 +51,8 @@
             ],
             "get_user_stats": [
                 "get-user-stats",
-                "stats-get-all"
+                "stats-get-all",
+                "user-stats"
             ],
             "get_stat_names": [
                 "list-stats",
@@ -60,7 +61,8 @@
             ],
             "get_user_stat": [
                 "get-user-stat",
-                "stats-get"
+                "stats-get",
+                "user-stat"
             ],
             "set_user_stat": [
                 "set-user-stat",

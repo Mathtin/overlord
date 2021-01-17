@@ -127,9 +127,9 @@ class BotExtension(object):
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
 
-    def help_embed(self) -> discord.Embed:
+    def help_embed(self, name) -> discord.Embed:
         title = f'{self.__extname__}'
-        help_page = discord.Embed(title=title, description=self.__description__, color=self.__color__)
+        help_page = self.bot.base_embed(name, title, self.__description__, self.__color__)
         commands = self.bot.config["commands"]
         prefix = self.bot.prefix
         help_page

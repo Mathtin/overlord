@@ -6,6 +6,7 @@
    <string name="error">❗ Error: {0}</string>
    <string name="warning">⚠ Attention: {0}</string>
    <string name="internal_error">❌ Internal error</string>
+   <string name="embed_footer">Overlord by Daniel [Mathtin] Shiko. Special for Eclipse Co. comms</string>
    
    <!-- Basic error messages -->
    <string name="unknown_channel">❌ Unknown channel</string>

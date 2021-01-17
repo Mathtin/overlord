@@ -144,6 +144,12 @@ class OverlordBase(discord.Client):
             return 0
         return (datetime.now() - self.__awaiting_sync_last_updated).total_seconds()
 
+    def base_embed(self, name, title, description, color):
+        embed = discord.Embed(title=title, description=description, color=color)
+        embed.set_author(name=name, icon_url=self.me.avatar_url)
+        embed.set_footer(text=res.get("messages.embed_footer"), icon_url=self.me.avatar_url)
+        return embed
+
     ################
     # Sync methods #
     ################

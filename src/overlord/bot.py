@@ -198,10 +198,7 @@ class Overlord(OverlordBase):
                 return
             i = self.extension_idx(ext)
             l = len(self.__extensions)
-            help_embed = ext.help_embed()
-            help_embed.set_author(name=f"Overlord Help page [{i+1}/{l}]", icon_url=self.me.avatar_url)
-            help_embed.set_footer(text="Overlord by Daniel [Mathtin] Shiko. Special for Eclipse Co. comms", icon_url=self.me.avatar_url)
-            await message.channel.send(embed=help_embed)
+            await message.channel.send(embed=ext.help_embed(f"Overlord Help page [{i+1}/{l}]"))
             return
 
         if cmd_name not in self.__cmd_cache:
