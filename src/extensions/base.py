@@ -17,6 +17,7 @@ import sys
 import traceback
 import asyncio
 import logging
+import discord
 
 from discord.errors import InvalidArgument
 from overlord.base import OverlordBase
@@ -37,6 +38,7 @@ class BotExtension(object):
     __priority__ = 0
     __extname__ = 'Base Extension'
     __description__ = 'Base bot extension class'
+    __color__ = 0x7B838A
 
     # Members passed via constructor
     bot: OverlordBase
@@ -103,6 +105,10 @@ class BotExtension(object):
                 await func.__self__.on_error(func.__name__, *args, **kwargs)
         return wrapped
 
+    @property
+    def name(self):
+        return self.__extname__
+
     def start(self) -> None:
         if self.__enabled:
             return
@@ -120,6 +126,19 @@ class BotExtension(object):
 
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
+
+    def help_embed(self) -> discord.Embed:
+        title = f'{self.__extname__}'
+        help_page = discord.Embed(title=title, description=self.__description__, color=self.__color__)
+        commands = self.bot.config["commands"]
+        prefix = self.bot.prefix
+        help_page
+        for name, cmd in self.__commands.items():
+            if name not in commands:
+                help_page.add_field(name=f'[DISABLED] `{prefix}{name}`', value=cmd.help(prefix, []), inline=False)
+            else:
+                help_page.add_field(name=f'`$ {prefix}{name}`', value=cmd.help(prefix, commands[name]), inline=False)
+        return help_page
 
     def cmd(self, name: str) -> Optional[OverlordCommand]:
         if name in self.__commands:

@@ -24,7 +24,7 @@ from util import ConfigView, get_coroutine_attrs, parse_control_message
 from util.exceptions import InvalidConfigException
 from util.extbot import qualified_name, is_dm_message
 from util.extbot import skip_bots, after_initialized, event_config, guild_member_event
-from typing import Dict, List, Callable, Awaitable
+from typing import Dict, List, Callable, Awaitable, Optional, Union
 from .base import OverlordBase
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordRole, OverlordUser, OverlordVCState
 from extensions.base import BotExtension
@@ -87,6 +87,23 @@ class Overlord(OverlordBase):
                 if alias in self.__cmd_cache:
                     raise InvalidConfigException(f"Command alias collision for {alias}: {cmd} <-> {self.__cmd_cache[alias]}", "bot.commands")
                 self.__cmd_cache[alias] = handler
+
+    def resolve_extension(self, ext: Union[int, str]) -> Optional[BotExtension]:
+        if isinstance(ext, int):
+            if 0 <= ext < len(self.__extensions):
+                return self.__extensions[ext]
+            return None
+        try:
+            return self.resolve_extension(int(ext))
+        except ValueError:
+            exts = [e for e in self.__extensions if e.name == ext]
+            return exts[0] if exts else None
+
+    def extension_idx(self, ext: BotExtension) -> int:
+        for i in range(len(self.__extensions)):
+            if self.__extensions[i] is ext:
+                return i
+        return -1
 
     #################
     # Async methods #
@@ -166,18 +183,33 @@ class Overlord(OverlordBase):
         if not self.is_admin(message.author):
             return
         # Parse argv
-        prefix = self.config["control.prefix"]
-        argv = parse_control_message(prefix, message)
+        argv = parse_control_message(self.prefix, message)
         if argv is None or len(argv) == 0:
             return
         # Resolve cmd handler
         cmd_name = argv[0]
+
+        # Handle help page
+        if cmd_name == 'help':
+            page = argv[1] if len(argv) > 1 else 0
+            ext = self.resolve_extension(page)
+            if ext is None:
+                await message.channel.send("No such help page")
+                return
+            i = self.extension_idx(ext)
+            l = len(self.__extensions)
+            help_embed = ext.help_embed()
+            help_embed.set_author(name=f"Overlord Help page [{i+1}/{l}]", icon_url=self.me.avatar_url)
+            help_embed.set_footer(text="Overlord by Daniel [Mathtin] Shiko. Special for Eclipse Co. comms", icon_url=self.me.avatar_url)
+            await message.channel.send(embed=help_embed)
+            return
+
         if cmd_name not in self.__cmd_cache:
             await message.channel.send(res.get("messages.unknown_command"))
             return
         handler = self.__cmd_cache[cmd_name]
         # Call handler
-        await handler(message, prefix, argv)
+        await handler(message, self.prefix, argv)
 
     
     @after_initialized

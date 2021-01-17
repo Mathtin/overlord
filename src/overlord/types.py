@@ -13,7 +13,7 @@
 
 __author__ = 'Mathtin'
 
-from typing import Any
+from typing import Any, List
 import db as DB
 import discord as DIS
 import asyncio
@@ -100,6 +100,12 @@ class OverlordCommand(object):
 
     def usage(self, prefix: str, cmdname: str) -> str:
         return f'{prefix}{cmdname} {self.args_str}'
+
+    def help(self, prefix: str, aliases: List[str]) -> str:
+        aliases_str = ' ,'.join([f'`{prefix}{a}`' for a in aliases])
+        return f'Usage: `{prefix}{self.name} {self.args_str}`\n' + \
+            f'{self.desciption}\n' + \
+            f'Aliases: {aliases_str}\n'
 
     def handler(self, ext):
         async def wrapped_func(message, prefix, argv):

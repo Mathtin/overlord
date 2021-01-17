@@ -27,8 +27,9 @@ log = logging.getLogger('utility-extension')
 
 class UtilityExtension(BotExtension):
 
-    __extname__ = 'Base Extension'
-    __description__ = 'Base bot extension class'
+    __extname__ = 'Utility Extension'
+    __description__ = 'Basic utility commands collection'
+    __color__ = 0xa83fc8
             
     #########
     # Tasks #

@@ -27,6 +27,10 @@ log = logging.getLogger('config-extension')
 ##################
 
 class ConfigExtension(BotExtension):
+
+    __extname__ = 'Config Extension'
+    __description__ = 'Raw config manipulation commands'
+    __color__ = 0x23BC71
             
     ############
     # Commands #

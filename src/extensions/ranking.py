@@ -36,6 +36,10 @@ log = logging.getLogger('ranking-extension')
 # Ranking Extension #
 #####################
 class RankingExtension(BotExtension):
+
+    __extname__ = 'Ranking Extension'
+    __description__ = 'Member ranking system based on stats (check Stats Extension)'
+    __color__ = 0xc84e3f
             
     #########
     # Props #

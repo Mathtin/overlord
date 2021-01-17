@@ -108,6 +108,10 @@ class OverlordBase(discord.Client):
     # Getters #
     ###########
 
+    @property
+    def prefix(self) -> str:
+        return self.config["control.prefix"]
+
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
 

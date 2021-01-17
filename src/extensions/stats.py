@@ -39,6 +39,10 @@ def _build_stat_line(s_stats: StatService, user: DB.User, stat: str, formatter=l
 ##################
 
 class StatsExtension(BotExtension):
+
+    __extname__ = 'Stats Extension'
+    __description__ = 'Gathers member stats (messages, vc, membership and etc.)'
+    __color__ = 0x3fbbc8
             
     ###########
     # Methods #
