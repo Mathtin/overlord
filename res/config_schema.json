@@ -283,6 +283,10 @@
             "require",
             "role"
           ]
+        },
+        "invites": {
+          "type": "object",
+          "default": {}
         }
       },
       "required": [
@@ -291,6 +295,7 @@
         "control",
         "user",
         "ranks",
+        "invites",
         "egg_done"
       ]
     }

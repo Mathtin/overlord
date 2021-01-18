@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 from util import ConfigView
 from overlord import Overlord
-from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension
+from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
 from db import DBSession, EventType, UserStatType
 from db.predefined import EVENT_TYPES, USER_STAT_TYPES
 
@@ -56,15 +56,17 @@ def main(argv):
 
     # Init extensions
     extras_ext = UtilityExtension(bot=discord_bot)
-    conf_ext = ConfigExtension(bot=discord_bot)
     stats_ext = StatsExtension(bot=discord_bot)
     ranking_ext = RankingExtension(bot=discord_bot, priority=1)
+    conf_ext = ConfigExtension(bot=discord_bot)
+    invite_ext = InviteExtension(bot=discord_bot)
 
     # Attach extensions
     discord_bot.extend(extras_ext)
     discord_bot.extend(conf_ext)
     discord_bot.extend(stats_ext)
     discord_bot.extend(ranking_ext)
+    discord_bot.extend(invite_ext)
 
     # Start bot
     discord_bot.run()

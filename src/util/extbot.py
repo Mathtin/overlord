@@ -165,6 +165,9 @@ def embed_long_line(embed: discord.Embed, line: str):
         
 def embed_long_message(embed: discord.Embed, message: str):
     message = message[:5000]
+    if len(message) <= 2000:
+        embed.description = message
+        return
     f_p = message[:2000]
     i = f_p.rfind('\n')
     if i == -1:

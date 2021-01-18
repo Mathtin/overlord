@@ -109,23 +109,35 @@
             ],
             "reload_config": [
                 "reload-config",
-                "config-reload"
+                "config-reload",
+                "reload-conf",
+                "conf-reload"
             ],
             "save_config": [
                 "save-config",
-                "config-save"
+                "config-save",
+                "save-conf",
+                "conf-save"
             ],
             "get_config_value": [
                 "get-config-value",
                 "get-config",
-                "config-get"
+                "config-get",
+                "get-conf-value",
+                "get-conf",
+                "conf-get"
             ],
             "alter_config": [
                 "alter-config",
                 "edit-config",
                 "config-edit",
                 "config-set",
-                "set-config"
+                "set-config",
+                "alter-conf",
+                "edit-conf",
+                "conf-edit",
+                "conf-set",
+                "set-conf"
             ]
         },
         "control": {
@@ -206,6 +218,11 @@
                     "messages": 123,
                     "vc": 1234
                 }
+            }
+        },
+        "invites": {
+            "XXXXXXX": {
+                "role": "DJ"
             }
         }
     }

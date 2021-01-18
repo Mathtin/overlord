@@ -24,9 +24,9 @@ import util.resources as res
 
 log = logging.getLogger('config-extension')
 
-##################
-# Stat Extension #
-##################
+####################
+# Config Extension #
+####################
 
 class ConfigExtension(BotExtension):
 

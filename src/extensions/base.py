@@ -19,12 +19,14 @@ import asyncio
 import logging
 import discord
 
+import util.resources as res
+
 from discord.errors import InvalidArgument
 from overlord.base import OverlordBase
 from overlord.types import OverlordCommand, OverlordTask
 
 from util import get_coroutine_attrs, limit_traceback, quote_msg
-import util.resources as res
+from util.exceptions import InvalidConfigException
 from typing import Dict, List, Optional, Callable, Awaitable
 
 log = logging.getLogger('overlord-extension')
@@ -101,6 +103,8 @@ class BotExtension(object):
             await func.__self__.bot.init_lock()
             try:
                 await func(*args, **kwargs)
+            except InvalidConfigException as e:
+                raise e
             except:
                 await func.__self__.on_error(func.__name__, *args, **kwargs)
         return wrapped

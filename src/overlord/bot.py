@@ -143,6 +143,7 @@ class Overlord(OverlordBase):
                 ext.start()
             # Call 'on_ready' extension handlers
             await self.__run_call_plan('on_ready')
+            await self.on_config_update()
             # Message for pterodactyl panel
             print(self.config["egg_done"])
             await self.maintainer.send('Started!')

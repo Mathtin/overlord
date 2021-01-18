@@ -18,3 +18,4 @@ from .utility import UtilityExtension
 from .config import ConfigExtension
 from .ranking import RankingExtension
 from .stats import StatsExtension
+from .invite import InviteExtension
