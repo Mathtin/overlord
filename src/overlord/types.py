@@ -13,11 +13,11 @@
 
 __author__ = 'Mathtin'
 
-from typing import Any, List
+from typing import Any, Dict, List
 import db as DB
 import discord as DIS
 import asyncio
-from util import check_coroutine
+from util import check_coroutine, ConfigView
 from discord.ext import tasks
 
 ###################
@@ -125,3 +125,31 @@ class OverlordCommand(object):
                 except:
                     await ext.on_error(self.func.__name__, message, prefix, argv)
         return wrapped_func
+
+class OverlordControlConfig(ConfigView):
+    """
+    control {
+        prefix = "..."
+        roles = [...]
+        channel = ...
+    }
+    """
+    prefix  : str       = "ov/"
+    roles   : List[str] = ["Overlord"]
+    channel : int       = 0
+
+class OverlordRootConfig(ConfigView):
+    """
+    bot {
+        control : OverlordControlConfig
+        keep_absent_users = ...
+        command {
+            help = ["help", ...]
+            ...
+        }
+    }
+    """
+    control           : OverlordControlConfig = OverlordControlConfig()
+    keep_absent_users : bool                  = True
+    command           : Dict[str, List[str]]  = {}
+    

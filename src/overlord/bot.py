@@ -26,7 +26,7 @@ from util.extbot import qualified_name, is_dm_message
 from util.extbot import skip_bots, after_initialized, event_config, guild_member_event
 from typing import Dict, List, Callable, Awaitable, Optional, Union
 from .base import OverlordBase
-from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, OverlordRole, OverlordUser, OverlordVCState
+from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, OverlordRole, OverlordVCState
 from extensions.base import BotExtension
 
 log = logging.getLogger('overlord-bot')

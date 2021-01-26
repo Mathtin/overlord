@@ -13,9 +13,7 @@
 
 __author__ = 'Mathtin'
 
-from .base import BotExtension
-from .utility import UtilityExtension
-from .config import ConfigExtension
-from .ranking import RankingExtension, RankingRootConfig
-from .stats import StatsExtension
-from .invite import InviteExtension
+from .view import ConfigView
+from .parser import ConfigParser
+from .manager import ConfigManager
+

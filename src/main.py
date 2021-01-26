@@ -20,11 +20,39 @@ import logging.config
 
 from dotenv import load_dotenv
 
-from util import ConfigView
-from overlord import Overlord
-from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
+from util import ConfigView, ConfigManager
 from db import DBSession, EventType, UserStatType
 from db.predefined import EVENT_TYPES, USER_STAT_TYPES
+from overlord import Overlord, OverlordRootConfig
+from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
+from extensions import RankingRootConfig
+
+class ExtensionsConfig(ConfigView):
+    """
+    extension {
+        rank : RankingRootConfig
+        invite {
+            ...
+        }
+    }
+    """
+    rank   : RankingRootConfig = RankingRootConfig()
+    invite : dict              = {}
+
+class RootConfig(ConfigView):
+    """
+    logger { 
+        ... 
+    }
+    bot : OverlordRootConfig
+    extension : ExtensionsConfig
+    """
+    logger    : dict               = {}
+    bot       : OverlordRootConfig = OverlordRootConfig()
+    extension : ExtensionsConfig   = ExtensionsConfig()
+
+class Configuration(ConfigManager):
+    config : RootConfig
 
 def main(argv):
     # Load env variables
@@ -32,15 +60,17 @@ def main(argv):
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Overlord Discord Bot')
-    parser.add_argument('-c', '--config', nargs='?', type=str, default='config.json', help='config path')
+    parser.add_argument('-c', '--config', nargs='?', type=str, default='overlord.cfg', help='config path')
     args = parser.parse_args(argv[1:])
 
     # Load config
-    config = ConfigView(path=args.config, schema_name="config_schema")
+    cnf_manager = Configuration(args.config)
+    for i in range(1000):
+        cnf_manager.reload()
+    return
 
     # Apply logging config
-    if config['logger']:
-        logging.config.dictConfig(config['logger'])
+    logging.config.dictConfig(cnf_manager.config.logger)
 
     # Init database
     url = os.getenv('DATABASE_ACCESS_URL')
@@ -52,7 +82,7 @@ def main(argv):
     session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
 
     # Init bot
-    discord_bot = Overlord(config.bot, session)
+    discord_bot = Overlord(cnf_manager, session)
 
     # Init extensions
     extras_ext = UtilityExtension(bot=discord_bot)

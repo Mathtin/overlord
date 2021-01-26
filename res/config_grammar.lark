@@ -1,0 +1,39 @@
+//////////////////////////////////////////////////
+// Overlord config file grammar                 //
+//////////////////////////////////////////////////
+// Author: Daniel [Mathtin] Shiko               //
+// Copyright (c) 2021 <wdaniil@mail.ru>         //
+// This file is released under the MIT license  //
+//////////////////////////////////////////////////
+
+root : (assignment | section)*
+
+section : name "{" [_NEWLINE] (assignment | section)* "}" _ENDMARKER
+
+assignment : name "=" value _ENDMARKER
+
+?value : list
+      | STRING  -> string
+      | INTEGER -> integer
+      | FLOAT   -> float
+      | "true"  -> true
+      | "false" -> false
+
+list : "[" [_NEWLINE] [value ( "," [_NEWLINE] value )* [_NEWLINE]] "]"
+
+name : NAME
+
+_ENDMARKER : (_NEWLINE | ";")+
+NAME : ("_"|LETTER) ("_"|"-"|LETTER|DIGIT)*
+
+%import common.ESCAPED_STRING   -> STRING
+%import common.SIGNED_INT       -> INTEGER
+%import common.SIGNED_FLOAT     -> FLOAT
+%import common.LETTER           -> LETTER
+%import common.DIGIT            -> DIGIT
+%import common.NEWLINE          -> _NEWLINE
+%import common.SH_COMMENT       -> COMMENT
+%import common.WS_INLINE        -> WHITESPACE
+
+%ignore WHITESPACE
+%ignore COMMENT

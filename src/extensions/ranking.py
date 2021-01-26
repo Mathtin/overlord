@@ -13,25 +13,58 @@
 
 __author__ = 'Mathtin'
 
-import json
 import logging
 
 import discord
 import db as DB
-from overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit
-from services.role import RoleService
-from services.stat import StatService
 import util.resources as res
 
 from typing import Optional, List, Tuple, Dict
-from .base import BotExtension
-from util import qualified_name, dict_fancy_table, quote_msg
+
 from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
-from util.extbot import filter_roles, is_role_applied
-from overlord import OverlordMessage, OverlordVCState
+from util.extbot import filter_roles, is_role_applied, qualified_name
+from services.role import RoleService
+from services.stat import StatService
+from overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit, OverlordMessage, OverlordVCState
+
+from .base import BotExtension
 
 log = logging.getLogger('ranking-extension')
+
+##################
+# Ranking Config #
+##################
+
+class RankConfig(ConfigView):
+    """
+    ... {
+        weight = ...
+        membership = ...
+        messages = ...
+        vc = ...
+    }
+    """
+    weight     : int = 0
+    membership : int = 1
+    messages   : int = 1
+    vc         : int = 1
+
+
+class RankingRootConfig(ConfigView):
+    """
+    rank {
+        ignored = [...]
+        required = [...]
+        role {
+            ... : RankConfig
+        }
+    }
+    """
+    ignored  : List[str]             = []
+    required : List[str]             = []
+    role     : Dict[str, RankConfig] = {}
+
 
 #####################
 # Ranking Extension #
