@@ -74,6 +74,8 @@ class RankingExtension(BotExtension):
     __extname__ = 'Ranking Extension'
     __description__ = 'Member ranking system based on stats (check Stats Extension)'
     __color__ = 0xc84e3f
+
+    config: RankingRootConfig
             
     #########
     # Props #
@@ -88,16 +90,16 @@ class RankingExtension(BotExtension):
         return self.bot.s_roles
 
     @property
-    def ranks(self) -> Dict[str, Dict[str, int]]:
-        return self.bot.config["ranks.role"]
+    def ranks(self) -> Dict[str, RankConfig]:
+        return self.config.role
 
     @property
     def required_roles(self) -> List[str]:
-        return self.bot.config["ranks.require"]
+        return self.config.required
 
     @property
     def ignored_roles(self) -> List[str]:
-        return self.bot.config["ranks.ignore"]
+        return self.config.ignored
             
     ###########
     # Methods #

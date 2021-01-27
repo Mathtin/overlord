@@ -143,6 +143,7 @@ class OverlordRootConfig(ConfigView):
     bot {
         control : OverlordControlConfig
         keep_absent_users = ...
+        ignore_afk_vc = ...
         command {
             help = ["help", ...]
             ...
@@ -151,5 +152,7 @@ class OverlordRootConfig(ConfigView):
     """
     control           : OverlordControlConfig = OverlordControlConfig()
     keep_absent_users : bool                  = True
+    ignore_afk_vc     : bool                  = True
+    egg_done          : str                   = "change this part"
     command           : Dict[str, List[str]]  = {}
     

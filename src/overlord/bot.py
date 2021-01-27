@@ -20,10 +20,11 @@ import discord
 import db as DB
 import util.resources as res
 
-from util import ConfigView, get_coroutine_attrs, parse_control_message
+from util import get_coroutine_attrs, parse_control_message
+from util.config import ConfigManager
 from util.exceptions import InvalidConfigException
 from util.extbot import qualified_name, is_dm_message
-from util.extbot import skip_bots, after_initialized, event_config, guild_member_event
+from util.extbot import skip_bots, after_initialized, guild_member_event
 from typing import Dict, List, Callable, Awaitable, Optional, Union
 from .base import OverlordBase
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, OverlordRole, OverlordVCState
@@ -43,8 +44,8 @@ class Overlord(OverlordBase):
     __call_plan_map: Dict[str, List[Callable[..., Awaitable[None]]]]
     __cmd_cache: Dict[str, Callable[..., Awaitable[None]]]
 
-    def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
-        super().__init__(config, db_session)
+    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
+        super().__init__(cnf_manager, db_session)
         self.__extensions = []
         self.__handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
         self.__handlers = {n.replace('_raw',''):h for n,h in self.__handlers.items()}
@@ -83,9 +84,8 @@ class Overlord(OverlordBase):
         raise InvalidConfigException(f"Command handler not found for {name}", "bot.commands")
 
     def update_command_cache(self) -> None:
-        commands = self.config["commands"]
         self.__cmd_cache = {}
-        for cmd, aliases in commands.items():
+        for cmd, aliases in self.config.command.items():
             handler = self.__find_cmd_handler(cmd)
             self.__cmd_cache[cmd] = handler
             for alias in aliases:
@@ -124,11 +124,6 @@ class Overlord(OverlordBase):
         for ext in self.__extensions:
             ext.stop()
         return await super().logout()
-        
-    async def update_config(self, config: ConfigView) -> None:
-        await super().update_config(config)
-        self.update_command_cache()
-        await self.on_config_update()
 
     #########
     # Hooks #
@@ -137,24 +132,21 @@ class Overlord(OverlordBase):
     async def on_ready(self) -> None:
         async with self.sync():
             await super().on_ready()
-            self.update_command_cache()
             # Start extensions
             for ext in self.__extensions:
                 ext.start()
             # Call 'on_ready' extension handlers
             await self.__run_call_plan('on_ready')
-            await self.on_config_update()
             # Message for pterodactyl panel
-            print(self.config["egg_done"])
+            print(self.config.egg_done)
             await self.maintainer.send('Started!')
 
     async def on_config_update(self) -> None:
-        self.check_config()
+        super().on_config_update()
         # Call extension 'on_config_update' handlers
         await self.__run_call_plan('on_config_update')
 
     @after_initialized
-    @event_config("message.new")
     @skip_bots
     async def on_message(self, message: discord.Message) -> None:
         """
@@ -204,7 +196,6 @@ class Overlord(OverlordBase):
 
     
     @after_initialized
-    @event_config("message.edit")
     async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
         """
             Async message edit event handler
@@ -224,7 +215,6 @@ class Overlord(OverlordBase):
 
     
     @after_initialized
-    @event_config("message.delete")
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
         """
             Async message delete event handler
@@ -244,7 +234,6 @@ class Overlord(OverlordBase):
     
 
     @after_initialized
-    @event_config("user.join")
     @skip_bots
     @guild_member_event
     async def on_member_join(self, member: discord.Member) -> None:
@@ -264,7 +253,6 @@ class Overlord(OverlordBase):
 
     
     @after_initialized
-    @event_config("user.update")
     @skip_bots
     @guild_member_event
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -293,7 +281,6 @@ class Overlord(OverlordBase):
 
     
     @after_initialized
-    @event_config("user.leave")
     @skip_bots
     @guild_member_event
     async def on_member_remove(self, member: discord.Member) -> None:
@@ -302,7 +289,7 @@ class Overlord(OverlordBase):
 
             Removes user from database (or keep it, depends on config)
         """
-        if self.config["user.leave.keep"]:
+        if self.config.keep_absent_users:
             user = self.s_users.mark_absent(member)
             if user is None:
                 log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
@@ -334,7 +321,6 @@ class Overlord(OverlordBase):
             await self.on_vc_join(member, after)
             
     @after_initialized
-    @event_config("voice.join")
     async def on_vc_join(self, member: discord.Member, state: discord.VoiceState) -> None:
         """
             Async vc join event handler
@@ -354,7 +340,6 @@ class Overlord(OverlordBase):
         await self.__run_call_plan('on_vc_join', OverlordMember(member, user), OverlordVCState(state, event))
             
     @after_initialized
-    @event_config("voice.leave")
     async def on_vc_leave(self, member: discord.Member, state: discord.VoiceState) -> None:
         """
             Async vc join event handler
@@ -424,7 +409,6 @@ class Overlord(OverlordBase):
         await self.__run_call_plan('on_guild_role_update', OverlordRole(before, role), OverlordRole(after, role))
 
     @after_initialized
-    @event_config("reaction.new")
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
         """
             Async new reaction event handler
@@ -469,7 +453,6 @@ class Overlord(OverlordBase):
         await self.__run_call_plan('on_control_reaction_add', member, message, emoji)
 
     @after_initialized
-    @event_config("reaction.delete")
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent) -> None:
         """
             Async reaction remove event handler

@@ -19,10 +19,24 @@ from typing import Dict, List, Optional
 import discord
 
 from overlord.types import OverlordMember
-from util import InvalidConfigException
+from util import InvalidConfigException, ConfigView
 from .base import BotExtension
 
 log = logging.getLogger('config-extension')
+
+#################
+# Invite Config #
+#################
+
+class InviteRootConfig(ConfigView):
+    """
+    invite {
+        role {
+            ... = "..."
+        }
+    }
+    """
+    role : Dict[str, str] = {}
 
 ####################
 # Invite Extension #
@@ -36,14 +50,12 @@ class InviteExtension(BotExtension):
 
     # State
     __invites = List[discord.Invite]
+    __invite_role_map: Dict[str, List[str]]
+    config: InviteRootConfig
             
     ###########
     # Methods #
     ###########
-
-    @property
-    def invites(self) -> Dict[str, Dict[str, str]]:
-        return self.bot.config["invites"]
 
     def find_invite(self, code) -> Optional[discord.Invite]:
         for inv in self.__invites:
@@ -56,12 +68,11 @@ class InviteExtension(BotExtension):
     #################
 
     async def handle_invite(self, member: discord.Member, invite: discord.Invite):
-        invites = self.invites
-        if not invite.code in invites:
+        if not invite.code in self.__invite_role_map:
             return
-        role_name = invites[invite.code]["role"]
-        role = self.bot.s_roles.get(role_name)
-        await member.add_roles(role)
+        role_names = self.__invite_role_map[invite.code]
+        roles = [self.bot.s_roles.get(r) for r in role_names]
+        await member.add_roles(*roles)
 
     #########
     # Hooks #
@@ -71,31 +82,28 @@ class InviteExtension(BotExtension):
         self.__invites = await self.bot.guild.invites()
 
     async def on_config_update(self) -> None:
-        for code, conf in self.invites.items():
+        self.__invite_role_map = {}
+        self.config = self.bot.cnf_manager.find_section(InviteRootConfig)
+        for role, code in self.config.role.items():
+            if self.bot.s_roles.get(role) is None:
+                raise InvalidConfigException(f"No such role: '{role}'", self.config.path('role'))
             if self.find_invite(code) is None:
-                raise InvalidConfigException(f"No such invite code: '{code}'", "bot.invites")
-            role = conf["role"]
-            if self.bot.s_roles.get(conf["role"]) is None:
-                raise InvalidConfigException(f"No such role: '{role}'", "bot.invites")
+                raise InvalidConfigException(f"No such invite code: '{code}'", self.config.path(f'role.{role}'))
+            if code not in self.__invite_role_map:
+                self.__invite_role_map[code] = []
+            self.__invite_role_map[code].append(role)
             
-    
     async def on_member_join(self, member: OverlordMember) -> None:
-
         invites_after = await member.discord.guild.invites()
-
         for new_invite in invites_after:
-        
             old_invite = self.find_invite(new_invite.code)
             if old_invite is None or old_invite.uses == new_invite.uses:
                 continue
-
             await self.handle_invite(member.discord, new_invite)
-
         self.__invites = invites_after
 
     async def on_member_remove(self, member: OverlordMember):
         self.__invites = await member.discord.guild.invites()
-
             
     ############
     # Commands #

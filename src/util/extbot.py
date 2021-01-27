@@ -68,15 +68,6 @@ def guild_member_event(func):
         return await func(self, obj, *args, **kwargs)
     return _func
 
-def event_config(name: str):
-    def wrapper(func):
-        async def _func(self, *args, **kwargs):
-            if not self.config[f"event.{name}.track"]:
-                return
-            return await func(self, *args, **kwargs)
-        return _func
-    return wrapper
-
 ###########################
 # Bot model utility funcs #
 ###########################

@@ -134,7 +134,7 @@ class BotExtension(object):
     def help_embed(self, name) -> discord.Embed:
         title = f'{self.__extname__}'
         help_page = self.bot.base_embed(name, title, self.__description__, self.__color__)
-        commands = self.bot.config["commands"]
+        commands = self.bot.config.command
         prefix = self.bot.prefix
         help_page
         for name, cmd in self.__commands.items():

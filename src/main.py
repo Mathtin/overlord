@@ -16,43 +16,45 @@ __author__ = 'Mathtin'
 import os
 import sys
 import argparse
-import logging.config
 
 from dotenv import load_dotenv
 
 from util import ConfigView, ConfigManager
+from util.logger import LoggerRootConfig, update_config as update_logger
 from db import DBSession, EventType, UserStatType
 from db.predefined import EVENT_TYPES, USER_STAT_TYPES
 from overlord import Overlord, OverlordRootConfig
 from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
-from extensions import RankingRootConfig
+from extensions import RankingRootConfig, InviteRootConfig
 
 class ExtensionsConfig(ConfigView):
     """
     extension {
-        rank : RankingRootConfig
-        invite {
-            ...
-        }
+        rank   : RankingRootConfig
+        invite : InviteRootConfig
     }
     """
     rank   : RankingRootConfig = RankingRootConfig()
-    invite : dict              = {}
+    invite : InviteRootConfig  = InviteRootConfig()
 
 class RootConfig(ConfigView):
     """
-    logger { 
-        ... 
-    }
-    bot : OverlordRootConfig
-    extension : ExtensionsConfig
+    logger      : LoggerRootConfig
+    bot         : OverlordRootConfig
+    extension   : ExtensionsConfig
     """
-    logger    : dict               = {}
+    logger    : LoggerRootConfig   = LoggerRootConfig()
     bot       : OverlordRootConfig = OverlordRootConfig()
     extension : ExtensionsConfig   = ExtensionsConfig()
 
 class Configuration(ConfigManager):
+
     config : RootConfig
+
+    def alter(self, raw: str) -> None:
+        super().alter(raw)
+        update_logger(self.config.logger)
+
 
 def main(argv):
     # Load env variables
@@ -65,12 +67,6 @@ def main(argv):
 
     # Load config
     cnf_manager = Configuration(args.config)
-    for i in range(1000):
-        cnf_manager.reload()
-    return
-
-    # Apply logging config
-    logging.config.dictConfig(cnf_manager.config.logger)
 
     # Init database
     url = os.getenv('DATABASE_ACCESS_URL')

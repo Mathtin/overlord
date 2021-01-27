@@ -15,7 +15,7 @@ __author__ = 'Mathtin'
 
 from .view import ConfigView
 from .parser import ConfigParser
-from typing import Any, Dict, get_type_hints
+from typing import Any, Dict, Type, get_type_hints
 
 class ConfigManager(object):
 
@@ -40,25 +40,24 @@ class ConfigManager(object):
 
     def reload(self) -> None:
         with open(self.path, 'r') as f:
-            self.raw = f.read()
-        self.raw_dict = self.parser.parse(self.raw)
-        self.config = self.model(self.raw_dict)
+            raw = f.read()
+        self.alter(raw)
 
     def save(self) -> None:
         with open(self.path, 'w') as f:
             f.write(self.raw)
 
-    def alter(self, raw : str):
+    def alter(self, raw : str) -> None:
         self.raw = raw
         self.raw_dict = self.parser.parse(self.raw)
-        self.config = self.model(self.raw)
+        self.config = self.model(self.raw_dict)
 
     def resolve_section_path(self, model : ConfigView) -> str:
         if isinstance(self.config, model):
             return '.'
         return ''
 
-    def find_section(self, model : ConfigView) -> ConfigView:
+    def find_section(self, model : Type[ConfigView]) -> Any:
         if model not in self.__section_model_cache:
             self.__section_model_cache[model] = self.resolve_section_path(model)
         path = self.__section_model_cache[model]

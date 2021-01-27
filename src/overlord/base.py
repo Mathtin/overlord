@@ -24,12 +24,15 @@ import logging
 import discord
 import db as DB
 
-from util import ConfigView, limit_traceback
+from util import limit_traceback
+from util.config import ConfigManager
 from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import is_dm_message, filter_roles, quote_msg, is_text_channel, qualified_name
 import util.resources as res
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 from services import EventService, RoleService, StatService, UserService
+
+from .types import OverlordRootConfig
 
 log = logging.getLogger('overlord-bot')
 
@@ -51,7 +54,8 @@ class OverlordBase(discord.Client):
     maintainer_id: int
 
     # Members passed via constructor
-    config: ConfigView
+    cnf_manager: ConfigManager
+    config: OverlordRootConfig
     db: DB.DBSession
 
     # Values initiated on_ready
@@ -67,13 +71,14 @@ class OverlordBase(discord.Client):
     s_events: EventService
     s_stats: StatService
 
-    def __init__(self, config: ConfigView, db_session: DB.DBSession) -> None:
+    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
         self.__async_lock = asyncio.Lock()
         self.__initialized = False
         self.__awaiting_sync = True
         self.__awaiting_sync_last_updated = datetime.now()
 
-        self.config = config
+        self.cnf_manager = cnf_manager
+        self.config = cnf_manager.find_section(OverlordRootConfig)
         self.db = db_session
 
         # Init base class
@@ -110,12 +115,12 @@ class OverlordBase(discord.Client):
     ###########
 
     @property
-    def prefix(self) -> str:
-        return self.config["control.prefix"]
+    def extensions(self) -> List[Any]:
+        pass
 
     @property
-    def extensions(self) -> None:
-        return None
+    def prefix(self) -> str:
+        return self.config.control.prefix
 
     def sync(self) -> asyncio.Lock:
         return self.__async_lock
@@ -127,7 +132,7 @@ class OverlordBase(discord.Client):
         return not is_dm_message(msg) and msg.guild.id == self.guild.id
 
     def check_afk_state(self, state: discord.VoiceState) -> bool:
-        return not state.afk or not self.config["event.voice.afk.ignore"]
+        return not state.afk or not self.config.ignore_afk_vc
 
     def is_special_channel_id(self, channel_id: int) -> bool:
         return channel_id == self.control_channel.id or channel_id == self.error_channel.id
@@ -138,8 +143,7 @@ class OverlordBase(discord.Client):
     def is_admin(self, user: discord.Member) -> bool:
         if user == self.maintainer:
             return True
-        roles = self.config["control.roles"]
-        return len(filter_roles(user, roles)) > 0
+        return len(filter_roles(user, self.config.control.roles)) > 0
 
     def awaiting_sync(self) -> bool:
         return self.__awaiting_sync
@@ -155,6 +159,9 @@ class OverlordBase(discord.Client):
         embed.set_footer(text=res.get("messages.embed_footer"), icon_url=self.me.avatar_url)
         return embed
 
+    def extension_idx(self, ext: Any) -> None:
+        pass
+
     ################
     # Sync methods #
     ################
@@ -163,16 +170,14 @@ class OverlordBase(discord.Client):
         super().run(self.token)
 
     def check_config(self) -> None:
-        admin_roles = self.config["control.roles"]
-        for role_name in admin_roles:
+        log.info(f'Checking configuration')
+        for i, role_name in enumerate(self.config.control.roles):
             if self.get_role(role_name) is None:
-                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.control.roles")
+                raise InvalidConfigException(f"No such role: '{role_name}'", self.config.control.path(f'roles[{i}]'))
 
     def save_config(self):
-        log.warn(f'Dumping raw config')
-        parent_config = self.config.parent()
-        with open(parent_config.fpath(), "w") as f:
-            json.dump(parent_config.value(), f, indent=4)
+        log.info(f'Saving configuration on disk')
+        self.cnf_manager.save()
 
     def set_awaiting_sync(self) -> None:
         self.__awaiting_sync_last_updated = datetime.now()
@@ -182,10 +187,13 @@ class OverlordBase(discord.Client):
         self.__awaiting_sync_last_updated = datetime.now()
         self.__awaiting_sync = False
 
-    def resolve_extension(self, page: Union[int, str]) -> None:
+    def extend(self, extension: Any) -> None:
         pass
 
-    def extension_idx(self, ext: Any) -> None:
+    def update_command_cache(self) -> None:
+        pass
+
+    def resolve_extension(self, ext: Union[int, str]) -> Optional[Any]:
         pass
 
     #################
@@ -212,13 +220,9 @@ class OverlordBase(discord.Client):
     async def sync_users(self) -> None:
         log.info('Syncing roles')
         self.s_roles.load(self.guild.roles)
-
         log.info(f'Syncing users')
-        # Mark everyone absent
         self.s_users.mark_everyone_absent()
-        # Reload
         async for member in self.guild.fetch_members(limit=None):
-            # Cache and skip bots
             if member.bot:
                 continue
             # Update and repair
@@ -228,7 +232,7 @@ class OverlordBase(discord.Client):
         if not self.config["user.leave.keep"]:
             self.s_users.remove_absent()
         self.unset_awaiting_sync()
-        log.info(f'Syncing users done')
+        log.info(f'Syncing is done')
 
     async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
             try:
@@ -284,24 +288,19 @@ class OverlordBase(discord.Client):
     async def logout(self) -> None:
         await super().logout()
 
-    async def update_config(self, config: ConfigView) -> None:
-        self.config = config
+    async def alter_config(self, config: str) -> None:
+        log.info(f'Altering configuration')
+        self.cnf_manager.alter(config)
+        self.config = self.cnf_manager.find_section(OverlordRootConfig)
+        await self.on_config_update()
 
-    async def safe_alter_config(self, path: str, value) -> Optional[Exception]:
-        parent_config = self.config.parent()
-        old_value = parent_config[path]
+    async def safe_alter_config(self, config: str) -> Optional[Exception]:
+        old_config = self.cnf_manager.raw
         try:
-            log.warn(f'Altering raw config path {path}')
-            parent_config.alter(path, value)
-            if parent_config['logger']:
-                logging.config.dictConfig(parent_config['logger'])
-            await self.update_config(parent_config.bot)
+            await self.alter_config(config)
         except (InvalidConfigException, TypeError) as e:
-            log.warn(f'Invalid config value provided: {value}, reason: {e}. Reverting.')
-            parent_config.alter(path, old_value)
-            if parent_config['logger']:
-                logging.config.dictConfig(parent_config['logger'])
-            await self.update_config(parent_config.bot)
+            log.warn(f'Invalid config data: {e}. Reverting.')
+            await self.alter_config(old_config)
             return e
         return None
 
@@ -387,6 +386,10 @@ class OverlordBase(discord.Client):
         await self.sync_users()
 
         # Check config value
-        self.check_config()
+        await self.on_config_update()
 
         self.__initialized = True
+        
+    async def on_config_update(self) -> None:
+        self.check_config()
+        self.update_command_cache()

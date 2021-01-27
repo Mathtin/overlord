@@ -3,6 +3,7 @@
 config.json
 *.db
 *.log.*
+overlord.cfg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
