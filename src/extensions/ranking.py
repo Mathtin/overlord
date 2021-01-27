@@ -19,7 +19,7 @@ import discord
 import db as DB
 import util.resources as res
 
-from typing import Optional, List, Tuple, Dict
+from typing import Callable, Optional, List, Tuple, Dict
 
 from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
@@ -118,22 +118,23 @@ class RankingExtension(BotExtension):
 
         # Search exact
         if exact_weight > 0:
-            exact_ranks = [(n,r) for n,r in ranks if r['weight'] == exact_weight]
+            exact_ranks = [(n,r) for n,r in ranks if r.weight == exact_weight]
             return exact_ranks[0] if exact_ranks else None
 
         # Filter minimal
         if min_weight > 0:
-            ranks = [(n,r) for n,r in ranks if r['weight'] >= min_weight]
+            ranks = [(n,r) for n,r in ranks if r.weight >= min_weight]
 
         # Filter maximal
         if max_weight > 0:
-            ranks = [(n,r) for n,r in ranks if r['weight'] <= max_weight]
+            ranks = [(n,r) for n,r in ranks if r.weight <= max_weight]
 
         # Filter meeting criteria
-        meet_criteria = lambda n,r: (messages >= r["messages"] or vc_time >= r["vc"]) and membership >= r["membership"]
+        meet_criteria : Callable[[str,RankConfig], bool] = \
+            lambda n,r: (messages >= r.messages or vc_time >= r.vc) and membership >= r.membership
         ranks = [(n,r) for n,r in ranks if meet_criteria(n,r)]
 
-        return max(ranks, key=lambda nr: nr[1]["weight"])[0] if ranks else None
+        return max(ranks, key=lambda nr: nr[1].weight)[0] if ranks else None
 
     def ignore_member(self, member: discord.Member) -> bool:
         return len(filter_roles(member, self.ignored_roles)) > 0 or len(filter_roles(member, self.required_roles)) == 0
@@ -196,22 +197,25 @@ class RankingExtension(BotExtension):
     #########
 
     async def on_config_update(self) -> None:
-        # Check ranks config
-        for role_name in self.ignored_roles:
+        self.config = self.bot.get_config_section(RankingRootConfig)
+        if self.config is None:
+            raise InvalidConfigException("RankingRootConfig section not found", "root")
+        # Check rank roles
+        for i,role_name in enumerate(self.ignored_roles):
             if self.s_roles.get(role_name) is None:
-                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.ignore")
-        for role_name in self.required_roles:
+                raise InvalidConfigException(f"No such role: '{role_name}'", self.config.path(f"ignored[{i}]"))
+        for i,role_name in enumerate(self.required_roles):
             if self.s_roles.get(role_name) is None:
-                raise InvalidConfigException(f"No such role: '{role_name}'", "bot.ranks.require")
+                raise InvalidConfigException(f"No such role: '{role_name}'", self.config.path(f"required[{i}]"))
+        # Check rank weights
         ranks_weights = {}
-        for rank_name in self.ranks:
-            rank = ConfigView(value=self.ranks[rank_name], schema_name="rank_schema")
-            if self.s_roles.get(rank_name) is None:
-                raise InvalidConfigException(f"No such role: '{rank_name}'", "bot.ranks.role")
-            if rank['weight'] in ranks_weights:
-                dup_rank = ranks_weights[rank['weight']]
-                raise InvalidConfigException(f"Duplicate weights '{rank_name}', '{dup_rank}'", "bot.ranks.role")
-            ranks_weights[rank['weight']] = rank_name
+        for name, props in self.ranks.items():
+            if self.s_roles.get(name) is None:
+                raise InvalidConfigException(f"No such role: '{name}'", self.config.path("role"))
+            if props.weight in ranks_weights:
+                dup_rank = ranks_weights[props.weight]
+                raise InvalidConfigException(f"Duplicate weights '{name}', '{dup_rank}'", self.config.path(f"role.{name}"))
+            ranks_weights[props.weight] = name
 
     async def on_message(self, msg: OverlordMessage) -> None:
         async with self.sync():
