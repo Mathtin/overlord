@@ -21,7 +21,7 @@ from .config import ConfigView
 # Logger Config #
 #################
 
-class LogFileConfig(object):
+class LogFileConfig(ConfigView):
     """
     file {
         filename = "..."
@@ -33,7 +33,7 @@ class LogFileConfig(object):
     maxBytes : int = 1048576
     backupCount : int = 10
 
-class DiscordLogConfig(object):
+class DiscordLogConfig(ConfigView):
     """
     discord {
         channel = ...
@@ -41,7 +41,7 @@ class DiscordLogConfig(object):
     """
     channel : int = 0
 
-class LoggerRootConfig(object):
+class LoggerRootConfig(ConfigView):
     """
     logger {
         format = "..."
