@@ -83,7 +83,9 @@ class InviteExtension(BotExtension):
 
     async def on_config_update(self) -> None:
         self.__invite_role_map = {}
-        self.config = self.bot.cnf_manager.find_section(InviteRootConfig)
+        self.config = self.bot.get_config_section(InviteRootConfig)
+        if self.config is None:
+            raise InvalidConfigException("InviteRootConfig section not found", "root")
         for role, code in self.config.role.items():
             if self.bot.s_roles.get(role) is None:
                 raise InvalidConfigException(f"No such role: '{role}'", self.config.path('role'))

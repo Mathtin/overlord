@@ -79,6 +79,8 @@ class OverlordBase(discord.Client):
 
         self.cnf_manager = cnf_manager
         self.config = cnf_manager.find_section(OverlordRootConfig)
+        if self.config is None:
+            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         self.db = db_session
 
         # Init base class
@@ -161,6 +163,9 @@ class OverlordBase(discord.Client):
 
     def extension_idx(self, ext: Any) -> None:
         pass
+
+    def get_config_section(self, section_type: Any) -> Any:
+        return self.cnf_manager.find_section(section_type)
 
     ################
     # Sync methods #
@@ -292,6 +297,8 @@ class OverlordBase(discord.Client):
         log.info(f'Altering configuration')
         self.cnf_manager.alter(config)
         self.config = self.cnf_manager.find_section(OverlordRootConfig)
+        if self.config is None:
+            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
 
     async def safe_alter_config(self, config: str) -> Optional[Exception]:
