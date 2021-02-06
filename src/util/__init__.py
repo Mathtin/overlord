@@ -26,14 +26,14 @@ import discord
 # Utility Funcs #
 #################
 
-__module_cache = {}
+_module_cache = {}
 def get_module_element(path: str) -> Any:
     splited_path = path.split('.')
     module_name = '.'.join(splited_path[:-1])
     object_name = splited_path[-1]
-    if module_name not in __module_cache:
-        __module_cache[module_name] = importlib.import_module(module_name)
-    module = __module_cache[module_name]
+    if module_name not in _module_cache:
+        _module_cache[module_name] = importlib.import_module(module_name)
+    module = _module_cache[module_name]
     return getattr(module, object_name)
 
 def dict_fancy_table(values: dict, key_name='name') -> str:

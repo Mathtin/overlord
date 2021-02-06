@@ -63,7 +63,7 @@ class StatService(object):
         stat.value = value
         self.db.commit()
 
-    def __reload_stat(self, query, stat: str, event: str) -> None:
+    def _reload_stat(self, query, stat: str, event: str) -> None:
         stat_id = self.user_stat_type_map[stat]
         event_id = self.events.type_id(event)
         self.db.query(DB.UserStat).filter_by(type_id=stat_id).delete()
@@ -85,23 +85,23 @@ class StatService(object):
         pass
 
     def reload_membership_stat(self):
-        self.__reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
+        self._reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
 
     def reload_new_message_count_stat(self):
-        self.__reload_stat(q.select_message_count_per_user, 'new_message_count', 'new_message')
+        self._reload_stat(q.select_message_count_per_user, 'new_message_count', 'new_message')
 
     def reload_delete_message_count_stat(self):
-        self.__reload_stat(q.select_message_count_per_user, 'delete_message_count', 'message_delete')
+        self._reload_stat(q.select_message_count_per_user, 'delete_message_count', 'message_delete')
 
     def reload_edit_message_count_stat(self):
-        self.__reload_stat(q.select_message_count_per_user, 'edit_message_count', 'message_edit')
+        self._reload_stat(q.select_message_count_per_user, 'edit_message_count', 'message_edit')
 
     def reload_new_reaction_count_stat(self):
-        self.__reload_stat(q.select_reaction_count_per_user, 'new_reaction_count', 'new_reaction')
+        self._reload_stat(q.select_reaction_count_per_user, 'new_reaction_count', 'new_reaction')
 
     def reload_delete_reaction_count_stat(self):
-        self.__reload_stat(q.select_reaction_count_per_user, 'delete_reaction_count', 'reaction_delete')
+        self._reload_stat(q.select_reaction_count_per_user, 'delete_reaction_count', 'reaction_delete')
 
     def reload_vc_time_stat(self):
-        self.__reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
+        self._reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
 

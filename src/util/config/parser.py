@@ -50,20 +50,20 @@ class TreeToDict(Transformer):
 
 class ConfigParser(object):
 
-    __grammar: str
-    __parser: Lark
+    _grammar: str
+    _parser: Lark
 
     def __init__(self, grammar_file='config_grammar.lark', start='root') -> None:
         with open(res_path(grammar_file), 'r') as f:
-            self.__grammar = f.read()
-        self.__parser = Lark(self.__grammar, start=start, parser='lalr', transformer=TreeToDict())
+            self._grammar = f.read()
+        self._parser = Lark(self._grammar, start=start, parser='lalr', transformer=TreeToDict())
         
     @property
     def grammar(self) -> str:
-        return self.__grammar
+        return self._grammar
 
     def parse(self, data: str) -> dict:
         try:
-            return self.__parser.parse(data)
+            return self._parser.parse(data)
         except lark.exceptions.UnexpectedToken as e:
             raise InvalidConfigException(str(e), "root")

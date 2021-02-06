@@ -55,10 +55,10 @@ class ConfigView(object):
         
     def get_type_constructor(self, type_: Type[Any]) -> Callable[[Any, str], Any]:
         if type_ not in self._type_constructor_map:
-            self._type_constructor_map[type_] = self.__resolve_constructor(type_)
+            self._type_constructor_map[type_] = self._resolve_constructor(type_)
         return self._type_constructor_map[type_]
 
-    def __resolve_constructor(self, type_: Type[Any]) -> Callable[[Any, str], Any]:
+    def _resolve_constructor(self, type_: Type[Any]) -> Callable[[Any, str], Any]:
         # Primitive types already exist, only ConfigView and complex List/Dict type-hints are supported
         if isinstance(type_, typing._GenericAlias):
             # Resolve complex List type-hint
@@ -92,3 +92,7 @@ class ConfigView(object):
                 raise KeyError(f"Invalid path: {path}")
             node = getattr(node, part)
         return node
+
+    def __iter__(self):
+        for field in self._field_constructor_map:
+            yield (field, getattr(self, field))

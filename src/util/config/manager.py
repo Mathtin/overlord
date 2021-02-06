@@ -13,7 +13,7 @@
 
 __author__ = 'Mathtin'
 
-import typing
+import typing, json
 
 from .view import ConfigView
 from .parser import ConfigParser
@@ -28,7 +28,7 @@ class ConfigManager(object):
     parser    : ConfigParser
     model     = None
 
-    __section_model_cache : Dict[Type[ConfigView], Dict[Type[ConfigView], str]] = {}
+    _section_model_cache : Dict[Type[ConfigView], Dict[Type[ConfigView], str]] = {}
 
     def __init__(self, path : str, parser : ConfigParser = None) -> None:
         if parser is None:
@@ -45,6 +45,7 @@ class ConfigManager(object):
         self.alter(raw)
 
     def save(self) -> None:
+        self.sync()
         with open(self.path, 'w') as f:
             f.write(self.raw)
 
@@ -53,10 +54,15 @@ class ConfigManager(object):
         self.raw_dict = self.parser.parse(self.raw)
         self.config = self.model(self.raw_dict)
 
+    def sync(self):
+        raw_dict = dict(self.config)
+        raw = self.serialize_dict(raw_dict)
+        self.alter(raw)
+
     def section_path(self, element : Type[ConfigView], source : Type[ConfigView]) -> Optional[str]:
-        if source not in self.__section_model_cache:
-            self.__section_model_cache[source] = {source:'.'}
-        cache = self.__section_model_cache[source]
+        if source not in self._section_model_cache:
+            self._section_model_cache[source] = {source:'.'}
+        cache = self._section_model_cache[source]
         if element in cache:
             return cache[element]
         res = None
@@ -76,4 +82,16 @@ class ConfigManager(object):
     def find_section(self, model : Type[ConfigView]) -> Any:
         path = self.section_path(model, self.config.__class__)
         return self.config.get(path)
+
+    @staticmethod
+    def serialize_dict(d: dict) -> str:
+        res = []
+        for k,v in d:
+            if type(v) is dict:
+                section_lines = ConfigManager.serialize_dict(v).splitlines()
+                section_lines_idented = [f'    {l}\n' for l in section_lines]
+                res.append(f'{k} {{\n' + ''.join(section_lines_idented) + '}\n') 
+            else:
+                res.append(f'{k} = {json.dumps(v)}\n')
+        return ''.join(res)
         

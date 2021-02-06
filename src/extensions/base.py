@@ -46,33 +46,33 @@ class BotExtension(object):
     bot: OverlordBase
 
     # State members
-    __enabled: bool
-    __tasks: List[OverlordTask]
-    __commands: Dict[str, OverlordCommand]
-    __command_handlers: Dict[str, Callable[..., Awaitable[None]]]
-    __task_instances: List[asyncio.AbstractEventLoop]
-    __async_lock: asyncio.Lock
+    _enabled: bool
+    _tasks: List[OverlordTask]
+    _commands: Dict[str, OverlordCommand]
+    _command_handlers: Dict[str, Callable[..., Awaitable[None]]]
+    _task_instances: List[asyncio.AbstractEventLoop]
+    _async_lock: asyncio.Lock
 
     def __init__(self, bot: OverlordBase, priority=None) -> None:
         super().__init__()
         self.bot = bot
-        self.__enabled = False
-        self.__async_lock = asyncio.Lock()
+        self._enabled = False
+        self._async_lock = asyncio.Lock()
 
         attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
 
         # Gather tasks
-        self.__tasks =  [t for t in attrs if isinstance(t, OverlordTask)]
-        self.__task_instances =  []
+        self._tasks =  [t for t in attrs if isinstance(t, OverlordTask)]
+        self._task_instances =  []
 
         # Gather commands
-        self.__commands =  {c.name:c for c in attrs if isinstance(c, OverlordCommand)}
-        self.__command_handlers =  {name:c.handler(self) for name, c in self.__commands.items()}
+        self._commands =  {c.name:c for c in attrs if isinstance(c, OverlordCommand)}
+        self._command_handlers =  {name:c.handler(self) for name, c in self._commands.items()}
 
         # Reattach implemented handlers
         handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
         for h_name, h in handlers.items():
-            setattr(self, h_name, self.__handler(h))
+            setattr(self, h_name, self._handler(h))
 
         # Prioritize
         if priority is not None:
@@ -96,7 +96,7 @@ class BotExtension(object):
         return decorator
 
     @staticmethod
-    def __handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+    def _handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
         async def wrapped(*args, **kwargs):
             if not func.__self__.__enabled:
                 return
@@ -114,22 +114,22 @@ class BotExtension(object):
         return self.__extname__
 
     def start(self) -> None:
-        if self.__enabled:
+        if self._enabled:
             return
-        self.__enabled = True
-        self.__task_instances =  [t.task(self) for t in self.__tasks]
-        for task in self.__task_instances:
+        self._enabled = True
+        self._task_instances =  [t.task(self) for t in self._tasks]
+        for task in self._task_instances:
             task.start()
 
     def stop(self) -> None:
-        if not self.__enabled:
+        if not self._enabled:
             return
-        self.__enabled = False
-        for task in self.__task_instances:
+        self._enabled = False
+        for task in self._task_instances:
             task.stop()
 
     def sync(self) -> asyncio.Lock:
-        return self.__async_lock
+        return self._async_lock
 
     def help_embed(self, name) -> discord.Embed:
         title = f'{self.__extname__}'
@@ -137,7 +137,7 @@ class BotExtension(object):
         commands = self.bot.config.command
         prefix = self.bot.prefix
         help_page
-        for name, cmd in self.__commands.items():
+        for name, cmd in self._commands.items():
             if name not in commands:
                 help_page.add_field(name=f'[DISABLED] `{prefix}{name}`', value=cmd.help(prefix, []), inline=False)
             else:
@@ -145,13 +145,13 @@ class BotExtension(object):
         return help_page
 
     def cmd(self, name: str) -> Optional[OverlordCommand]:
-        if name in self.__commands:
-            return self.__commands[name]
+        if name in self._commands:
+            return self._commands[name]
         return None
 
     def cmd_handler(self, name: str) -> Optional[Callable[..., Awaitable[None]]]:
-        if name in self.__command_handlers:
-            return self.__command_handlers[name]
+        if name in self._command_handlers:
+            return self._command_handlers[name]
         return None
 
     @property

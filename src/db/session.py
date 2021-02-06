@@ -29,7 +29,8 @@ log = getLogger('db')
 
 class DBSession(object):
 
-    __session: Session
+    _session: Session
+    _last_connection: datetime
 
     # Main DB Connection Ref Obj
     db_engine = None
@@ -41,25 +42,25 @@ class DBSession(object):
         self.db_engine = create_engine(self.engine_url, pool_recycle=60)
         Base.metadata.create_all(self.db_engine)
         self.session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
-        self.__last_connection = None
-        self.__session = None
-        self.__check_connection()
+        self._last_connection = None
+        self._session = None
+        self._check_connection()
 
-    def __check_connection(self):
+    def _check_connection(self):
         now = datetime.now()
-        if self.__last_connection is None or (now - self.__last_connection).total_seconds() > 10:
-            if self.__session is not None:
-                self.__session.close()
-            self.__session = self.session_factory()
-            self.__last_connection = now
+        if self._last_connection is None or (now - self._last_connection).total_seconds() > 10:
+            if self._session is not None:
+                self._session.close()
+            self._session = self.session_factory()
+            self._last_connection = now
 
     def query(self, *entities, **kwargs):
-        self.__check_connection()
-        return self.__session.query(*entities, **kwargs)
+        self._check_connection()
+        return self._session.query(*entities, **kwargs)
 
     def execute(self, *entities, **kwargs):
-        self.__check_connection()
-        return self.__session.execute(*entities, **kwargs)
+        self._check_connection()
+        return self._session.execute(*entities, **kwargs)
 
     def add(self, model: BaseModel, value: dict, need_flush: bool = False):
         row = model(**value)
@@ -67,14 +68,14 @@ class DBSession(object):
         return row
 
     def add_model(self, model: BaseModel, need_flush: bool = False):
-        self.__check_connection()
-        self.__session.add(model)
+        self._check_connection()
+        self._session.add(model)
         if need_flush:
-            self.__session.flush([model])
+            self._session.flush([model])
 
     def add_all(self, models: list):
-        self.__check_connection()
-        self.__session.add_all(models)
+        self._check_connection()
+        self._session.add_all(models)
 
     def delete(self, model: BaseModel, pk: str, value: dict):
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
@@ -84,18 +85,18 @@ class DBSession(object):
         return row
 
     def delete_model(self, model: BaseModel):
-        self.__check_connection()
+        self._check_connection()
         try:
-            self.__session.delete(model)
+            self._session.delete(model)
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
         except DataError as e:
             log.error(f'`{__name__}` {e}')
 
     def commit(self, need_close: bool = False):
-        self.__check_connection()
+        self._check_connection()
         try:
-            self.__session.commit()
+            self._session.commit()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
@@ -107,7 +108,7 @@ class DBSession(object):
             self.close_session()
 
     def sync_table(self, model: BaseModel, pk: str, values: list):
-        self.__check_connection()
+        self._check_connection()
         index = {}
         for v in values:
             index[v[pk]] = v
@@ -136,7 +137,7 @@ class DBSession(object):
         return res
 
     def update(self, model: BaseModel, pk: str, value: dict):
-        self.__check_connection()
+        self._check_connection()
         row = self.query(model).filter_by(**{pk:value[pk]}).first()
         if row is None:
             return None
@@ -146,13 +147,13 @@ class DBSession(object):
         return row
 
     def touch(self, model: BaseModel, id: int):
-        self.__check_connection()
+        self._check_connection()
         stmt = update(model).where(model.id == id)
         self.execute(stmt)
 
     def close(self):
         try:
-            self.__session.close()
+            self._session.close()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
