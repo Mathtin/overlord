@@ -41,10 +41,8 @@ log = logging.getLogger('overlord-bot')
 #############################
 
 class OverlordBase(discord.Client):
-    _async_lock: asyncio.Lock
+    _async_lock: asyncio.locks
     _initialized: bool
-    _awaiting_sync: bool
-    _awaiting_sync_last_updated: datetime
 
     # Members loaded from ENV
     token: str
@@ -74,8 +72,6 @@ class OverlordBase(discord.Client):
     def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
         self._async_lock = asyncio.Lock()
         self._initialized = False
-        self._awaiting_sync = True
-        self._awaiting_sync_last_updated = datetime.now()
 
         self.cnf_manager = cnf_manager
         self.config = cnf_manager.find_section(OverlordRootConfig)
@@ -147,14 +143,6 @@ class OverlordBase(discord.Client):
             return True
         return len(filter_roles(user, self.config.control.roles)) > 0
 
-    def awaiting_sync(self) -> bool:
-        return self._awaiting_sync
-
-    def awaiting_sync_elapsed(self) -> int:
-        if not self._awaiting_sync:
-            return 0
-        return (datetime.now() - self._awaiting_sync_last_updated).total_seconds()
-
     def base_embed(self, name, title, description, color):
         embed = discord.Embed(title=title, description=description, color=color)
         embed.set_author(name=name, icon_url=self.me.avatar_url)
@@ -179,14 +167,6 @@ class OverlordBase(discord.Client):
         for i, role_name in enumerate(self.config.control.roles):
             if self.get_role(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", self.config.control.path(f'roles[{i}]'))
-
-    def set_awaiting_sync(self) -> None:
-        self._awaiting_sync_last_updated = datetime.now()
-        self._awaiting_sync = True
-
-    def unset_awaiting_sync(self) -> None:
-        self._awaiting_sync_last_updated = datetime.now()
-        self._awaiting_sync = False
 
     def extend(self, extension: Any) -> None:
         pass
@@ -236,7 +216,6 @@ class OverlordBase(discord.Client):
         # Remove effectively absent
         if not self.config.keep_absent_users:
             self.s_users.remove_absent()
-        self.unset_awaiting_sync()
         log.info(f'Syncing is done')
 
     async def resolve_user(self, user_mention: str) -> Optional[discord.User]:

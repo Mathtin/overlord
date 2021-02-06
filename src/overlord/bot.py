@@ -160,13 +160,14 @@ class Overlord(OverlordBase):
             return
         if not self.is_guild_member_message(message):
             return
-        user = self.s_users.get(message.author)
-        # Skip non-existing users
-        if user is None:
-            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
-            return
-        # Save event
-        msg = self.s_events.create_new_message_event(user, message)
+        async with self.sync():
+            user = self.s_users.get(message.author)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
+                return
+            # Save event
+            msg = self.s_events.create_new_message_event(user, message)
         # Call extension 'on_message' handlers
         await self._run_call_plan('on_message', OverlordMessage(message, msg))
 
@@ -186,7 +187,6 @@ class Overlord(OverlordBase):
             return
         # Resolve cmd handler
         cmd_name = argv[0]
-
         if cmd_name not in self._cmd_cache:
             await message.channel.send(res.get("messages.unknown_command"))
             return
@@ -204,12 +204,13 @@ class Overlord(OverlordBase):
         """
         if self.is_special_channel_id(payload.channel_id):
             return
-        # ingore absent
-        msg = self.s_events.get_message(payload.message_id)
-        if msg is None:
-            return
-        # Save event
-        msg_edit = self.s_events.create_message_edit_event(msg)
+        async with self.sync():
+            # ingore absent
+            msg = self.s_events.get_message(payload.message_id)
+            if msg is None:
+                return
+            # Save event
+            msg_edit = self.s_events.create_message_edit_event(msg)
         # Call extension 'on_message_edit' handlers
         await self._run_call_plan('on_message_edit', OverlordMessageEdit(payload, msg_edit))
 
@@ -223,12 +224,13 @@ class Overlord(OverlordBase):
         """
         if self.is_special_channel_id(payload.channel_id):
             return
-        # ingore absent
-        msg = self.s_events.get_message(payload.message_id)
-        if msg is None:
-            return
-        # Save event
-        msg_delete = self.s_events.create_message_delete_event(msg)
+        async with self.sync():
+            # ingore absent
+            msg = self.s_events.get_message(payload.message_id)
+            if msg is None:
+                return
+            # Save event
+            msg_delete = self.s_events.create_message_delete_event(msg)
         # Call extension 'on_message_delete' handlers
         await self._run_call_plan('on_message_delete', OverlordMessageDelete(payload, msg_delete))
     
@@ -242,12 +244,11 @@ class Overlord(OverlordBase):
 
             Saves user in database
         """
-        if self.awaiting_sync():
-            return
-        # Add/update user
-        user = self.s_users.update_member(member)
-        # Save event
-        self.s_events.create_member_join_event(user, member)
+        async with self.sync():
+            # Add/update user
+            user = self.s_users.update_member(member)
+            # Save event
+            self.s_events.create_member_join_event(user, member)
         # Call extension 'on_member_join' handlers
         await self._run_call_plan('on_member_join', OverlordMember(member, user))
 
@@ -261,21 +262,20 @@ class Overlord(OverlordBase):
 
             Removes user from database (or keep it, depends on config)
         """
-        if self.awaiting_sync():
-            return
         # track only role/nickname change
         if not (before.roles != after.roles or \
                 before.display_name != after.display_name or \
                 before.name != after.name or \
                 before.discriminator != after.discriminator):
             return
-        # Skip absent
-        user = self.s_users.get(before)
-        if user is None:
-            log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
-            return
-        # Update user
-        self.s_users.update_member(after)
+        async with self.sync():
+            # Skip absent
+            user = self.s_users.get(before)
+            if user is None:
+                log.warn(f'{qualified_name(after)} does not exist in db! Skipping user update event!')
+                return
+            # Update user
+            self.s_users.update_member(after)
         # Call extension 'on_member_update' handlers
         await self._run_call_plan('on_member_update', OverlordMember(before, user), OverlordMember(after, user))
 
@@ -289,17 +289,18 @@ class Overlord(OverlordBase):
 
             Removes user from database (or keep it, depends on config)
         """
-        if self.config.keep_absent_users:
-            user = self.s_users.mark_absent(member)
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                return
-            self.s_events.create_user_leave_event(user)
-        else:
-            user = self.s_users.remove(member)
-            if user is None:
-                log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
-                return
+        async with self.sync():
+            if self.config.keep_absent_users:
+                user = self.s_users.mark_absent(member)
+                if user is None:
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                    return
+                self.s_events.create_user_leave_event(user)
+            else:
+                user = self.s_users.remove(member)
+                if user is None:
+                    log.warn(f'{qualified_name(member)} does not exist in db! Skipping user leave event!')
+                    return
         # Call extension 'on_member_remove' handlers
         await self._run_call_plan('on_member_remove', OverlordMember(member, user))
 
@@ -327,15 +328,16 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        user = self.s_users.get(member)
-        # Skip non-existing users
-        if user is None:
-            log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
-            return
-        # Apply constraints
-        self.s_events.repair_vc_leave_event(user, state.channel)
-        # Save event
-        event = self.s_events.create_vc_join_event(user, state.channel)
+        async with self.sync():
+            user = self.s_users.get(member)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc join event!')
+                return
+            # Apply constraints
+            self.s_events.repair_vc_leave_event(user, state.channel)
+            # Save event
+            event = self.s_events.create_vc_join_event(user, state.channel)
         # Call extension 'on_vc_join' handlers
         await self._run_call_plan('on_vc_join', OverlordMember(member, user), OverlordVCState(state, event))
             
@@ -346,16 +348,17 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        user = self.s_users.get(member)
-        # Skip non-existing users
-        if user is None:
-            log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
-            return
-        # Close event
-        events = self.s_events.close_vc_join_event(user, state.channel)
-        if events is None:
-            return
-        join_event, leave_event = events
+        async with self.sync():
+            user = self.s_users.get(member)
+            # Skip non-existing users
+            if user is None:
+                log.warn(f'{qualified_name(member)} does not exist in db! Skipping vc leave event!')
+                return
+            # Close event
+            events = self.s_events.close_vc_join_event(user, state.channel)
+            if events is None:
+                return
+            join_event, leave_event = events
         # Call extension 'on_vc_leave' handlers
         await self._run_call_plan('on_vc_leave', OverlordMember(member, user), OverlordVCState(state, join_event), OverlordVCState(state, leave_event))
 
@@ -366,12 +369,8 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        if role.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('New role detected. Awaiting role syncronization.')
+        async with self.sync():
+            await self.sync_users()
         # Call extension 'on_guild_role_create' handlers
         await self._run_call_plan('on_guild_role_create', OverlordRole(role, self.s_roles.get(role.name)))
 
@@ -382,12 +381,8 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        if role.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('Role remove detected. Awaiting role syncronization.')
+        async with self.sync():
+            await self.sync_users()
         # Call extension 'on_guild_role_delete' handlers
         await self._run_call_plan('on_guild_role_delete', OverlordRole(role, self.s_roles.get(role.name)))
 
@@ -398,12 +393,8 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        if before.guild != self.guild:
-            return
-        if self.awaiting_sync():
-            return
-        self.set_awaiting_sync()
-        await self.send_warning('Role change detected. Awaiting role syncronization.')
+        async with self.sync():
+            await self.sync_users()
         role = self.s_roles.get(before.name)
         # Call extension 'on_guild_role_update' handlers
         await self._run_call_plan('on_guild_role_update', OverlordRole(before, role), OverlordRole(after, role))
@@ -415,31 +406,32 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        try:
-            # Resolve member, channel, message
-            member = await self.guild.fetch_member(payload.user_id)
-            channel = await self.fetch_channel(payload.channel_id)
-            message = await channel.fetch_message(payload.message_id)
-        except discord.NotFound:
-            return
-        if member.bot:
-            return
-        # handle control reactions
-        if channel == self.control_channel or (member == self.maintainer and isinstance(channel, discord.DMChannel)):
-            await self.on_control_reaction_add(member, message, payload.emoji)
-            return
-        if not self.is_guild_member_message(message):
-            return
-        # ingore absent
-        msg = self.s_events.get_message(message.id)
-        if msg is None:
-            return
-        user = self.s_users.get(member)
-        if user is None:
-            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new reaction event!')
-            return
-        # Save event
-        event = self.s_events.create_new_reaction_event(user, msg)
+        async with self.sync():
+            try:
+                # Resolve member, channel, message
+                member = await self.guild.fetch_member(payload.user_id)
+                channel = await self.fetch_channel(payload.channel_id)
+                message = await channel.fetch_message(payload.message_id)
+            except discord.NotFound:
+                return
+            if member.bot:
+                return
+            # handle control reactions
+            if channel == self.control_channel or (member == self.maintainer and isinstance(channel, discord.DMChannel)):
+                await self.on_control_reaction_add(member, message, payload.emoji)
+                return
+            if not self.is_guild_member_message(message):
+                return
+            # ingore absent
+            msg = self.s_events.get_message(message.id)
+            if msg is None:
+                return
+            user = self.s_users.get(member)
+            if user is None:
+                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new reaction event!')
+                return
+            # Save event
+            event = self.s_events.create_new_reaction_event(user, msg)
         # Call extension 'on_reaction_add' handlers
         await self._run_call_plan('on_reaction_add', OverlordMember(member, user), OverlordMessage(message, msg), OverlordReaction(payload.emoji, event))
 
@@ -459,24 +451,25 @@ class Overlord(OverlordBase):
 
             Saves event in database
         """
-        try:
-            # Resolve member, channel, message
-            member = await self.guild.fetch_member(payload.user_id)
-            channel = await self.fetch_channel(payload.channel_id)
-            message = await channel.fetch_message(payload.message_id)
-        except discord.NotFound:
-            return
-        if member.bot:
-            return
-        # ingore absent
-        msg = self.s_events.get_message(message.id)
-        if msg is None:
-            return
-        user = self.s_users.get(member)
-        if user is None:
-            log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new reaction event!')
-            return
-        # Save event
-        event = self.s_events.create_reaction_delete_event(user, msg)
+        async with self.sync():
+            try:
+                # Resolve member, channel, message
+                member = await self.guild.fetch_member(payload.user_id)
+                channel = await self.fetch_channel(payload.channel_id)
+                message = await channel.fetch_message(payload.message_id)
+            except discord.NotFound:
+                return
+            if member.bot:
+                return
+            # ingore absent
+            msg = self.s_events.get_message(message.id)
+            if msg is None:
+                return
+            user = self.s_users.get(member)
+            if user is None:
+                log.warn(f'{qualified_name(message.author)} does not exist in db! Skipping new reaction event!')
+                return
+            # Save event
+            event = self.s_events.create_reaction_delete_event(user, msg)
         # Call extension 'on_reaction_remove' handlers
         await self._run_call_plan('on_reaction_remove', OverlordMember(member, user), OverlordMessage(message, msg), OverlordReaction(payload.emoji, event))

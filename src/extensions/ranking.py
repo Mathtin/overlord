@@ -132,6 +132,7 @@ class RankingExtension(BotExtension):
         # Filter meeting criteria
         meet_criteria : Callable[[str,RankConfig], bool] = \
             lambda n,r: (messages >= r.messages or vc_time >= r.vc) and membership >= r.membership
+
         ranks = [(n,r) for n,r in ranks if meet_criteria(n,r)]
 
         return max(ranks, key=lambda nr: nr[1].weight)[0] if ranks else None
@@ -154,9 +155,6 @@ class RankingExtension(BotExtension):
     #################
 
     async def update_rank(self, member: discord.Member):
-        if self.bot.awaiting_sync():
-            log.warn("Cannot update user rank: awaiting role sync")
-            return
         # Resolve user
         if member.bot:
             return
@@ -182,9 +180,6 @@ class RankingExtension(BotExtension):
         self.bot.s_users.update_member(member)
 
     async def update_all_ranks(self) -> None:
-        if self.bot.awaiting_sync():
-            log.error("Cannot update user ranks: awaiting role sync")
-            return
         log.info(f'Updating user ranks')
         async for member in self.bot.guild.fetch_members(limit=None):
             if member.bot:

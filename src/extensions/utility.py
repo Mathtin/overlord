@@ -64,7 +64,6 @@ class UtilityExtension(BotExtension):
                     continue
                 await reaction.remove(user)
 
-
     #########
     # Hooks #
     #########
@@ -78,19 +77,6 @@ class UtilityExtension(BotExtension):
         
         if 'Overlord Help page' in embed.author.name:
             await self.switch_help_page(emoji, message)
-            
-    #########
-    # Tasks #
-    #########
-
-    @BotExtension.task(seconds=1)
-    async def user_sync_task(self):
-        if self.bot.awaiting_sync_elapsed() < 30:
-            return
-        log.info("Scheduled user sync update")
-        async with self.bot.sync():
-            await self.bot.sync_users()
-        log.info("Done scheduled user sync update")
             
     ############
     # Commands #
@@ -138,7 +124,7 @@ class UtilityExtension(BotExtension):
                 await msg.channel.send(table_data_drop.format(model.table_name()))
                 self.bot.db.query(model).delete()
                 self.bot.db.commit()
-            self.bot.set_awaiting_sync()
+            self.bot.sync_users()
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
 
