@@ -27,7 +27,7 @@ from .types import OverlordMember
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
 class OverlordCommand(object):
 
-    optional_prefix = 'optional'
+    optional_prefix = 'opt_'
     
     func:       Callable[..., Awaitable[None]]
     name:       str
@@ -53,7 +53,7 @@ class OverlordCommand(object):
         for a in self.f_args:
             arg = a
             if a in self.hints:
-                arg += f'{self.hints[a]}'
+                arg += f': {self.hints[a].__name__}'
             if not a.lower().startswith(self.optional_prefix):
                 self.req_f_args.append(a)
                 args.append(f'{{{arg}}}')
@@ -68,10 +68,14 @@ class OverlordCommand(object):
         return f'{prefix}{cmdname} {self.args_str}'
 
     def help(self, prefix: str, aliases: List[str]) -> str:
-        aliases_str = ' ,'.join([f'`{prefix}{a}`' for a in aliases])
-        return f'Usage: `{prefix}{self.name} {self.args_str}`\n' + \
-            f'{self.desciption}\n' + \
-            f'Aliases: {aliases_str}\n'
+        if not aliases:
+            return 'This command is disabled. Please, add appropriate config'
+        usage_line = f'Usage: `{prefix}{aliases[0]} {self.args_str}`' if self.args_str \
+            else f'Usage: `{prefix}{aliases[0]}`'
+        desciption_line = f'{self.desciption}'
+        aliases_str = ' ,'.join([f'`{prefix}{a}`' for a in aliases[1:]])
+        aliases_line = f'Aliases: {aliases_str}'
+        return '\n'.join([usage_line, desciption_line, aliases_line])
 
     def handler(self, ext):
         async def wrapped_func(message: DIS.Message, prefix: str, argv: List[str]):

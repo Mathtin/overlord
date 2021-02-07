@@ -83,8 +83,8 @@ class UtilityExtension(BotExtension):
     ############
 
     @BotExtension.command("help", desciption="Help pages")
-    async def cmd_help(self, msg: discord.Message, optional_page: str='1'):
-        ext = self.bot.resolve_extension(optional_page)
+    async def cmd_help(self, msg: discord.Message, opt_page: str='1'):
+        ext = self.bot.resolve_extension(opt_page)
         if ext is None:
             await msg.channel.send("No such help page")
             return
@@ -95,7 +95,6 @@ class UtilityExtension(BotExtension):
         await help_msg.add_reaction(u'◀')
         await help_msg.add_reaction(u'▶')
         await help_msg.add_reaction(u'⏭')
-        return
 
 
     @BotExtension.command("ping", desciption="Checks bot state")

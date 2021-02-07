@@ -139,10 +139,10 @@ class BotExtension(object):
         prefix = self.bot.prefix
         help_page
         for name, cmd in self._commands.items():
-            if name not in commands:
-                help_page.add_field(name=f'[DISABLED] `{prefix}{name}`', value=cmd.help(prefix, []), inline=False)
+            if name not in commands or not commands[name]:
+                help_page.add_field(name=f'[DISABLED] {prefix}{name}', value=cmd.help(prefix, []), inline=False)
             else:
-                help_page.add_field(name=f'`$ {prefix}{name}`', value=cmd.help(prefix, commands[name]), inline=False)
+                help_page.add_field(name=f'`$ {prefix}{commands[name][0]}`', value=cmd.help(prefix, commands[name]), inline=False)
         return help_page
 
     def cmd(self, name: str) -> Optional[OverlordCommand]:
