@@ -75,7 +75,7 @@ class RankingExtension(BotExtension):
     __description__ = 'Member ranking system based on stats (check Stats Extension)'
     __color__ = 0xc84e3f
 
-    config: RankingRootConfig
+    config: RankingRootConfig = RankingRootConfig()
             
     #########
     # Props #

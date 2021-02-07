@@ -23,7 +23,8 @@ import util.resources as res
 
 from discord.errors import InvalidArgument
 from overlord.base import OverlordBase
-from overlord.types import OverlordCommand, OverlordTask
+from overlord.types import OverlordTask
+from overlord.command import OverlordCommand
 
 from util import get_coroutine_attrs, limit_traceback, quote_msg
 from util.exceptions import InvalidConfigException
@@ -98,7 +99,7 @@ class BotExtension(object):
     @staticmethod
     def _handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
         async def wrapped(*args, **kwargs):
-            if not func.__self__.__enabled:
+            if not func.__self__._enabled:
                 return
             await func.__self__.bot.init_lock()
             try:

@@ -87,10 +87,9 @@ class Overlord(OverlordBase):
         self._cmd_cache = {}
         for cmd, aliases in self.config.command.items():
             handler = self._find_cmd_handler(cmd)
-            self._cmd_cache[cmd] = handler
             for alias in aliases:
                 if alias in self._cmd_cache:
-                    raise InvalidConfigException(f"Command alias collision for {alias}: {cmd} <-> {self._cmd_cache[alias]}", "bot.commands")
+                    raise InvalidConfigException(f"Command alias collision for {alias}: {cmd}", "bot.commands")
                 self._cmd_cache[alias] = handler
 
     def resolve_extension(self, ext: Union[int, str]) -> Optional[BotExtension]:
@@ -142,7 +141,7 @@ class Overlord(OverlordBase):
             await self.maintainer.send('Started!')
 
     async def on_config_update(self) -> None:
-        super().on_config_update()
+        await super().on_config_update()
         # Call extension 'on_config_update' handlers
         await self._run_call_plan('on_config_update')
 

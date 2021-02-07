@@ -24,9 +24,8 @@ from discord.errors import InvalidArgument
 from util import check_coroutine
 from .types import OverlordMember
 
+_type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
 class OverlordCommand(object):
-
-    _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
 
     optional_prefix = 'optional'
     
@@ -106,22 +105,22 @@ class OverlordCommand(object):
 
     @staticmethod
     async def _convert_arg(msg: DIS.Message, ext: Any, name: str, arg: str, type_: Type[Any]) -> Optional[Any]:
-        if type_ in OverlordCommand._type_arg_converter_map:
-            return OverlordCommand._type_arg_converter_map[type_](msg, ext, arg)
+        if type_ in _type_arg_converter_map:
+            return _type_arg_converter_map[type_](msg, ext, arg)
         try:
             return type_(arg)
         except ValueError:
             await msg.channel.send(res.get("messages.invalid_command_arg").format(name, type_))
 
-    @staticmethod
-    def _for_type(type_: Type[Any]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        def wrapper(func: Callable[..., Any]):
-            OverlordCommand._type_arg_converter_map[type_] = func
+    class _for_type(object):
+        def __init__(self, type_) -> None:
+            self.type = type_
+        def __call__(self, func: Callable[..., Any]):
+            _type_arg_converter_map[self.type] = func
             return func
-        return wrapper
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_db_user_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DB.User]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
@@ -129,8 +128,8 @@ class OverlordCommand(object):
             return None
         return user
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_user_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.User]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
@@ -143,8 +142,8 @@ class OverlordCommand(object):
             return None
         return d_user
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.Member]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
@@ -157,8 +156,8 @@ class OverlordCommand(object):
             return None
         return member
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_text_channel_w_fb(fb: DIS.Message, ext: Any, channel_mention: str) -> Optional[DIS.TextChannel]:
         channel = await ext.bot.resolve_text_channel(channel_mention)
         if channel is None:
@@ -169,8 +168,8 @@ class OverlordCommand(object):
             return None
         return channel
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_voice_channel_w_fb(fb: DIS.Message, ext: Any, channel_mention: str) -> Optional[DIS.VoiceChannel]:
         channel = await ext.bot.resolve_voice_channel(channel_mention)
         if channel is None:
@@ -181,8 +180,8 @@ class OverlordCommand(object):
             return None
         return channel
 
-    @_for_type(DB.User)
     @staticmethod
+    @_for_type(DB.User)
     async def _resolve_role_w_fb(fb: DIS.Message, ext: Any, role_name: str) -> Optional[DIS.Role]:
         role = ext.bot.get_role(role_name)
         if role is None:
@@ -190,8 +189,8 @@ class OverlordCommand(object):
             return None
         return role
 
-    @_for_type(OverlordMember)
     @staticmethod
+    @_for_type(OverlordMember)
     async def _resolve_ov_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[OverlordMember]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
