@@ -377,9 +377,6 @@ class OverlordBase(discord.Client):
         # Sync roles and users
         await self.sync_users()
 
-        # Check config value
-        await self.on_config_update()
-
         self._initialized = True
         
     async def on_config_update(self) -> None:

@@ -257,7 +257,7 @@ class RankingExtension(BotExtension):
         desc = f'Configured ranks list'
         embed = self.bot.base_embed("Overlord Ranking", f"🎖 Ranks", desc, self.__color__)
         for name, rank in self.ranks.items():
-            lines = [f'{p}: {FORMATTERS[p](v)}' for p,v in rank.items()]
+            lines = [f'{p}: {FORMATTERS[p](v)}' for p,v in rank]
             rank_s = '\n'.join(lines)
             embed.add_field(name=name, value=rank_s, inline=True)
         await msg.channel.send(embed=embed)

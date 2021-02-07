@@ -110,11 +110,11 @@ class OverlordCommand(object):
     @staticmethod
     async def _convert_arg(msg: DIS.Message, ext: Any, name: str, arg: str, type_: Type[Any]) -> Optional[Any]:
         if type_ in _type_arg_converter_map:
-            return _type_arg_converter_map[type_](msg, ext, arg)
+            return await _type_arg_converter_map[type_](msg, ext, arg)
         try:
             return type_(arg)
         except ValueError:
-            await msg.channel.send(res.get("messages.invalid_command_arg").format(name, type_))
+            await msg.channel.send(res.get("messages.invalid_command_arg").format(name, type_.__name__))
 
     class _for_type(object):
         def __init__(self, type_) -> None:
@@ -133,7 +133,7 @@ class OverlordCommand(object):
         return user
 
     @staticmethod
-    @_for_type(DB.User)
+    @_for_type(DIS.User)
     async def _resolve_user_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.User]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
@@ -147,7 +147,7 @@ class OverlordCommand(object):
         return d_user
 
     @staticmethod
-    @_for_type(DB.User)
+    @_for_type(DIS.Member)
     async def _resolve_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.Member]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
@@ -161,7 +161,7 @@ class OverlordCommand(object):
         return member
 
     @staticmethod
-    @_for_type(DB.User)
+    @_for_type(DIS.TextChannel)
     async def _resolve_text_channel_w_fb(fb: DIS.Message, ext: Any, channel_mention: str) -> Optional[DIS.TextChannel]:
         channel = await ext.bot.resolve_text_channel(channel_mention)
         if channel is None:
@@ -173,7 +173,7 @@ class OverlordCommand(object):
         return channel
 
     @staticmethod
-    @_for_type(DB.User)
+    @_for_type(DIS.VoiceChannel)
     async def _resolve_voice_channel_w_fb(fb: DIS.Message, ext: Any, channel_mention: str) -> Optional[DIS.VoiceChannel]:
         channel = await ext.bot.resolve_voice_channel(channel_mention)
         if channel is None:
@@ -185,7 +185,7 @@ class OverlordCommand(object):
         return channel
 
     @staticmethod
-    @_for_type(DB.User)
+    @_for_type(DIS.Role)
     async def _resolve_role_w_fb(fb: DIS.Message, ext: Any, role_name: str) -> Optional[DIS.Role]:
         role = ext.bot.get_role(role_name)
         if role is None:

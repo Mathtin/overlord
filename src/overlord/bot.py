@@ -47,8 +47,10 @@ class Overlord(OverlordBase):
     def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
         super().__init__(cnf_manager, db_session)
         self._extensions = []
-        self._handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
-        self._handlers = {n.replace('_raw',''):h for n,h in self._handlers.items()}
+        handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
+        self._handlers = {n.replace('_raw',''):h for n,h in handlers.items()}
+        self._call_plan_map = {}
+        self._cmd_cache = {}
 
     ################
     # Sync methods #
@@ -117,7 +119,7 @@ class Overlord(OverlordBase):
         call_plan = self._call_plan_map[name]
         for handlers in call_plan:
             calls = [h(*args, **kwargs) for h in handlers]
-            await asyncio.wait(calls)
+            await asyncio.gather(*calls)
 
     async def logout(self) -> None:
         for ext in self._extensions:
@@ -136,6 +138,8 @@ class Overlord(OverlordBase):
                 ext.start()
             # Call 'on_ready' extension handlers
             await self._run_call_plan('on_ready')
+            # Check config value
+            await self.on_config_update()
             # Message for pterodactyl panel
             print(self.config.egg_done)
             await self.maintainer.send('Started!')

@@ -55,8 +55,8 @@ class ConfigManager(object):
         self.config = self.model(self.raw_dict)
 
     def sync(self):
-        raw_dict = dict(self.config)
-        raw = self.serialize_dict(raw_dict)
+        raw_dict = self.config.to_dict()
+        raw = self.serialize_obj(raw_dict)
         self.alter(raw)
 
     def section_path(self, element : Type[ConfigView], source : Type[ConfigView]) -> Optional[str]:
@@ -84,14 +84,27 @@ class ConfigManager(object):
         return self.config.get(path)
 
     @staticmethod
-    def serialize_dict(d: dict) -> str:
-        res = []
-        for k,v in d:
-            if type(v) is dict:
-                section_lines = ConfigManager.serialize_dict(v).splitlines()
-                section_lines_idented = [f'    {l}\n' for l in section_lines]
-                res.append(f'{k} {{\n' + ''.join(section_lines_idented) + '}\n') 
-            else:
-                res.append(f'{k} = {json.dumps(v)}\n')
-        return ''.join(res)
+    def serialize_obj(obj: Any) -> str:
+        if isinstance(obj, dict):
+            res = []
+            for k,v in obj.items():
+                if isinstance(v, dict):
+                    section_lines = ConfigManager.serialize_obj(v).splitlines()
+                    section_lines_idented = [f'    {l}\n' for l in section_lines]
+                    res.append(f'{k} {{\n' + ''.join(section_lines_idented) + '}\n') 
+                elif isinstance(v, list):
+                    values = [ConfigManager.serialize_obj(a) for a in v]
+                    values_str = ', '.join(values)
+                    res.append(f'{k} = [{values_str}]\n')
+                else:
+                    res.append(f'{k} = {ConfigManager.serialize_obj(v)}\n')
+            return ''.join(res)
+        elif isinstance(obj, str):
+            return '"' + obj.replace('"', '\\"') + '"'
+        else:
+            return json.dumps(obj) 
+
+
+
+    
         

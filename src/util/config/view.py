@@ -18,6 +18,8 @@ import typing
 from ..exceptions import InvalidConfigException
 from typing import Any, Callable, Dict, List, Type, get_type_hints
 
+
+
 class ConfigView(object):
 
     # Class fields
@@ -92,6 +94,23 @@ class ConfigView(object):
                 raise KeyError(f"Invalid path: {path}")
             node = getattr(node, part)
         return node
+
+    def to_dict(self) -> dict:
+        res = {}
+        for field in self._field_constructor_map:
+            value = getattr(self, field)
+            res[field] = self._deconstruct_obj(value)
+        return res
+
+    @staticmethod
+    def _deconstruct_obj(o: Any) -> Any:
+        if isinstance(o, ConfigView):
+            return o.to_dict()
+        elif isinstance(o, list):
+            return [ConfigView._deconstruct_obj(v) for v in o]
+        elif isinstance(o, dict):
+            return {k:ConfigView._deconstruct_obj(v) for k,v in o.items()}
+        return o
 
     def __iter__(self):
         for field in self._field_constructor_map:
