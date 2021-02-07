@@ -99,17 +99,17 @@ class ConfigView(object):
         res = {}
         for field in self._field_constructor_map:
             value = getattr(self, field)
-            res[field] = self._deconstruct_obj(value)
+            res[field] = self.deconstruct_obj(value)
         return res
 
     @staticmethod
-    def _deconstruct_obj(o: Any) -> Any:
+    def deconstruct_obj(o: Any) -> Any:
         if isinstance(o, ConfigView):
             return o.to_dict()
         elif isinstance(o, list):
-            return [ConfigView._deconstruct_obj(v) for v in o]
+            return [ConfigView.deconstruct_obj(v) for v in o]
         elif isinstance(o, dict):
-            return {k:ConfigView._deconstruct_obj(v) for k,v in o.items()}
+            return {k:ConfigView.deconstruct_obj(v) for k,v in o.items()}
         return o
 
     def __iter__(self):

@@ -6,11 +6,15 @@
 // This file is released under the MIT license  //
 //////////////////////////////////////////////////
 
-root : (assignment | section)*
+root : (assignment | section)* [last_assignment | last_section]
 
-section : name "{" [_NEWLINE] (assignment | section)* "}" _ENDMARKER
+section : name "{" [_NEWLINE] (assignment | section)* [last_assignment | last_section] "}" _ENDMARKER
 
 assignment : name "=" value _ENDMARKER
+
+last_assignment : name "=" value
+
+last_section : name "{" [_NEWLINE] (assignment | section)* "}"
 
 ?value : list
       | STRING  -> string

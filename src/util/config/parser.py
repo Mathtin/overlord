@@ -22,12 +22,16 @@ class TreeToDict(Transformer):
 
     list = list
     assignment = tuple
+    last_assignment = tuple
     root = dict
 
     true = lambda self, _: True
     false = lambda self, _: False
 
     def section(self, s) -> str:
+        return (s[0], dict(s[1:]))
+
+    def last_section(self, s) -> str:
         return (s[0], dict(s[1:]))
 
     def name(self, s) -> str:

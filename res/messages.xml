@@ -71,6 +71,7 @@
    <!-- control.py: get_config_value/alter_config -->
    <string name="invalid_config_path">❌ Invalid config path</string>
    <string name="invalid_json_value">❌ Unable to decode json value</string>
+   <string name="invalid_config_value">❌ Unable to parse config: {0}</string>
    <string name="config_value_header">⚙ Config value:</string>
 
    <!-- control.py: get_ranks/add_rank/remove_rank/edit_rank -->

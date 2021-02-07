@@ -54,9 +54,40 @@ class ConfigManager(object):
         self.raw_dict = self.parser.parse(self.raw)
         self.config = self.model(self.raw_dict)
 
-    def sync(self):
+    def sync(self) -> None:
         raw_dict = self.config.to_dict()
         raw = self.serialize_obj(raw_dict)
+        self.alter(raw)
+
+    def get_raw(self, path: str) -> str:
+        value = self.config.get(path)
+        value_prim = ConfigView.deconstruct_obj(value)
+        return ConfigManager.serialize_obj(value_prim)
+
+    def set_raw(self, path: str, assigment: str) -> None:
+        value_dict = self.parser.parse(assigment)
+        # Set root
+        if path == '.':
+            self._merge_dict(self.raw_dict, value_dict)
+            return self._explode_raw_dict()
+        # Resolve path node
+        parts =  path.split('.')
+        node = self.raw_dict
+        for part in parts:
+            if part not in node:
+                raise KeyError(f"Invalid path: {path}")
+            node =  node[part]
+        # Update
+        self._merge_dict(node, value_dict)
+        self._explode_raw_dict()
+
+    @staticmethod
+    def _merge_dict(d1, d2):
+        for k in d2:
+            d1[k] = d2[k]
+
+    def _explode_raw_dict(self) -> None:
+        raw = self.serialize_obj(self.raw_dict)
         self.alter(raw)
 
     def section_path(self, element : Type[ConfigView], source : Type[ConfigView]) -> Optional[str]:

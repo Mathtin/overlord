@@ -28,6 +28,7 @@ from util import limit_traceback
 from util.config import ConfigManager
 from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import is_dm_message, filter_roles, quote_msg, is_text_channel, qualified_name
+from util.logger import DiscordLogConfig
 import util.resources as res
 from typing import Any, List, Optional, Union
 from services import EventService, RoleService, StatService, UserService
@@ -54,6 +55,7 @@ class OverlordBase(discord.Client):
     # Members passed via constructor
     cnf_manager: ConfigManager
     config: OverlordRootConfig
+    log_config: DiscordLogConfig
     db: DB.DBSession
 
     # Values initiated on_ready
@@ -74,7 +76,7 @@ class OverlordBase(discord.Client):
         self._initialized = False
 
         self.cnf_manager = cnf_manager
-        self.config = cnf_manager.find_section(OverlordRootConfig)
+        self.reload_sections()
         if self.config is None:
             raise InvalidConfigException("OverlordRootConfig section not found", "root")
         self.db = db_session
@@ -181,6 +183,11 @@ class OverlordBase(discord.Client):
         log.info(f'Saving configuration on disk')
         self.cnf_manager.save()
 
+    def reload_sections(self) -> None:
+        self.config = self.get_config_section(OverlordRootConfig)
+        self.log_config = self.get_config_section(DiscordLogConfig)
+
+
     #################
     # Async methods #
     #################
@@ -263,7 +270,7 @@ class OverlordBase(discord.Client):
     async def alter_config(self, config: str) -> None:
         log.info(f'Altering configuration')
         self.cnf_manager.alter(config)
-        self.config = self.cnf_manager.find_section(OverlordRootConfig)
+        self.reload_sections()
         if self.config is None:
             raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
@@ -281,7 +288,7 @@ class OverlordBase(discord.Client):
     async def update_config(self) -> None:
         log.info(f'Updating configuration')
         self.save_config()
-        self.config = self.cnf_manager.find_section(OverlordRootConfig)
+        self.reload_sections()
         if self.config is None:
             raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
@@ -295,6 +302,14 @@ class OverlordBase(discord.Client):
             await self.alter_config(old_config)
             return e
         return None
+
+    async def reload_config(self) -> None:
+        log.info(f'Altering configuration')
+        self.cnf_manager.reload()
+        self.reload_sections()
+        if self.config is None:
+            raise InvalidConfigException("OverlordRootConfig section not found", "root")
+        await self.on_config_update()
 
     #########
     # Hooks #

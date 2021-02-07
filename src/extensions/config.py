@@ -16,6 +16,8 @@ __author__ = 'Mathtin'
 import logging
 import discord
 import json
+from util.config.manager import ConfigManager
+from util.exceptions import InvalidConfigException
 
 from util.extbot import embed_long_message
 from .base import BotExtension
@@ -33,6 +35,24 @@ class ConfigExtension(BotExtension):
     __extname__ = '⚙ Config Extension'
     __description__ = 'Raw config manipulation commands'
     __color__ = 0x23BC71
+
+    @property
+    def config(self):
+        return self.bot.cnf_manager.config
+
+    @property
+    def raw_config(self):
+        return self.bot.cnf_manager.raw
+
+    @property
+    def parser(self):
+        return self.bot.cnf_manager.parser
+
+    def get_raw(self, path: str) -> str:
+        return self.bot.cnf_manager.get_raw(path)
+
+    def set_raw(self, path: str, value: str) -> None:
+        self.bot.cnf_manager.set_raw(path, value)
             
     ############
     # Commands #
@@ -42,11 +62,7 @@ class ConfigExtension(BotExtension):
     async def cmd_reload_config(self, msg: discord.Message):
         log.info(f'Reloading config')
         # Reload config
-        parent_config = self.bot.config.parent()
-        new_config = ConfigView(path=parent_config.fpath(), schema_name="config_schema")
-        if new_config['logger']:
-            logging.config.dictConfig(new_config['logger'])
-        await self.bot.update_config(new_config.bot)
+        await self.bot.reload_config()
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
 
@@ -60,10 +76,9 @@ class ConfigExtension(BotExtension):
     @BotExtension.command("get_config_value", desciption="Print config value (in json)")
     async def cmd_get_config_value(self, msg: discord.Message, path: str):
         embed = self.bot.base_embed("Overlord Configuration", f"⚙ {path} value", '', self.__color__)
-        parent_config = self.bot.config.parent()
         try:
-            value = parent_config[path]
-            value_s = code_msg(json.dumps(value, indent=4))
+            value = self.get_raw(path)
+            value_s = code_msg(value)
             embed_long_message(embed, value_s)
             await msg.channel.send(embed=embed)
         except KeyError:
@@ -71,24 +86,23 @@ class ConfigExtension(BotExtension):
 
     @BotExtension.command("alter_config", desciption="Set config value (in json, use quote to wrap complex values)")
     async def cmd_alter_config(self, msg: discord.Message, path: str, value: str):
+        old_config = self.raw_config
         try:
-            value_obj = json.loads(value)
-        except json.decoder.JSONDecodeError:
-            log.info(f'Invalid json value provided: {value}')
-            await msg.channel.send(res.get("messages.invalid_json_value"))
-            return
-
-        try:
-            err = await self.bot.safe_alter_config(path, value_obj)
-        except KeyError as e:
-            print(e)
-            log.info(f'Invalid config path provided: {path}')
+            self.set_raw(path, value)
+        except KeyError:
+            self.set_raw('.', old_config)
             await msg.channel.send(res.get("messages.invalid_config_path"))
-            return False
-        
+            return
+        except InvalidConfigException as e:
+            self.set_raw('.', old_config)
+            log.info(f'Invalid config value provided: {e}')
+            await msg.channel.send(res.get("messages.invalid_config_value").format(str(e)))
+            return
+        # Update config properly
+        err = await self.bot.safe_update_config()
         if not err:
-            log.info(f'Done')
-            await msg.channel.send(res.get("messages.done"))
+            answer = res.get("messages.done")
         else:
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
-            await msg.channel.send(answer)
+        await msg.channel.send(answer)
+
