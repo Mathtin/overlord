@@ -15,7 +15,7 @@ __author__ = 'Mathtin'
 
 import typing
 
-from util.exceptions import InvalidConfigException
+from ..exceptions import InvalidConfigException
 from typing import Any, Callable, Dict, List, Type, get_type_hints
 
 class ConfigView(object):

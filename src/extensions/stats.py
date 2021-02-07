@@ -129,16 +129,10 @@ class StatsExtension(BotExtension):
 
 
     @BotExtension.command("get_user_stats", desciption="Fetches user stats from db")
-    async def cmd_get_user_stats(self, msg: discord.Message, user_mention: str):
-        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
-        if member is None:
-            return
-        # Resolve user
-        user = self.s_users.get(member)
-        if user is None:
-            await msg.channel.send(res.get("messages.unknown_user"))
-            return
-        
+    async def cmd_get_user_stats(self, msg: discord.Message, ov_user: OverlordMember):
+        member = ov_user.discord
+        user = ov_user.db
+
         desc = f'{member.mention} stats gathered so far by me'
         embed = self.bot.base_embed("Overlord Stats", f"📊 {qualified_name(member)} stats", desc, self.__color__)
 
@@ -171,14 +165,7 @@ class StatsExtension(BotExtension):
 
 
     @BotExtension.command("get_user_stat", desciption="Fetches user stats from db (for specified user)")
-    async def cmd_get_user_stat(self, msg: discord.Message, user_mention: str, stat_name: str):
-        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
-        if member is None:
-            return
-        user = self.s_users.get(member)
-        if user is None:
-            await msg.channel.send(res.get("messages.unknown_user"))
-            return
+    async def cmd_get_user_stat(self, msg: discord.Message, user: DB.User, stat_name: str):
         try:
             answer = _build_stat_line(self.s_stats, user, stat_name)
             await msg.channel.send(answer)
@@ -188,21 +175,9 @@ class StatsExtension(BotExtension):
 
 
     @BotExtension.command("set_user_stat", desciption="Sets user stat value in db")
-    async def cmd_set_user_stat(self, msg: discord.Message, user_mention: str, stat_name: str, value: str):
-        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
-        if member is None:
-            return
-        try:
-            value = int(value)
-        except ValueError:
-            await msg.channel.send(res.get("messages.error").format("integer expected"))
-            return
+    async def cmd_set_user_stat(self, msg: discord.Message, user: DB.User, stat_name: str, value: int):
         if value < 0:
             await msg.channel.send(res.get("messages.warning").format("negative stat value!"))
-        user = self.s_users.get(member)
-        if user is None:
-            await msg.channel.send(res.get("messages.unknown_user"))
-            return
         try:
             self.s_stats.set(user, stat_name, value)
             await msg.channel.send(res.get("messages.done"))

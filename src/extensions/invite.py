@@ -96,7 +96,7 @@ class InviteExtension(BotExtension):
             self._invite_role_map[code].append(role)
             
     async def on_member_join(self, member: OverlordMember) -> None:
-        invites_after = await member.discord.guild.invites()
+        invites_after = await self.bot.guild.invites()
         for new_invite in invites_after:
             old_invite = self.find_invite(new_invite.code)
             if old_invite is None or old_invite.uses == new_invite.uses:
@@ -105,7 +105,7 @@ class InviteExtension(BotExtension):
         self._invites = invites_after
 
     async def on_member_remove(self, member: OverlordMember):
-        self._invites = await member.discord.guild.invites()
+        self._invites = await self.bot.guild.invites()
             
     ############
     # Commands #

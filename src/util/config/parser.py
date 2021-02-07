@@ -13,11 +13,9 @@
 
 __author__ = 'Mathtin'
 
-import os
-
 import lark
-from util.exceptions import InvalidConfigException
-from util.resources import res_path
+from ..exceptions import InvalidConfigException
+from ..resources import res_path
 from lark import Lark, Transformer
 
 class TreeToDict(Transformer):

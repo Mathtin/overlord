@@ -257,18 +257,6 @@ class OverlordBase(discord.Client):
             channel = [c for c in self.guild.voice_channels if c.name == channel_name]
             return channel[0] if channel else None
 
-    async def resolve_member_w_fb(self, user_mention: str, fb_channel: discord.TextChannel) -> Optional[discord.Member]:
-        user = await self.resolve_user(user_mention)
-        if user is None:
-            await fb_channel.send(res.get("messages.unknown_user"))
-            return
-        try:
-            member = await self.guild.fetch_member(user.id)
-        except discord.NotFound:
-            await fb_channel.send(res.get("messages.not_member_user"))
-            return
-        return member
-
     async def logout(self) -> None:
         await super().logout()
 
@@ -292,7 +280,7 @@ class OverlordBase(discord.Client):
 
     async def update_config(self) -> None:
         log.info(f'Updating configuration')
-        self.cnf_manager.sync()
+        self.save_config()
         self.config = self.cnf_manager.find_section(OverlordRootConfig)
         if self.config is None:
             raise InvalidConfigException("OverlordRootConfig section not found", "root")

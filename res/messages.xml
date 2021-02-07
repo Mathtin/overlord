@@ -12,10 +12,13 @@
    <string name="unknown_channel">❌ Unknown channel</string>
    <string name="invalid_channel_mention">❌ Mention channel properly</string>
    <string name="invalid_channel_type_text">❌ Not a text channel</string>
+   <string name="invalid_channel_type_voice">❌ Not a voice channel</string>
    <string name="unknown_user">❌ No such user in database</string>
    <string name="invalid_user_mention">❌ Mention user properly</string>
    <string name="not_member_user">❌ User is not member of this guild</string>
    <string name="missing_access">❌ Missing access for {0}</string>
+   <string name="invalid_command_arg">❌ Invalid argument {0} type (expected {1})</string>
+   <string name="unknown_role">❌ No such role</string>
 
    <!-- Maintainer messages -->
    <string name="dm_bot_exception">We have a situation here. Bot failed :(&#xA;Event: {0}&#xA;Error: {1}&#xA;Traceback:</string>
@@ -72,7 +75,6 @@
 
    <!-- control.py: get_ranks/add_rank/remove_rank/edit_rank -->
    <string name="rank_table_header">🎖 Ranks table 🎖</string>
-   <string name="rank_arg_parse_error">❌ Weight, membership, messages count and vc time should be integers</string>
    <string name="rank_role_unknown">❌ No such role '{0}'</string>
    <string name="rank_role_exists">❌ Rank already exists</string>
    <string name="rank_role_same_weight">❌ Rank {0} have same weight</string>

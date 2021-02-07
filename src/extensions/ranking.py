@@ -246,10 +246,7 @@ class RankingExtension(BotExtension):
             await msg.channel.send(res.get("messages.done"))
 
     @BotExtension.command("update_rank", desciption="Update specified user rank")
-    async def cmd_update_rank(self, msg: discord.Message, user_mention: str):
-        member = await self.bot.resolve_member_w_fb(user_mention, msg.channel)
-        if member is None:
-            return
+    async def cmd_update_rank(self, msg: discord.Message, member: discord.Member):
         async with self.sync():
             await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
             await self.update_rank(member)
@@ -264,125 +261,67 @@ class RankingExtension(BotExtension):
             rank_s = '\n'.join(lines)
             embed.add_field(name=name, value=rank_s, inline=True)
         await msg.channel.send(embed=embed)
-        #table_header = res.get('messages.rank_table_header')
-        #table = dict_fancy_table(self.ranks, key_name='rank')
-        #await msg.channel.send(f'{table_header}\n{quote_msg(table)}')
 
     @BotExtension.command("add_rank", desciption="Creates new user rank")
-    async def cmd_add_rank(self, msg: discord.Message, role_name: str, weight: str, membership: str, msg_count: str, vc_time: str):
-        try:
-            weight = int(weight)
-            membership = int(membership)
-            messages_count = int(msg_count)
-            vc_time = int(vc_time)
-        except ValueError:
-            await msg.channel.send(res.get("messages.rank_arg_parse_error"))
-            return
-        role = self.bot.get_role(role_name)
-        if role is None:
-            await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
-            return
-        ranks = self.bot.config.ranks.role.copy().value()
-        if role_name in ranks:
+    async def cmd_add_rank(self, msg: discord.Message, role: discord.Role, weight: int, membership: int, msg_count: int, vc_time: int):
+        # Check already existed rank for specified role 
+        if role.name in self.ranks:
             await msg.channel.send(res.get("messages.rank_role_exists"))
             return
-        ranks_weights = {ranks[r]['weight']:r for r in ranks}
+        # Check weight uniqueness
+        ranks_weights = {r.weight for r in self.ranks.values()}
         if weight in ranks_weights:
             await msg.channel.send(res.get("messages.rank_role_same_weight").format(ranks_weights[weight]))
             return
-        ranks[role_name] = {
-            "weight": weight,
-            "membership": membership,
-            "messages": messages_count,
-            "vc": vc_time
-        }
-        path = 'bot.ranks.role'
-
-        try:
-            err = await self.bot.safe_alter_config(path, ranks)
-        except KeyError:
-            log.info(f'Invalid config path provided: {path}')
-            await msg.channel.send(res.get("messages.invalid_config_path"))
-            return False
-        
+        # Add new rank
+        rank = RankConfig()
+        rank.weight = weight
+        rank.membership = membership
+        rank.messages = msg_count
+        rank.vc = vc_time
+        self.ranks[role.name] = rank
+        # Update config properly
+        err = await self.bot.safe_update_config()
         if not err:
-            self.bot.save_config()
-            log.info(f'Done')
-            await msg.channel.send(res.get("messages.done"))
+            answer = res.get("messages.done")
         else:
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
-            await msg.channel.send(answer)
-
+        await msg.channel.send(answer)
 
     @BotExtension.command("remove_rank", desciption="Update specified user rank")
-    async def cmd_remove_rank(self, msg: discord.Message, role_name: str):
-        role = self.bot.get_role(role_name)
-        if role is None:
-            await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
-            return
-        ranks = self.bot.config.ranks.role.copy().value()
-        if role_name not in ranks:
+    async def cmd_remove_rank(self, msg: discord.Message, role: discord.Role):
+        if role.name not in self.ranks:
             await msg.channel.send(res.get("messages.rank_unknown"))
             return
-        del ranks[role_name]
-        path = 'bot.ranks.role'
-
-        try:
-            err = await self.bot.safe_alter_config(path, ranks)
-        except KeyError:
-            log.info(f'Invalid config path provided: {path}')
-            await msg.channel.send(res.get("messages.invalid_config_path"))
-            return False
-        
+        del self.ranks[role.name]
+        # Update config properly
+        err = await self.bot.safe_update_config()
         if not err:
-            self.bot.save_config()
-            log.info(f'Done')
-            await msg.channel.send(res.get("messages.done"))
+            answer = res.get("messages.done")
         else:
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
-            await msg.channel.send(answer)
+        await msg.channel.send(answer)
 
     @BotExtension.command("edit_rank", desciption="Update specified user rank")
-    async def cmd_edit_rank(self, msg: discord.Message, role_name: str, weight: str, membership: str, msg_count: str, vc_time: str):
-        try:
-            weight = int(weight)
-            membership = int(membership)
-            messages_count = int(msg_count)
-            vc_time = int(vc_time)
-        except ValueError:
-            await msg.channel.send(res.get("messages.rank_arg_parse_error"))
-            return
-        role = self.bot.get_role(role_name)
-        if role is None:
-            await msg.channel.send(res.get("messages.rank_role_unknown").format(role_name))
-            return
-        ranks = self.bot.config.ranks.role.copy().value()
-        if role_name not in ranks:
+    async def cmd_edit_rank(self, msg: discord.Message, role: discord.Role, weight: int, membership: int, msg_count: int, vc_time: int):
+        if role.name not in self.ranks:
             await msg.channel.send(res.get("messages.rank_unknown"))
             return
-        ranks_weights = {ranks[r]['weight']:r for r in ranks}
-        if weight in ranks_weights and ranks_weights[weight] != role_name:
+        # Check weight uniqueness
+        ranks_weights = {r.weight for r in self.ranks.values()}
+        if weight in ranks_weights:
             await msg.channel.send(res.get("messages.rank_role_same_weight").format(ranks_weights[weight]))
             return
-        ranks[role_name] = {
-            "weight": weight,
-            "membership": membership,
-            "messages": messages_count,
-            "vc": vc_time
-        }
-        path = 'bot.ranks.role'
-
-        try:
-            err = await self.bot.safe_alter_config(path, ranks)
-        except KeyError:
-            log.info(f'Invalid config path provided: {path}')
-            await msg.channel.send(res.get("messages.invalid_config_path"))
-            return False
-        
+        # Update rank
+        rank = self.ranks[role.name]
+        rank.weight = weight
+        rank.membership = membership
+        rank.messages = msg_count
+        rank.vc = vc_time
+        # Update config properly
+        err = await self.bot.safe_update_config()
         if not err:
-            self.bot.save_config()
-            log.info(f'Done')
-            await msg.channel.send(res.get("messages.done"))
+            answer = res.get("messages.done")
         else:
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
-            await msg.channel.send(answer)
+        await msg.channel.send(answer)
