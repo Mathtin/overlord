@@ -14,8 +14,6 @@
 
 __author__ = 'Mathtin'
 
-from datetime import datetime
-import json
 import os
 import sys
 import traceback
@@ -30,7 +28,7 @@ from util.config import ConfigManager
 from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import is_dm_message, filter_roles, quote_msg, is_text_channel, qualified_name
 from util.logger import DiscordLogConfig
-import util.resources as res
+from util.resources import R
 from typing import Any, List, Optional, Union
 from services import EventService, RoleService, StatService, UserService
 
@@ -146,18 +144,45 @@ class OverlordBase(discord.Client):
             return True
         return len(filter_roles(user, self.config.control.roles)) > 0
 
-    def base_embed(self, name, title, description, color):
-        embed = discord.Embed(title=title, description=description, color=color)
-        embed.set_author(name=name, icon_url=self.me.avatar_url)
-        embed.set_footer(text=res.get("messages.embed_footer"), icon_url=self.me.avatar_url)
-        return embed
-
     def extension_idx(self, ext: Any) -> None:
         pass
 
     def get_config_section(self, section_type: Any) -> Any:
         return self.cnf_manager.find_section(section_type)
 
+    ##########
+    # Embeds #
+    ##########
+
+    def new_embed(self, title, body, footer:str=None, header:str=None, color:int=0xd75242):
+        header = header or R.EMBED.HEADER.DEFAULT
+        footer = footer or R.EMBED.FOOTER.DEFAULT
+        embed = discord.Embed(title=title, description=body, color=color)
+        embed.set_author(name=header, icon_url=self.me.avatar_url)
+        embed.set_footer(text=footer, icon_url=self.me.avatar_url)
+        return embed
+
+    def new_error_report(self, name: str, details: str, traceback: str=None, color: int=0xd75242):
+        header = R.EMBED.HEADER.ERROR_REPORT
+        title = f'❗ {R.EMBED.TITLE.ERROR}: {name}'
+        embed = self.new_embed(title=title, body=details, header=header, color=color)
+        if traceback is not None:
+            traceback_limited = limit_traceback(traceback, "src", 6)
+            embed.add_field(name=R.NAME.COMMON.TRACEBACK, value=traceback_limited, inline=False)
+        return embed
+
+    def new_warn_report(self, name: str, details: str, color: int=0xd75242):
+        header = R.EMBED.HEADER.WARN_REPORT
+        title = f'⚠ {R.EMBED.TITLE.WARNING}: {name}'
+        embed = self.new_embed(title=title, body=details, header=header, color=color)
+        return embed
+
+    def new_info_report(self, name: str, details: str, color: int=0xd75242):
+        header = R.EMBED.HEADER.INFO_REPORT
+        title = f'📰 {R.EMBED.TITLE.INFO}: {name}'
+        embed = self.new_embed(title=title, body=details, header=header, color=color)
+        return embed
+        
     ################
     # Sync methods #
     ################
@@ -198,16 +223,18 @@ class OverlordBase(discord.Client):
             await asyncio.sleep(0.1)
         return
 
-    async def send_error(self, msg: str) -> None:
+    async def send_error(self, from_: str, msg: str) -> None:
+        error_report = self.new_error_report(from_, msg)
         if self.error_channel is not None:
-            await self.error_channel.send(res.get("messages.error").format(msg))
-        await self.maintainer.send(res.get("messages.error").format(msg))
+            await self.error_channel.send(embed=error_report)
+        await self.maintainer.send(embed=error_report)
         return
 
-    async def send_warning(self, msg: str) -> None:
+    async def send_warning(self, from_: str, msg: str) -> None:
+        warn_report = self.new_warn_report(from_, msg)
         if self.error_channel is not None:
-            await self.error_channel.send(res.get("messages.warning").format(msg))
-        await self.maintainer.send(res.get("messages.error").format(msg))
+            await self.error_channel.send(warn_report)
+        await self.maintainer.send(warn_report)
         return
 
     async def sync_users(self) -> None:
@@ -322,23 +349,22 @@ class OverlordBase(discord.Client):
 
             Sends stacktrace to error channel
         """
-        ex_type = sys.exc_info()[0]
-        ex = sys.exc_info()[1]
-
         logging.exception(f'Error on event: {event}')
 
-        exception_tb = traceback.format_exception(*sys.exc_info())
-        exception_tb_limited = limit_traceback(exception_tb, "src", 6)
-        exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
+        ex_type = sys.exc_info()[0]
+        ex = sys.exc_info()[1]
+        tb = traceback.format_exception(*sys.exc_info())
+        name = ex_type.__name__
 
-        exception_msg = res.get("messages.dm_bot_exception").format(event, ('`'+str(ex).replace("`","\\`")+'`')) + '\n' + exception_tb_quoted
+        reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.maintainer.mention}'
 
-        exception_msg_short = f'`{str(ex)}` Reported to {self.maintainer.mention}'
+        maintainer_report = self.new_error_report(name, str(ex), tb)
+        channel_report = self.new_error_report(name, str(ex) + '\n' + reported_to)
 
         if self.error_channel is not None and event != 'on_ready':
-            await self.error_channel.send(res.get("messages.error").format(exception_msg_short))
+            await self.error_channel.send(embed=channel_report)
         
-        await self.maintainer.send(exception_msg)
+        await self.maintainer.send(embed=maintainer_report)
 
         if ex_type is InvalidConfigException:
             await self.logout()
@@ -383,7 +409,6 @@ class OverlordBase(discord.Client):
         # Resolve maintainer
         try:
             self.maintainer = await self.guild.fetch_member(self.maintainer_id)
-            await self.maintainer.send('Starting instance')
         except discord.NotFound:
             raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
         except discord.Forbidden:

@@ -37,14 +37,13 @@ class StringResourceView(object):
     _root:          ET.Element
     _path_cache:   Dict[str, str]
 
-    def __init__(self, lang='en') -> None:
-        self._lang = lang
+    def __init__(self, lang:str='en') -> None:
         self._strings_path = res_path(STRING_RESOURCE_FILE)
         if not os.path.isfile(self._strings_path):
             raise MissingResourceException(self._strings_path, STRING_RESOURCE_FILE)
         log.info(f'Loading {self._strings_path}')
         self._root = ET.parse(self._strings_path).getroot()
-        self._path_cache = {}
+        self.switch_lang(lang)
 
     @staticmethod
     def _section_name(section: str) -> str:
@@ -57,6 +56,10 @@ class StringResourceView(object):
     def _attribute_name(attrib: str) -> str:
         return attrib.lower().replace('_','-')
 
+    def switch_lang(self, lang:str):
+        self._lang = lang
+        self._path_cache = {}
+
     def get(self, path: str) -> str:
         if path in self._path_cache:
             return self._path_cache[path]
@@ -64,7 +67,7 @@ class StringResourceView(object):
         section = StringResourceView._section_name(section)
         type_ = StringResourceView._attribute_name(type_)
         name = StringResourceView._attribute_name(name)
-        res = self._root.find(f'./{section}/string[@lang="{self._lang}" and @type="{type_}" and @name="{name}"]')
+        res = self._root.find(f'.//{section}/string[@lang="{self._lang}"][@type="{type_}"][@name="{name}"]')
         self._path_cache[path] = res.text if res is not None else path
         return self._path_cache[path]
 
@@ -89,8 +92,4 @@ class StringResourceView(object):
     def __getattr__(self, name: str):
         return StringResourceView.SectionView(self, name)
 
-
 R = StringResourceView()
-def set_language(lang: str):
-    global R
-    R = StringResourceView(lang)

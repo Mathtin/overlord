@@ -20,7 +20,6 @@ import asyncio
 import logging
 import discord
 
-import util.resources as res
 
 from discord.errors import InvalidArgument
 from overlord.base import OverlordBase
@@ -29,6 +28,7 @@ from overlord.command import OverlordCommand
 
 from util import get_coroutine_attrs, limit_traceback, quote_msg
 from util.exceptions import InvalidConfigException
+from util.resources import R
 from typing import Dict, List, Optional, Callable, Awaitable
 
 log = logging.getLogger('overlord-extension')
@@ -171,22 +171,24 @@ class BotExtension(object):
             Sends stacktrace to error channel
         """
         ext_name = type(self).__name__
-        ex = sys.exc_info()[1]
-
         logging.exception(f'Error from {ext_name} extension on event: {event}')
 
-        exception_tb = traceback.format_exception(*sys.exc_info())
-        exception_tb_limited = limit_traceback(exception_tb, "src", 4)
-        exception_tb_quoted = quote_msg('\n'.join(exception_tb_limited))
+        ex_type = sys.exc_info()[0]
+        ex = sys.exc_info()[1]
+        tb = traceback.format_exception(*sys.exc_info())
+        name = ex_type.__name__
 
-        exception_msg = res.get("messages.dm_ext_exception").format(ext_name, event, str(ex)) + '\n' + exception_tb_quoted
+        reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.bot.maintainer.mention}'
+        details = f'{str(ex)}\n**{R.NAME.COMMON.EXTENSION} {ext_name}**'
 
-        #exception_msg_short = f'`{str(ex)}` Reported to {self.bot.maintainer.mention}'
+        maintainer_report = self.bot.new_error_report(name, details, tb)
+        channel_report = self.bot.new_error_report(name, str(ex) + '\n' + reported_to)
 
-        #if self.bot.error_channel is not None:
-        #    await self.bot.send_error(exception_msg_short)
+        if self.bot.error_channel is not None and event != 'on_ready':
+            await self.bot.error_channel.send(embed=channel_report)
         
-        await self.bot.maintainer.send(exception_msg)
+        await self.bot.maintainer.send(embed=maintainer_report)
+        
         self.stop()
 
     async def on_ready(self) -> None:

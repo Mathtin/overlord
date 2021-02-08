@@ -12,6 +12,16 @@
 <resources>
 
    <names>
+      <!-- Common terms -->
+      <string type="common" lang="en" name="traceback">Traceback</string>
+      <string type="common" lang="en" name="extension">Extension</string>
+      <string type="common" lang="en" name="guild">Discord Server</string>
+      <string type="common" lang="en" name="channel">Channel</string>
+      <string type="common" lang="en" name="error">Error</string>
+      <string type="common" lang="en" name="info">Information</string>
+      <string type="common" lang="en" name="error-channel">Error channel</string>
+      <string type="common" lang="en" name="control-channel">Control channel</string>
+      <string type="common" lang="en" name="maintainer">Maintainer</string>
       <!-- User stat names -->
       <string type="user-stat" lang="en" name="membership">Membership period</string>
       <string type="user-stat" lang="en" name="new-message-count">New message count</string>
@@ -25,15 +35,35 @@
       <string type="user-stat" lang="en" name="exact-weight">Exact weight (rank)</string>
    </names>
 
-   <embeds>
-      <string type="header" lang="en" name="commands-list">Available commands</string>
-      <string type="header" lang="en" name="stat-type-list">Available stat names</string>
-      <string type="header" lang="en" name="stats-list">Available stats</string>
-      <string type="header" lang="en" name="rank-table">Rank table</string>
-      <string type="header" lang="en" name="config-value">Config value</string>
-      <string type="header" lang="en" name="dm-error-report">Error report</string>
+   <words>
+      <string type="verb" lang="en" name="expected">expected</string>
+      <string type="preposition" lang="en" name="for">for</string>
+   </words>
 
+   <embeds>
+      <!-- Defaults header/footer -->
+      <string type="header" lang="en" name="default">Overlord Discord Bot</string>
       <string type="footer" lang="en" name="default">Overlord by Daniel [Mathtin] Shiko. Special for Eclipse Co. comms</string>
+
+      <!-- Custom headers -->
+      <string type="header" lang="en" name="error-report">Overlord Error report</string>
+      <string type="header" lang="en" name="warn-report">Overlord Warning</string>
+      <string type="header" lang="en" name="info-report">Overlord Information</string>
+      <string type="header" lang="en" name="log-report">Overlord Logging</string>
+
+      <!-- report titles -->
+      <string type="title" lang="en" name="success">Done</string>
+      <string type="title" lang="en" name="error">Error</string>
+      <string type="title" lang="en" name="warning">Attention</string>
+      <string type="title" lang="en" name="info">FYI</string>
+      <string type="title" lang="en" name="traceback">Traceback</string>
+
+      <!-- other titles -->
+      <string type="title" lang="en" name="commands-list">Available commands</string>
+      <string type="title" lang="en" name="stat-type-list">Available stat names</string>
+      <string type="title" lang="en" name="stats-list">Available stats</string>
+      <string type="title" lang="en" name="rank-table">Rank table</string>
+      <string type="title" lang="en" name="config-value">Config value</string>
    </embeds>
 
    <messages>
@@ -50,19 +80,13 @@
       <string type="status" lang="en" name="clear-stats">Clearing stats</string>
       <string type="status" lang="en" name="calc-stats">Calculating stats</string>
       <string type="status" lang="en" name="stop-extension">Disabling extension</string>
-
-      <!-- report messages -->
-      <string type="report" lang="en" name="success">Done</string>
-      <string type="report" lang="en" name="error">Error</string>
-      <string type="report" lang="en" name="warning">Attention</string>
-      <string type="report" lang="en" name="info">FYI</string>
-      <string type="report" lang="en" name="traceback">Traceback</string>
+      <string type="status" lang="en" name="reported-to">Reported to</string>
+      <string type="status" lang="en" name="started">Bot started successfully</string>
 
       <!-- basic error messages -->
       <string type="error" lang="en" name="internal">Internal error</string>
       <string type="error" lang="en" name="no-access">Missing access</string>
       <string type="error" lang="en" name="invalid-argument-type">Invalid argument type</string>
-      <string type="error" lang="en" name="expected">expected</string>
       <string type="error" lang="en" name="unknown-command">No such command</string>
 
       <!-- discord error messages -->

@@ -15,7 +15,7 @@
 __author__ = 'Mathtin'
 
 import os
-from typing import Any, Callable, Dict, List, Awaitable, Optional, Union
+from typing import Any, Callable, Dict, List, Awaitable, Optional, Tuple, Union
 import discord
 import asyncio
 
@@ -149,13 +149,13 @@ async def send_long_message(channel: discord.TextChannel, message: str):
         await channel.send(cur)
 
 SEP='-------------------------------------------------------------------------------------------------'
-def embed_long_line(embed: discord.Embed, line: str):
+def embed_long_line(embed: discord.Embed, line: str) -> None:
     chunk = 1000
     parts = [ line[i:i+chunk] for i in range(0, len(len), chunk) ]
     for part in parts:
         embed.add_field(name=SEP, value=part, inline=False)
         
-def embed_long_message(embed: discord.Embed, message: str):
+def embed_long_message(embed: discord.Embed, message: str) -> None:
     message = message[:5000]
     if len(message) <= 2000:
         embed.description = message
@@ -188,6 +188,4 @@ def embed_long_message(embed: discord.Embed, message: str):
                 cur = line
     if cur:
         embed.add_field(name=SEP, value=cur, inline=False)
-            
-
     

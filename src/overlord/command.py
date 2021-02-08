@@ -16,13 +16,15 @@ __author__ = 'Mathtin'
 
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Type, get_type_hints
 
+from discord.message import Message
+
 import db as DB
 import discord as DIS
-import util.resources as res
 
 from discord.errors import InvalidArgument
 
 from util import check_coroutine
+from util.resources import R
 from .types import OverlordMember
 
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
@@ -115,7 +117,7 @@ class OverlordCommand(object):
         try:
             return type_(arg)
         except ValueError:
-            await msg.channel.send(res.get("messages.invalid_command_arg").format(name, type_.__name__))
+            await msg.channel.send(f'{R.MESSAGE.ERROR.INVALID_ARGUMENT_TYPE} {R.WORD.PREPOSITION.FOR} "{name}" ({R.WORD.VERB.EXPECTED} {type_.__name__})')
 
     class _for_type(object):
         def __init__(self, type_) -> None:
@@ -128,36 +130,34 @@ class OverlordCommand(object):
     @_for_type(DB.User)
     async def _resolve_db_user_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DB.User]:
         user = await ext.bot.resolve_user(user_mention)
-        if user is None:
-            await fb.channel.send(res.get("messages.unknown_user"))
+        if user is None: 
+            await fb.channel.send(R.MESSAGE.DB_ERROR.UNKNOWN_USER)
             return None
         return user
 
     @staticmethod
     @_for_type(DIS.User)
     async def _resolve_user_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.User]:
-        user = await ext.bot.resolve_user(user_mention)
+        user = await OverlordCommand._resolve_db_user_w_fb(fb, ext, user_mention)
         if user is None:
-            await fb.channel.send(res.get("messages.unknown_user"))
             return None
         try:
-            d_user = await ext.bot.fetch_user(user.id)
+            d_user = await ext.bot.fetch_user(user.did)
         except DIS.NotFound:
-            await fb.channel.send(res.get("messages.unknown_user"))
+            await fb.channel.send(R.MESSAGE.D_ERROR.UNKNOWN_USER)
             return None
         return d_user
 
     @staticmethod
     @_for_type(DIS.Member)
     async def _resolve_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[DIS.Member]:
-        user = await ext.bot.resolve_user(user_mention)
+        user = await OverlordCommand._resolve_user_w_fb(fb, ext, user_mention)
         if user is None:
-            await fb.channel.send(res.get("messages.unknown_user"))
             return None
         try:
             member = await ext.bot.guild.fetch_member(user.id)
         except DIS.NotFound:
-            await fb.channel.send(res.get("messages.not_member_user"))
+            await fb.channel.send(R.MESSAGE.D_ERROR.USER_NOT_MEMBER)
             return None
         return member
 
@@ -167,9 +167,9 @@ class OverlordCommand(object):
         channel = await ext.bot.resolve_text_channel(channel_mention)
         if channel is None:
             if await ext.bot.resolve_voice_channel(channel_mention) is not None:
-                await fb.channel.send(res.get("messages.invalid_channel_type_text"))
+                await fb.channel.send(R.MESSAGE.D_ERROR.CHANNEL_NOT_TEXT)
             else:
-                await fb.channel.send(res.get("messages.unknown_channel"))
+                await fb.channel.send(R.MESSAGE.D_ERROR.UNKNOWN_CHANNEL)
             return None
         return channel
 
@@ -179,9 +179,9 @@ class OverlordCommand(object):
         channel = await ext.bot.resolve_voice_channel(channel_mention)
         if channel is None:
             if await ext.bot.resolve_text_channel(channel_mention) is not None:
-                await fb.channel.send(res.get("messages.invalid_channel_type_voice"))
+                await fb.channel.send(R.MESSAGE.D_ERROR.CHANNEL_NOT_VOICE)
             else:
-                await fb.channel.send(res.get("messages.unknown_channel"))
+                await fb.channel.send(R.MESSAGE.D_ERROR.UNKNOWN_CHANNEL)
             return None
         return channel
 
@@ -190,7 +190,7 @@ class OverlordCommand(object):
     async def _resolve_role_w_fb(fb: DIS.Message, ext: Any, role_name: str) -> Optional[DIS.Role]:
         role = ext.bot.get_role(role_name)
         if role is None:
-            await fb.channel.send(res.get("messages.unknown_role"))
+            await fb.channel.send(R.MESSAGE.D_ERROR.UNKNOWN_ROLE)
             return None
         return role
 
@@ -199,11 +199,11 @@ class OverlordCommand(object):
     async def _resolve_ov_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[OverlordMember]:
         user = await ext.bot.resolve_user(user_mention)
         if user is None:
-            await fb.channel.send(res.get("messages.unknown_user"))
+            await fb.channel.send(R.MESSAGE.DB_ERROR.UNKNOWN_USER)
             return None
         try:
             member = await ext.bot.guild.fetch_member(user.id)
         except DIS.NotFound:
-            await fb.channel.send(res.get("messages.not_member_user"))
+            await fb.channel.send(R.MESSAGE.D_ERROR.USER_NOT_MEMBER)
             return None
         return OverlordMember(member, user)

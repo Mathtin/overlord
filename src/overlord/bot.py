@@ -19,13 +19,13 @@ import logging
 
 import discord
 import db as DB
-import util.resources as res
 
 from util import get_coroutine_attrs, parse_control_message
 from util.config import ConfigManager
 from util.exceptions import InvalidConfigException
 from util.extbot import qualified_name, is_dm_message
 from util.extbot import skip_bots, after_initialized, guild_member_event
+from util.resources import R
 from typing import Dict, List, Callable, Awaitable, Optional, Union
 from .base import OverlordBase
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, OverlordRole, OverlordVCState
@@ -143,7 +143,12 @@ class Overlord(OverlordBase):
             await self.on_config_update()
             # Message for pterodactyl panel
             print(self.config.egg_done)
-            await self.maintainer.send('Started!')
+            start_report = f'{R.NAME.COMMON.MAINTAINER}: {self.maintainer.mention}\n'
+            start_report += f'{R.NAME.COMMON.CONTROL_CHANNEL}: {self.control_channel.mention}\n'
+            if self.error_channel is not None:
+                start_report += f'{R.NAME.COMMON.ERROR_CHANNEL}: {self.error_channel.mention}\n'
+            embed = self.new_info_report(R.MESSAGE.STATUS.STARTED, start_report)
+            await self.maintainer.send(embed=embed)
 
     async def on_config_update(self) -> None:
         await super().on_config_update()
@@ -192,7 +197,7 @@ class Overlord(OverlordBase):
         # Resolve cmd handler
         cmd_name = argv[0]
         if cmd_name not in self._cmd_cache:
-            await message.channel.send(res.get("messages.unknown_command"))
+            await message.channel.send(R.MESSAGE.ERROR.UNKNOWN_COMMAND)
             return
         handler = self._cmd_cache[cmd_name]
         # Call handler
