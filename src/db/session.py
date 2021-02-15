@@ -35,7 +35,8 @@ class DBPersistSession(object):
     def __init__(self, engine_url) -> None:
         self._db_engine = create_engine(engine_url, pool_recycle=60)
         Base.metadata.create_all(self._db_engine)
-        self._session_factory = sessionmaker(bind=self._db_engine, autocommit=False, autoflush=True)
+        self._session_factory = sessionmaker(bind=self._db_engine, autocommit=False, autoflush=True,
+                                             expire_on_commit=False)
 
     def _keep_session(self) -> None:
         if self._session is None:
@@ -104,13 +105,13 @@ class DBPersistSession(object):
         self.delete_model(row)
         return row
 
-    def update_or_add(self, model: Type[BaseModel], pk: str, value: dict):
+    def update_or_add(self, model: Type[BaseModel], pk: str, value: dict) -> BaseModel:
         res = self.update(model, pk, value)
         if res is None:
             return self.add(model, value)
         return res
 
-    def update(self, model: Type[BaseModel], pk: str, value: dict):
+    def update(self, model: Type[BaseModel], pk: str, value: dict) -> Optional[BaseModel]:
         row = self.query(model).filter_by(**{pk: value[pk]}).first()
         if row is None:
             return None
@@ -119,7 +120,7 @@ class DBPersistSession(object):
                 setattr(row, col, value[col])
         return row
 
-    def touch(self, model: BaseModel, id_: int):
+    def touch(self, model: BaseModel, id_: int) -> None:
         stmt = update(model).where(model.id == id_)
         self.execute(stmt)
 

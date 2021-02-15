@@ -85,7 +85,7 @@ class OverlordCommand(object):
         usage_line = f'Usage: `{prefix}{aliases[0]} {self.args_str}`' if self.args_str \
             else f'Usage: `{prefix}{aliases[0]}`'
         description_line = f'{self.description}'
-        aliases_str = ' ,'.join([f'`{prefix}{a}`' for a in aliases[1:]])
+        aliases_str = ', '.join([f'`{prefix}{a}`' for a in aliases[1:]])
         aliases_line = f'Aliases: {aliases_str}'
         return '\n'.join([usage_line, description_line, aliases_line])
 

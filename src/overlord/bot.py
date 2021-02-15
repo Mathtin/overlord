@@ -470,6 +470,13 @@ class Overlord(OverlordBase):
                 return
             if member.bot:
                 return
+            # handle control reactions
+            if channel == self.control_channel or (
+                    member == self.maintainer and isinstance(channel, discord.DMChannel)):
+                await self.on_control_reaction_remove(member, message, payload.emoji)
+                return
+            if not self.is_guild_member_message(message):
+                return
             # ignore absent
             msg = self.s_events.get_message(message.id)
             if msg is None:
@@ -483,3 +490,13 @@ class Overlord(OverlordBase):
         # Call extension 'on_reaction_remove' handlers
         await self._run_call_plan('on_reaction_remove', OverlordMember(member, user), OverlordMessage(message, msg),
                                   OverlordReaction(payload.emoji, event))
+
+    async def on_control_reaction_remove(self, member: discord.Member, message: discord.Message,
+                                         emoji: discord.PartialEmoji) -> None:
+        """
+            Async control reaction add event handler
+
+            Saves event in database
+        """
+        # Call extension 'on_control_reaction_add' handlers
+        await self._run_call_plan('on_control_reaction_remove', member, message, emoji)

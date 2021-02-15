@@ -32,6 +32,7 @@ log = logging.getLogger('utility-extension')
 #####################
 
 class UtilityExtension(BotExtension):
+
     __extname__ = '🛠 Utility Extension'
     __description__ = 'Basic utility commands collection'
     __color__ = 0xa83fc8
@@ -82,13 +83,24 @@ class UtilityExtension(BotExtension):
         if 'Overlord Help page' in embed.author.name:
             await self.switch_help_page(emoji, message)
 
+    async def on_control_reaction_remove(self, _, message: discord.Message,
+                                         emoji: discord.PartialEmoji):
+        if not message.embeds or message.author != self.bot.me or not emoji.is_unicode_emoji():
+            return
+
+        emoji = emoji.name
+        embed = message.embeds[0]
+
+        if 'Overlord Help page' in embed.author.name:
+            await self.switch_help_page(emoji, message)
+
     ############
     # Commands #
     ############
 
     @BotExtension.command("help", description="Help pages")
-    async def cmd_help(self, msg: discord.Message, opt_page: str = '1'):
-        ext = self.bot.resolve_extension(opt_page)
+    async def cmd_help(self, msg: discord.Message, opt_page_or_ext_name: str = '1'):
+        ext = self.bot.resolve_extension(opt_page_or_ext_name)
         if ext is None:
             await msg.channel.send("No such help page")
             return
