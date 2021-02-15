@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -19,6 +19,7 @@ import discord as d
 from .models import User, MessageEvent
 from datetime import datetime
 
+
 #
 # Roles
 #
@@ -30,12 +31,14 @@ def role_to_row(role: d.Role) -> Dict[str, Any]:
         'created_at': role.created_at
     }
 
+
 def roles_to_rows(roles: list) -> List[Dict[str, Any]]:
     rows = [role_to_row(r) for r in roles]
-    rows = sorted(rows, key = lambda i: i['did'])
+    rows = sorted(rows, key=lambda i: i['did'])
     for i in range(len(rows)):
         rows[i]['idx'] = i
     return rows
+
 
 def role_mask(user: d.Member, role_map: dict) -> str:
     mask = ['0'] * len(role_map)
@@ -43,6 +46,7 @@ def role_mask(user: d.Member, role_map: dict) -> str:
         idx = role_map[role.id]['idx']
         mask[idx] = '1'
     return ''.join(mask)
+
 
 #
 # Users
@@ -57,6 +61,7 @@ def user_row(user: d.User) -> Dict[str, Any]:
         'roles': None
     }
 
+
 def member_row(user: d.Member, role_map: dict) -> Dict[str, Any]:
     return {
         'did': user.id,
@@ -67,18 +72,22 @@ def member_row(user: d.Member, role_map: dict) -> Dict[str, Any]:
         'created_at': user.joined_at
     }
 
-def member_join_row(user: User, joined: datetime ,events: dict) -> Dict[str, Any]:
+
+def member_join_row(user: User, joined: datetime, events: dict) -> Dict[str, Any]:
     return {
         'type_id': events["member_join"],
         'user_id': user.id,
         'created_at': joined
     }
 
+
 def user_leave_row(user: User, events: dict) -> Dict[str, Any]:
     return {
         'type_id': events["member_leave"],
         'user_id': user.id
     }
+
+
 #
 # Messages
 #
@@ -92,6 +101,7 @@ def new_message_to_row(user_id: int, msg: d.Message, events: dict) -> Dict[str, 
         'created_at': msg.created_at
     }
 
+
 def message_edit_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
     return {
         'type_id': events["message_edit"],
@@ -100,6 +110,7 @@ def message_edit_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
         'channel_id': msg.channel_id
     }
 
+
 def message_delete_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
     return {
         'type_id': events["message_delete"],
@@ -107,6 +118,7 @@ def message_delete_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
         'message_id': msg.message_id,
         'channel_id': msg.channel_id
     }
+
 
 #
 # VC
@@ -119,12 +131,14 @@ def vc_join_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str, 
         'channel_id': channel.id
     }
 
+
 def vc_leave_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str, Any]:
     return {
         'type_id': events["vc_leave"],
         'user_id': user.id,
         'channel_id': channel.id
     }
+
 
 #
 # Reaction
@@ -136,6 +150,7 @@ def new_reaction_to_row(user: User, msg: MessageEvent, events: dict) -> Dict[str
         'user_id': user.id,
         'message_event_id': msg.id
     }
+
 
 def reaction_delete_row(user: User, msg: MessageEvent, events: dict) -> Dict[str, Any]:
     return {

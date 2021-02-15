@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -17,29 +17,29 @@ __author__ = 'Mathtin'
 import logging
 
 import discord
-import db as DB
-import db.converters as conv
-import db.queries as q
+import src.db as DB
+import src.db.converters as conv
+import src.db.queries as q
 
 from typing import Dict, Tuple, Optional
 
 log = logging.getLogger('event-service')
+
 
 ##########################
 # Service implementation #
 ##########################
 
 class EventService(object):
-
     # State
     event_type_map: Dict[str, int]
 
     # Members passed via constructor
-    db: DB.DBSession
+    db: DB.DBPersistSession
 
-    def __init__(self, db: DB.DBSession) -> None:
+    def __init__(self, db: DB.DBPersistSession) -> None:
         self.db = db
-        self.event_type_map = {row.name:row.id for row in self.db.query(DB.EventType)}
+        self.event_type_map = {row.name: row.id for row in self.db.query(DB.EventType)}
 
     def check_event_name(self, name: str) -> None:
         if name not in self.event_type_map:
@@ -74,7 +74,7 @@ class EventService(object):
     def repair_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> None:
         last_event = self.get_last_vc_event(user, channel)
         if last_event is not None and last_event.type_id == self.type_id("vc_join"):
-            log.warn(f'VC leave event is absent for last vc_join event for {user} in <{channel.name}! Removing last vc_join event!')
+            log.warning(f'Closing VC leave event not found for {user} in <{channel.name} (removing vc_join event)')
             self.db.delete_model(last_event)
             self.db.commit()
 
@@ -132,11 +132,11 @@ class EventService(object):
         self.db.commit()
         return res
 
-    def close_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[Tuple[DB.VoiceChatEvent, DB.VoiceChatEvent]]:
+    def close_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> \
+            Optional[Tuple[DB.VoiceChatEvent, DB.VoiceChatEvent]]:
         join_event = self.get_last_vc_event(user, channel)
         if join_event is None or join_event.type_id != self.type_id("vc_join"):
-            # Skip absent vc join
-            log.warn(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
+            log.warning(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
             return None
         # Save event + update previous
         e_row = conv.vc_leave_row(user, channel, self.event_type_map)
@@ -147,4 +147,3 @@ class EventService(object):
     def clear_text_channel_history(self, channel: discord.TextChannel) -> None:
         self.db.query(DB.MessageEvent).filter_by(channel_id=channel.id).delete()
         self.db.commit()
-

@@ -83,7 +83,7 @@ class UtilityExtension(BotExtension):
     # Commands #
     ############
 
-    @BotExtension.command("help", desciption="Help pages")
+    @BotExtension.command("help", description="Help pages")
     async def cmd_help(self, msg: discord.Message, opt_page: str='1'):
         ext = self.bot.resolve_extension(opt_page)
         if ext is None:
@@ -98,21 +98,21 @@ class UtilityExtension(BotExtension):
         await help_msg.add_reaction(u'⏭')
 
 
-    @BotExtension.command("ping", desciption="Checks bot state")
+    @BotExtension.command("ping", description="Checks bot state")
     async def cmd_ping(self, msg: discord.Message):
         if self.bot.sync().locked():
             await msg.channel.send(res.get("messages.busy"))
         else:
             await msg.channel.send(res.get("messages.pong"))
 
-    @BotExtension.command("sync", desciption="Syncronize db data with guild data in terms of users and roles")
+    @BotExtension.command("sync", description="Syncronize db data with guild data in terms of users and roles")
     async def cmd_sync_roles(self, msg: discord.Message):
         async with self.bot.sync():
             await msg.channel.send(res.get("messages.sync_users_begin"))
             await self.bot.sync_users()
             await msg.channel.send(res.get("messages.done"))
             
-    @BotExtension.command("clear_all", desciption="Clears db data")
+    @BotExtension.command("clear_all", description="Clears db data")
     async def clear_data(self, msg: discord.Message):
         models = [DB.MemberEvent, DB.MessageEvent, DB.VoiceChatEvent, DB.UserStat, DB.User, DB.Role]
         table_data_drop = res.get("messages.table_data_drop")
@@ -128,7 +128,7 @@ class UtilityExtension(BotExtension):
             log.info(f'Done')
             await msg.channel.send(res.get("messages.done"))
 
-    @BotExtension.command("dump_channel", desciption="Fetches whole channel data into db (overwriting)")
+    @BotExtension.command("dump_channel", description="Fetches whole channel data into db (overwriting)")
     async def cmd_dump_channel(self, msg: discord.Message, channel_mention: str):
         channel = await self.bot.resolve_text_channel(channel_mention)
         vc_channel = await self.bot.resolve_voice_channel(channel_mention)

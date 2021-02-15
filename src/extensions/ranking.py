@@ -239,21 +239,21 @@ class RankingExtension(BotExtension):
     # Commands #
     ############
 
-    @BotExtension.command("update_all_ranks", desciption="Fetches all members of guild and updates each rank")
+    @BotExtension.command("update_all_ranks", description="Fetches all members of guild and updates each rank")
     async def cmd_update_all_ranks(self, msg: discord.Message):
         async with self.sync():
             await msg.channel.send(res.get("messages.update_ranks_begin"))
             await self.update_all_ranks()
             await msg.channel.send(res.get("messages.done"))
 
-    @BotExtension.command("update_rank", desciption="Update specified user rank")
+    @BotExtension.command("update_rank", description="Update specified user rank")
     async def cmd_update_rank(self, msg: discord.Message, member: discord.Member):
         async with self.sync():
             await msg.channel.send(res.get("messages.update_rank_begin").format(member.mention))
             await self.update_rank(member)
             await msg.channel.send(res.get("messages.done"))
         
-    @BotExtension.command("list_ranks", desciption="List all configured ranks")
+    @BotExtension.command("list_ranks", description="List all configured ranks")
     async def cmd_list_ranks(self, msg: discord.Message):
         desc = f'Configured ranks list'
         embed = self.bot.base_embed("Overlord Ranking", f"🎖 Ranks", desc, self.__color__)
@@ -263,7 +263,7 @@ class RankingExtension(BotExtension):
             embed.add_field(name=name, value=rank_s, inline=True)
         await msg.channel.send(embed=embed)
 
-    @BotExtension.command("add_rank", desciption="Creates new user rank")
+    @BotExtension.command("add_rank", description="Creates new user rank")
     async def cmd_add_rank(self, msg: discord.Message, role: discord.Role, weight: int, membership: int, msg_count: int, vc_time: int):
         # Check already existed rank for specified role 
         if role.name in self.ranks:
@@ -289,7 +289,7 @@ class RankingExtension(BotExtension):
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
         await msg.channel.send(answer)
 
-    @BotExtension.command("remove_rank", desciption="Update specified user rank")
+    @BotExtension.command("remove_rank", description="Update specified user rank")
     async def cmd_remove_rank(self, msg: discord.Message, role: discord.Role):
         if role.name not in self.ranks:
             await msg.channel.send(res.get("messages.rank_unknown"))
@@ -303,7 +303,7 @@ class RankingExtension(BotExtension):
             answer = res.get("messages.error").format(err) + '\n' + res.get("messages.warning").format('Config reverted')
         await msg.channel.send(answer)
 
-    @BotExtension.command("edit_rank", desciption="Update specified user rank")
+    @BotExtension.command("edit_rank", description="Update specified user rank")
     async def cmd_edit_rank(self, msg: discord.Message, role: discord.Role, weight: int, membership: int, msg_count: int, vc_time: int):
         if role.name not in self.ranks:
             await msg.channel.send(res.get("messages.rank_unknown"))

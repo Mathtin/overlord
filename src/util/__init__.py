@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -28,41 +28,54 @@ import discord
 #################
 
 _module_cache = {}
+
+
 def get_module_element(path: str) -> Any:
-    splited_path = path.split('.')
-    module_name = '.'.join(splited_path[:-1])
-    object_name = splited_path[-1]
+    split_path = path.split('.')
+    module_name = '.'.join(split_path[:-1])
+    object_name = split_path[-1]
     if module_name not in _module_cache:
         _module_cache[module_name] = importlib.import_module(module_name)
     module = _module_cache[module_name]
     return getattr(module, object_name)
 
+
 def dict_fancy_table(values: dict, key_name='name') -> str:
     if not values:
-        return '++\n'*2
+        return '++\n' * 2
 
     col0 = [key_name] + list(values.keys())
     row_count = len(col0)
     col_names = list(values[col0[-1]].keys())
 
-    to_col = lambda k: [k] + [values[v][k] for v in values]
+    def to_col(k):
+        return [k] + [values[v][k] for v in values]
+
+    def col_width(col):
+        return max(len(str(v)) for v in col)
+
     table = [col0] + [to_col(k) for k in col_names]
-
-    col_width = lambda col: max(len(str(v)) for v in col)
     cols_width = [col_width(col) for col in table]
-
     cols_format = [f'{{:{w}}}' for w in cols_width]
-    str_row_values = lambda i: [cols_format[j].format(col[i]) for (j,col) in enumerate(table)]
-    format_line = lambda i: '| ' + ' | '.join(str_row_values(i)) + ' |\n'
-    separator = '+-' + '-+-'.join(['-'*w for w in cols_width]) + '-+\n'
+    separator = '+-' + '-+-'.join(['-' * w for w in cols_width]) + '-+\n'
+
+    def str_row_values(i):
+        return [cols_format[j].format(col[i]) for (j, col) in enumerate(table)]
+
+    def format_line(i):
+        return '| ' + ' | '.join(str_row_values(i)) + ' |\n'
 
     lines = [format_line(i) for i in range(row_count)]
     return separator + separator.join(lines) + separator
 
+
 def pretty_days(days: int) -> str:
-    _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
     if days == 0:
         return '0 days'
+
+    def _s(x: int) -> str:
+        return '' if (x % 10) == 1 and x != 11 else 's'
+
     res = ''
     years = days // 365
     if years > 0:
@@ -74,12 +87,17 @@ def pretty_days(days: int) -> str:
         days %= 30
     if days > 0:
         res += f'{days} day{_s(days)} '
+
     return res.strip()
 
+
 def pretty_seconds(seconds: int) -> str:
-    _s = lambda x: '' if (x%10) == 1 and x != 11 else 's'
     if seconds == 0:
         return '0 seconds'
+
+    def _s(x: int) -> str:
+        return '' if (x % 10) == 1 and x != 11 else 's'
+
     res = ''
     days = seconds // 86400
     if days > 0:
@@ -89,20 +107,21 @@ def pretty_seconds(seconds: int) -> str:
     if hours > 0:
         res += f'{hours} hour{_s(hours)} '
         seconds %= 3600
-    mins = seconds // 60
-    if mins > 0:
-        res += f'{mins} min{_s(mins)} '
+    minutes = seconds // 60
+    if minutes > 0:
+        res += f'{minutes} min{_s(minutes)} '
         seconds %= 60
     if seconds > 0:
         res += f'{seconds} second{_s(seconds)} '
     return res.strip()
 
-def parse_control_message(prefix: str, message: discord.Message) -> List[str]:
+
+def parse_control_message(prefix: str, message: discord.Message) -> Optional[List[str]]:
     prefix_len = len(prefix)
     msg = message.content.strip()
 
     msg_prefix = msg[: prefix_len]
-    msg_suffix = msg[prefix_len :]
+    msg_suffix = msg[prefix_len:]
 
     if msg_prefix != prefix or msg_suffix == "":
         return None
@@ -130,6 +149,7 @@ def parse_control_message(prefix: str, message: discord.Message) -> List[str]:
 
     return res
 
+
 def limit_traceback(traceback: List[str], from_file: str, offset: int) -> List[str]:
     res = []
     found = False
@@ -144,21 +164,31 @@ def limit_traceback(traceback: List[str], from_file: str, offset: int) -> List[s
             res.append(line)
     return res
 
-F_MSGS = lambda m: f'{m} messages'
-F_REACTIONS = lambda m: f'{m} reactions'
-F_DEFAULT = lambda m: str(m)
+
+def _format_messages(m):
+    return f'{m} messages'
+
+
+def _format_reactions(m):
+    return f'{m} reactions'
+
+
+def _format_default(m):
+    return str(m)
+
+
 FORMATTERS = {
-    "membership":            pretty_days,
-    "new_message_count":     F_MSGS,
-    "delete_message_count":  F_MSGS,
-    "edit_message_count":    F_MSGS,
-    "new_reaction_count":    F_REACTIONS,
-    "delete_reaction_count": F_REACTIONS,
-    "vc_time":               pretty_seconds,
-    "min_weight":            F_DEFAULT,
-    "max_weight":            F_DEFAULT,
-    "exact_weight":          F_DEFAULT,
-    "weight":                F_DEFAULT,
-    "messages":              F_DEFAULT,
-    "vc":                    pretty_seconds
+    "membership": pretty_days,
+    "new_message_count": _format_messages,
+    "delete_message_count": _format_messages,
+    "edit_message_count": _format_messages,
+    "new_reaction_count": _format_reactions,
+    "delete_reaction_count": _format_reactions,
+    "vc_time": pretty_seconds,
+    "min_weight": _format_default,
+    "max_weight": _format_default,
+    "exact_weight": _format_default,
+    "weight": _format_default,
+    "messages": _format_default,
+    "vc": pretty_seconds
 }

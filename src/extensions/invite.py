@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -19,11 +19,12 @@ from typing import Dict, List, Optional
 
 import discord
 
-from overlord.types import OverlordMember
-from util import InvalidConfigException, ConfigView
+from src.overlord.types import OverlordMember
+from src.util import InvalidConfigException, ConfigView
 from .base import BotExtension
 
 log = logging.getLogger('config-extension')
+
 
 #################
 # Invite Config #
@@ -37,14 +38,14 @@ class InviteRootConfig(ConfigView):
         }
     }
     """
-    role : Dict[str, str] = {}
+    role: Dict[str, str] = {}
+
 
 ####################
 # Invite Extension #
 ####################
 
 class InviteExtension(BotExtension):
-
     __extname__ = '🚪 Invite Extension'
     __description__ = 'User invite handling'
     __color__ = 0x7623bc
@@ -53,7 +54,7 @@ class InviteExtension(BotExtension):
     _invites = List[discord.Invite]
     _invite_role_map: Dict[str, List[str]]
     config: InviteRootConfig
-            
+
     ###########
     # Methods #
     ###########
@@ -63,13 +64,13 @@ class InviteExtension(BotExtension):
             if inv.code == code:
                 return inv
         return None
-            
+
     #################
     # Async Methods #
     #################
 
     async def handle_invite(self, member: discord.Member, invite: discord.Invite):
-        if not invite.code in self._invite_role_map:
+        if invite.code not in self._invite_role_map:
             return
         role_names = self._invite_role_map[invite.code]
         roles = [self.bot.s_roles.get(r) for r in role_names]
@@ -95,7 +96,7 @@ class InviteExtension(BotExtension):
             if code not in self._invite_role_map:
                 self._invite_role_map[code] = []
             self._invite_role_map[code].append(role)
-            
+
     async def on_member_join(self, member: OverlordMember) -> None:
         invites_after = await self.bot.guild.invites()
         for new_invite in invites_after:
@@ -107,11 +108,7 @@ class InviteExtension(BotExtension):
 
     async def on_member_remove(self, member: OverlordMember):
         self._invites = await self.bot.guild.invites()
-            
+
     ############
     # Commands #
     ############
-
-    
-
-

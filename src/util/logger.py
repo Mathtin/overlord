@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -18,6 +18,7 @@ import logging.config
 
 from .config import ConfigView
 
+
 #################
 # Logger Config #
 #################
@@ -30,9 +31,10 @@ class LogFileConfig(ConfigView):
         backupCount = ...
     }
     """
-    filename : str = "overlord-bot.log"
-    maxBytes : int = 1048576
-    backupCount : int = 10
+    filename: str = "overlord-bot.log"
+    maxBytes: int = 1048576
+    backupCount: int = 10
+
 
 class DiscordLogConfig(ConfigView):
     """
@@ -40,7 +42,8 @@ class DiscordLogConfig(ConfigView):
         channel = ...
     }
     """
-    channel : int = 0
+    channel: int = 0
+
 
 class LoggerRootConfig(ConfigView):
     """
@@ -51,10 +54,11 @@ class LoggerRootConfig(ConfigView):
         discord : DiscordLogConfig
     }
     """
-    format  : str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    level   : str              = "INFO"
-    file    : LogFileConfig    = LogFileConfig()
-    discord : DiscordLogConfig = DiscordLogConfig()
+    format: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level: str = "INFO"
+    file: LogFileConfig = LogFileConfig()
+    discord: DiscordLogConfig = DiscordLogConfig()
+
 
 def update_config(config: LoggerRootConfig) -> None:
     config_dict = {

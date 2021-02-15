@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -14,10 +14,13 @@
 
 __author__ = 'Mathtin'
 
+from typing import Tuple
+
 import lark
 from ..exceptions import InvalidConfigException
 from ..resources import res_path
 from lark import Lark, Transformer
+
 
 class TreeToDict(Transformer):
 
@@ -26,30 +29,42 @@ class TreeToDict(Transformer):
     last_assignment = tuple
     root = dict
 
-    true = lambda self, _: True
-    false = lambda self, _: False
+    @staticmethod
+    def section(s) -> Tuple[str, dict]:
+        return s[0], dict(s[1:])
 
-    def section(self, s) -> str:
-        return (s[0], dict(s[1:]))
+    @staticmethod
+    def last_section(s) -> Tuple[str, dict]:
+        return s[0], dict(s[1:])
 
-    def last_section(self, s) -> str:
-        return (s[0], dict(s[1:]))
-
-    def name(self, s) -> str:
+    @staticmethod
+    def name(s) -> str:
         (s,) = s
         return str(s)
 
-    def string(self, s) -> str:
+    @staticmethod
+    def string(s) -> str:
         (s,) = s
         return s[1:-1]
 
-    def integer(self, n) -> int:
+    @staticmethod
+    def integer(n) -> int:
         (n,) = n
         return int(n)
 
-    def float(self, n) -> float:
+    @staticmethod
+    def float(n) -> float:
         (n,) = n
         return float(n)
+
+    @staticmethod
+    def true(_) -> bool:
+        return True
+
+    @staticmethod
+    def false(_) -> bool:
+        return True
+
 
 class ConfigParser(object):
 
@@ -60,7 +75,7 @@ class ConfigParser(object):
         with open(res_path(grammar_file), 'r') as f:
             self._grammar = f.read()
         self._parser = Lark(self._grammar, start=start, parser='lalr', transformer=TreeToDict())
-        
+
     @property
     def grammar(self) -> str:
         return self._grammar

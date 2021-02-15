@@ -45,7 +45,7 @@ class Overlord(OverlordBase):
     _call_plan_map: Dict[str, List[Callable[..., Awaitable[None]]]]
     _cmd_cache: Dict[str, Callable[..., Awaitable[None]]]
 
-    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
+    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBPersistSession) -> None:
         super().__init__(cnf_manager, db_session)
         self._extensions = []
         handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
@@ -143,7 +143,8 @@ class Overlord(OverlordBase):
             await self.on_config_update()
             # Message for pterodactyl panel
             print(self.config.egg_done)
-            start_report = f'{R.NAME.COMMON.MAINTAINER}: {self.maintainer.mention}\n'
+            start_report = f'{R.NAME.COMMON.GUILD}: {self.guild.name}\n'
+            start_report += f'{R.NAME.COMMON.MAINTAINER}: {self.maintainer.mention}\n'
             start_report += f'{R.NAME.COMMON.CONTROL_CHANNEL}: {self.control_channel.mention}\n'
             if self.error_channel is not None:
                 start_report += f'{R.NAME.COMMON.ERROR_CHANNEL}: {self.error_channel.mention}\n'

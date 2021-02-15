@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -14,24 +14,25 @@
 
 __author__ = 'Mathtin'
 
-import typing, json
-
-from .view import ConfigView
-from .parser import ConfigParser
+import json
+import typing
 from typing import Any, Dict, Optional, Type, get_type_hints
 
+from .parser import ConfigParser
+from .view import ConfigView
+
+
 class ConfigManager(object):
+    path: str
+    raw: str
+    raw_dict: dict
+    config: ConfigView
+    parser: ConfigParser
+    model = None
 
-    path      : str
-    raw       : str
-    raw_dict  : dict
-    config    : ConfigView
-    parser    : ConfigParser
-    model     = None
+    _section_model_cache: Dict[Type[ConfigView], Dict[Type[ConfigView], str]] = {}
 
-    _section_model_cache : Dict[Type[ConfigView], Dict[Type[ConfigView], str]] = {}
-
-    def __init__(self, path : str, parser : ConfigParser = None) -> None:
+    def __init__(self, path: str, parser: ConfigParser = None) -> None:
         if parser is None:
             parser = ConfigParser()
         if self.model is None:
@@ -50,7 +51,7 @@ class ConfigManager(object):
         with open(self.path, 'w') as f:
             f.write(self.raw)
 
-    def alter(self, raw : str) -> None:
+    def alter(self, raw: str) -> None:
         self.raw = raw
         self.raw_dict = self.parser.parse(self.raw)
         self.config = self.model(self.raw_dict)
@@ -72,12 +73,12 @@ class ConfigManager(object):
             self._merge_dict(self.raw_dict, value_dict)
             return self._explode_raw_dict()
         # Resolve path node
-        parts =  path.split('.')
+        parts = path.split('.')
         node = self.raw_dict
         for part in parts:
             if part not in node:
                 raise KeyError(f"Invalid path: {path}")
-            node =  node[part]
+            node = node[part]
         # Update
         self._merge_dict(node, value_dict)
         self._explode_raw_dict()
@@ -91,9 +92,9 @@ class ConfigManager(object):
         raw = self.serialize_obj(self.raw_dict)
         self.alter(raw)
 
-    def section_path(self, element : Type[ConfigView], source : Type[ConfigView]) -> Optional[str]:
+    def section_path(self, element: Type[ConfigView], source: Type[ConfigView]) -> Optional[str]:
         if source not in self._section_model_cache:
-            self._section_model_cache[source] = {source:'.'}
+            self._section_model_cache[source] = {source: '.'}
         cache = self._section_model_cache[source]
         if element in cache:
             return cache[element]
@@ -101,8 +102,8 @@ class ConfigManager(object):
         types = get_type_hints(source)
         for field, type_ in types.items():
             if field.startswith('_') or \
-                isinstance(type_, typing._GenericAlias) or \
-                not issubclass(type_, ConfigView):
+                    isinstance(type_, typing._GenericAlias) or \
+                    not issubclass(type_, ConfigView):
                 continue
             path = self.section_path(element, type_)
             if path is not None:
@@ -111,7 +112,7 @@ class ConfigManager(object):
         cache[element] = res
         return res
 
-    def find_section(self, model : Type[ConfigView]) -> Any:
+    def find_section(self, model: Type[ConfigView]) -> Any:
         path = self.section_path(model, self.config.__class__)
         return self.config.get(path)
 
@@ -119,11 +120,11 @@ class ConfigManager(object):
     def serialize_obj(obj: Any) -> str:
         if isinstance(obj, dict):
             res = []
-            for k,v in obj.items():
+            for k, v in obj.items():
                 if isinstance(v, dict):
                     section_lines = ConfigManager.serialize_obj(v).splitlines()
-                    section_lines_idented = [f'    {l}\n' for l in section_lines]
-                    res.append(f'{k} {{\n' + ''.join(section_lines_idented) + '}\n') 
+                    section_lines_indented = [f'    {line}\n' for line in section_lines]
+                    res.append(f'{k} {{\n' + ''.join(section_lines_indented) + '}\n')
                 elif isinstance(v, list):
                     values = [ConfigManager.serialize_obj(a) for a in v]
                     values_str = ', '.join(values)
@@ -134,9 +135,4 @@ class ConfigManager(object):
         elif isinstance(obj, str):
             return '"' + obj.replace('"', '\\"') + '"'
         else:
-            return json.dumps(obj) 
-
-
-
-    
-        
+            return json.dumps(obj)

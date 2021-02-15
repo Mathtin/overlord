@@ -10,8 +10,8 @@
 #   This file is released under the MIT license.  #
 ###################################################
 
-sqlalchemy
+sqlalchemy == 1.3.20
 discord.py == 1.5.0
-python-dotenv
-mysql-connector-python
-lark-parser
+python-dotenv == 0.15
+mysql-connector-python == 8.0.22
+lark-parser == 0.11.1

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -20,6 +20,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import UniqueConstraint
 from .base import BaseModel
 
+
 class UserStatType(BaseModel):
     __tablename__ = 'user_stat_types'
 
@@ -30,6 +31,7 @@ class UserStatType(BaseModel):
         s = super().__repr__()[:-2]
         f = ",name={0.name!r},description={0.description!r}".format(self)
         return s + f + ")>"
+
 
 class UserStat(BaseModel):
     __tablename__ = 'user_stats'

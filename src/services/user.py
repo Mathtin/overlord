@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -17,40 +17,40 @@ __author__ = 'Mathtin'
 import logging
 
 import discord
-import db as DB
-import db.converters as conv
-import db.queries as q
+import src.db as DB
+import src.db.converters as conv
+import src.db.queries as q
 
-from typing import Optional
+from typing import Optional, Union
 from .role import RoleService
 
 log = logging.getLogger('user-service')
+
 
 ##########################
 # Service implementation #
 ##########################
 
 class UserService(object):
-
     # Members passed via constructor
-    db:    DB.DBSession
+    db: DB.DBPersistSession
     roles: RoleService
 
-    def __init__(self, db: DB.DBSession, roles: RoleService) -> None:
+    def __init__(self, db: DB.DBPersistSession, roles: RoleService) -> None:
         self.db = db
         self.roles = roles
         self.bot_cache = {}
-        
+
     def mark_everyone_absent(self) -> None:
         self.db.query(DB.User).update({'roles': None, 'display_name': None})
         self.db.commit()
-            
+
     def update_member(self, member: discord.Member) -> DB.User:
         u_row = conv.member_row(member, self.roles.role_rows_did_map)
         user = self.db.update_or_add(DB.User, 'did', u_row)
         self.db.commit()
         return user
-            
+
     def add_user(self, user: discord.User) -> DB.User:
         u_row = conv.user_row(user)
         user = self.db.add(DB.User, u_row)
@@ -61,7 +61,8 @@ class UserService(object):
         self.db.query(DB.User).filter_by(roles=None).delete()
         self.db.commit()
 
-    def is_absent(self, user: DB.User) -> bool:
+    @staticmethod
+    def is_absent(user: DB.User) -> bool:
         return user.roles is None
 
     def remove(self, member: discord.Member) -> Optional[DB.User]:
@@ -71,7 +72,7 @@ class UserService(object):
         user.delete()
         self.db.commit()
         return user
-        
+
     def mark_absent(self, member: discord.Member) -> Optional[DB.User]:
         user = self.get(member)
         if user is None:
@@ -81,8 +82,8 @@ class UserService(object):
         self.db.commit()
         return user
 
-    def get(self, member: discord.User) -> Optional[DB.User]:
-        return q.get_user_by_did(self.db, member.id)
+    def get(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
+        return q.get_user_by_did(self.db, d_user.id)
 
     def get_by_display_name(self, display_name: str) -> Optional[DB.User]:
         return self.db.query(DB.User).filter_by(display_name=display_name).first()

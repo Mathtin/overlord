@@ -30,15 +30,10 @@
       <string type="user-stat" lang="en" name="new-reaction-count">Reactions count</string>
       <string type="user-stat" lang="en" name="delete-reaction-count">Reaction remove count</string>
       <string type="user-stat" lang="en" name="vc-time">VC time</string>
-      <string type="user-stat" lang="en" name="min-weight">Mimimal weight (rank)</string>
+      <string type="user-stat" lang="en" name="min-weight">Minimal weight (rank)</string>
       <string type="user-stat" lang="en" name="max-weight">Maximal weight (rank)</string>
       <string type="user-stat" lang="en" name="exact-weight">Exact weight (rank)</string>
    </names>
-
-   <words>
-      <string type="verb" lang="en" name="expected">expected</string>
-      <string type="preposition" lang="en" name="for">for</string>
-   </words>
 
    <embeds>
       <!-- Defaults header/footer -->
@@ -86,7 +81,7 @@
       <!-- basic error messages -->
       <string type="error" lang="en" name="internal">Internal error</string>
       <string type="error" lang="en" name="no-access">Missing access</string>
-      <string type="error" lang="en" name="invalid-argument-type">Invalid argument type</string>
+      <string type="error" lang="en" name="invalid-argument">Can't parse argument</string>
       <string type="error" lang="en" name="unknown-command">No such command</string>
 
       <!-- discord error messages -->

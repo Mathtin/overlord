@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -17,20 +17,18 @@ __author__ = 'Mathtin'
 import typing
 
 from ..exceptions import InvalidConfigException
-from typing import Any, Callable, Dict, List, Type, get_type_hints
-
+from typing import Any, Callable, Dict, Type, get_type_hints
 
 
 class ConfigView(object):
-
     # Class fields
     _type_constructor_map: Dict[Type[Any], Callable[[Any, str], Any]] = {
-        int:   lambda v,p: int(v),
-        float: lambda v,p: float(v),
-        bool:  lambda v,p: bool(v),
-        str:   lambda v,p: str(v),
-        list:  lambda v,p: list(v),
-        dict:  lambda v,p: dict(v),
+        int: lambda v, p: int(v),
+        float: lambda v, p: float(v),
+        bool: lambda v, p: bool(v),
+        str: lambda v, p: str(v),
+        list: lambda v, p: list(v),
+        dict: lambda v, p: dict(v),
     }
     _field_constructor_map: Dict[str, Callable[[Any, str], Any]] = None
 
@@ -44,8 +42,8 @@ class ConfigView(object):
             types = get_type_hints(self.__class__)
             self.__class__._field_constructor_map = {
                 field: self.get_type_constructor(type_)
-                    for field, type_ in types.items() 
-                        if not field.startswith('_')
+                for field, type_ in types.items()
+                if not field.startswith('_')
             }
         # Construct each field value provided by {values}
         for key, value in values.items():
@@ -55,7 +53,7 @@ class ConfigView(object):
                 constructor = self._field_constructor_map[key]
                 field_value = constructor(value, self.path(key))
                 setattr(self, key, field_value)
-        
+
     def get_type_constructor(self, type_: Type[Any]) -> Callable[[Any, str], Any]:
         if type_ not in self._type_constructor_map:
             self._type_constructor_map[type_] = self._resolve_constructor(type_)
@@ -66,15 +64,15 @@ class ConfigView(object):
         if isinstance(type_, typing._GenericAlias):
             # Resolve complex List type-hint
             if type_._name == 'List':
-                subcontructor = self.get_type_constructor(type_.__args__[0])
-                return lambda l, p: [subcontructor(e, f'{p}[{i}]') for i,e in enumerate(l)]
+                sub_constructor = self.get_type_constructor(type_.__args__[0])
+                return lambda l, p: [sub_constructor(e, f'{p}[{i}]') for i, e in enumerate(l)]
             # Resolve complex Dict type-hint
             elif type_._name == 'Dict':
                 # Check key type
                 if type_.__args__[0] is not str:
                     raise TypeError(f"Unsupported dict key type hint: {type_.__args__[0]}")
-                subcontructor = self.get_type_constructor(type_.__args__[1])
-                return lambda d, p: {k:subcontructor(v,f'{p}.{k}') for k,v in d.items()}
+                sub_constructor = self.get_type_constructor(type_.__args__[1])
+                return lambda d, p: {k: sub_constructor(v, f'{p}.{k}') for k, v in d.items()}
             # Other type-hints are not supported
             raise TypeError(f"Unsupported type hint: {type_}")
         # ConfigView are constructor-ready
@@ -82,8 +80,8 @@ class ConfigView(object):
             return type_
         raise TypeError(f"Unsupported type: {type_}")
 
-    def path(self, subpath: str) -> str:
-        return f'{self._path_prefix}.{subpath}' if self._path_prefix else subpath
+    def path(self, sub_path: str) -> str:
+        return f'{self._path_prefix}.{sub_path}' if self._path_prefix else sub_path
 
     def get(self, path: str) -> Any:
         if path == '.':
@@ -110,9 +108,9 @@ class ConfigView(object):
         elif isinstance(o, list):
             return [ConfigView.deconstruct_obj(v) for v in o]
         elif isinstance(o, dict):
-            return {k:ConfigView.deconstruct_obj(v) for k,v in o.items()}
+            return {k: ConfigView.deconstruct_obj(v) for k, v in o.items()}
         return o
 
     def __iter__(self):
         for field in self._field_constructor_map:
-            yield (field, getattr(self, field))
+            yield field, getattr(self, field)

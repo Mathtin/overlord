@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -22,11 +22,12 @@ from dotenv import load_dotenv
 
 from util import ConfigView, ConfigManager
 from util.logger import LoggerRootConfig, update_config as update_logger
-from db import DBSession, EventType, UserStatType
+from db import DBPersistSession, EventType, UserStatType
 from db.predefined import EVENT_TYPES, USER_STAT_TYPES
 from overlord import Overlord, OverlordRootConfig
 from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
 from extensions import RankingRootConfig, InviteRootConfig
+
 
 class ExtensionsConfig(ConfigView):
     """
@@ -35,8 +36,9 @@ class ExtensionsConfig(ConfigView):
         invite : InviteRootConfig
     }
     """
-    rank   : RankingRootConfig = RankingRootConfig()
-    invite : InviteRootConfig  = InviteRootConfig()
+    rank: RankingRootConfig = RankingRootConfig()
+    invite: InviteRootConfig = InviteRootConfig()
+
 
 class RootConfig(ConfigView):
     """
@@ -44,13 +46,13 @@ class RootConfig(ConfigView):
     bot         : OverlordRootConfig
     extension   : ExtensionsConfig
     """
-    logger    : LoggerRootConfig   = LoggerRootConfig()
-    bot       : OverlordRootConfig = OverlordRootConfig()
-    extension : ExtensionsConfig   = ExtensionsConfig()
+    logger: LoggerRootConfig = LoggerRootConfig()
+    bot: OverlordRootConfig = OverlordRootConfig()
+    extension: ExtensionsConfig = ExtensionsConfig()
+
 
 class Configuration(ConfigManager):
-
-    config : RootConfig
+    config: RootConfig
 
     def alter(self, raw: str) -> None:
         super().alter(raw)
@@ -74,7 +76,7 @@ def main(argv):
     if 'sqlite' in url:
         import db.queries as q
         q.MODE = q.MODE_SQLITE
-    session = DBSession(url, autocommit=False)
+    session = DBPersistSession(url, autocommit=False)
     session.sync_table(EventType, 'name', EVENT_TYPES)
     session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
 
@@ -99,6 +101,7 @@ def main(argv):
     discord_bot.run()
 
     return 0
+
 
 if __name__ == "__main__":
     res = main(sys.argv)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -14,24 +14,24 @@
 
 __author__ = 'Mathtin'
 
-import sys
-import traceback
 import asyncio
 import logging
-import discord
-
-
-from discord.errors import InvalidArgument
-from overlord.base import OverlordBase
-from overlord.types import OverlordTask
-from overlord.command import OverlordCommand
-
-from util import get_coroutine_attrs, limit_traceback, quote_msg
-from util.exceptions import InvalidConfigException
-from util.resources import R
+import sys
+import traceback
 from typing import Dict, List, Optional, Callable, Awaitable
 
+import discord
+from discord.errors import InvalidArgument
+
+from src.overlord.base import OverlordBase
+from src.overlord.command import OverlordCommand
+from src.overlord.types import OverlordTask
+from src.util import get_coroutine_attrs
+from src.util.exceptions import InvalidConfigException
+from src.util.resources import R
+
 log = logging.getLogger('overlord-extension')
+
 
 ############################
 # Bot Extension Base Class #
@@ -64,12 +64,12 @@ class BotExtension(object):
         attrs = [getattr(self, attr) for attr in dir(self) if not attr.startswith('_')]
 
         # Gather tasks
-        self._tasks =  [t for t in attrs if isinstance(t, OverlordTask)]
-        self._task_instances =  []
+        self._tasks = [t for t in attrs if isinstance(t, OverlordTask)]
+        self._task_instances = []
 
         # Gather commands
-        self._commands =  {c.name:c for c in attrs if isinstance(c, OverlordCommand)}
-        self._command_handlers =  {name:c.handler(self) for name, c in self._commands.items()}
+        self._commands = {c.name: c for c in attrs if isinstance(c, OverlordCommand)}
+        self._command_handlers = {name: c.handler(self) for name, c in self._commands.items()}
 
         # Reattach implemented handlers
         handlers = get_coroutine_attrs(self, name_filter=lambda x: x.startswith('on_'))
@@ -83,18 +83,25 @@ class BotExtension(object):
             raise InvalidArgument(f'priority should be less then 63 and bigger or equal then 0, got: {priority}')
 
     @staticmethod
-    def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> Callable[..., Callable[..., Awaitable[None]]]:
-        def decorator(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
-            async def wrapped(self, *args, **kwargs):
+    def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> \
+            Callable[[Callable[..., Awaitable[None]]], OverlordTask]:
+
+        def decorator(func: Callable[..., Awaitable[None]]) -> OverlordTask:
+
+            async def wrapped(self, *args, **kwargs) -> None:
                 await self.bot.init_lock()
                 await func(self, *args, **kwargs)
-            return OverlordTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count, reconnect=reconnect)
+
+            return OverlordTask(wrapped, seconds=seconds, minutes=minutes, hours=hours, count=count,
+                                reconnect=reconnect)
         return decorator
 
     @staticmethod
-    def command(name, desciption='') -> Callable[..., Callable[..., Awaitable[None]]]:
-        def decorator(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
-            return OverlordCommand(func, name=name, desciption=desciption)
+    def command(name, description='') -> Callable[[Callable[..., Awaitable[None]]], OverlordCommand]:
+
+        def decorator(func: Callable[..., Awaitable[None]]) -> OverlordCommand:
+            return OverlordCommand(func, name=name, description=description)
+
         return decorator
 
     @staticmethod
@@ -109,6 +116,7 @@ class BotExtension(object):
                 raise e
             except:
                 await func.__self__.on_error(func.__name__, *args, **kwargs)
+
         return wrapped
 
     @property
@@ -119,7 +127,7 @@ class BotExtension(object):
         if self._enabled:
             return
         self._enabled = True
-        self._task_instances =  [t.task(self) for t in self._tasks]
+        self._task_instances = [t.task(self) for t in self._tasks]
         for task in self._task_instances:
             task.start()
 
@@ -135,15 +143,15 @@ class BotExtension(object):
 
     def help_embed(self, name) -> discord.Embed:
         title = f'{self.__extname__}'
-        help_page = self.bot.base_embed(name, title, self.__description__, self.__color__)
+        help_page = self.bot.new_embed(name, title, self.__description__, color=self.__color__)
         commands = self.bot.config.command
         prefix = self.bot.prefix
-        help_page
         for name, cmd in self._commands.items():
             if name not in commands or not commands[name]:
                 help_page.add_field(name=f'[DISABLED] {prefix}{name}', value=cmd.help(prefix, []), inline=False)
             else:
-                help_page.add_field(name=f'`$ {prefix}{commands[name][0]}`', value=cmd.help(prefix, commands[name]), inline=False)
+                help_page.add_field(name=f'`$ {prefix}{commands[name][0]}`', value=cmd.help(prefix, commands[name]),
+                                    inline=False)
         return help_page
 
     def cmd(self, name: str) -> Optional[OverlordCommand]:
@@ -186,11 +194,10 @@ class BotExtension(object):
 
         if self.bot.error_channel is not None and event != 'on_ready':
             await self.bot.error_channel.send(embed=channel_report)
-        
+
         await self.bot.maintainer.send(embed=maintainer_report)
-        
+
         self.stop()
 
     async def on_ready(self) -> None:
         pass
-    

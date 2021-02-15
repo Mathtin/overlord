@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -24,20 +24,21 @@ log = logging.getLogger('util-resources')
 
 
 def res_path(local_path: str):
-    res_path = os.getenv('RESOURCE_PATH')
-    return os.path.join(res_path, local_path)
-    
+    path = os.getenv('RESOURCE_PATH')
+    return os.path.join(path, local_path)
+
 
 STRING_RESOURCE_FILE = 'strings.xml'
 
+
 class StringResourceView(object):
 
-    _strings_path:  str
-    _lang:          str
-    _root:          ET.Element
-    _path_cache:   Dict[str, str]
+    _strings_path: str
+    _lang: str
+    _root: ET.Element
+    _path_cache: Dict[str, str]
 
-    def __init__(self, lang:str='en') -> None:
+    def __init__(self, lang: str = 'en') -> None:
         self._strings_path = res_path(STRING_RESOURCE_FILE)
         if not os.path.isfile(self._strings_path):
             raise MissingResourceException(self._strings_path, STRING_RESOURCE_FILE)
@@ -54,9 +55,9 @@ class StringResourceView(object):
 
     @staticmethod
     def _attribute_name(attrib: str) -> str:
-        return attrib.lower().replace('_','-')
+        return attrib.lower().replace('_', '-')
 
-    def switch_lang(self, lang:str):
+    def switch_lang(self, lang: str):
         self._lang = lang
         self._path_cache = {}
 
@@ -73,23 +74,24 @@ class StringResourceView(object):
 
     class TypeView(object):
 
-        def __init__(self, section, type: str) -> None:
-            self._section = section
-            self._type = type
+        def __init__(self, section, type_: str) -> None:
+            self.section = section
+            self.type = type_
 
         def __getattr__(self, name: str):
-            return self._section._view.get(f'{self._section._section}.{self._type}.{name}')
+            return self.section.view.get(f'{self.section.section}.{self.type}.{name}')
 
     class SectionView(object):
 
         def __init__(self, view, section: str) -> None:
-            self._view = view
-            self._section = section
+            self.view = view
+            self.section = section
 
         def __getattr__(self, name: str):
             return StringResourceView.TypeView(self, name)
-    
+
     def __getattr__(self, name: str):
         return StringResourceView.SectionView(self, name)
+
 
 R = StringResourceView()

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -14,13 +14,16 @@
 
 __author__ = 'Mathtin'
 
+
 class InvalidConfigException(Exception):
     def __init__(self, msg: str, var_name: str):
         super().__init__(f'{msg}, check {var_name} value')
 
+
 class NotCoroutineException(TypeError):
     def __init__(self, func):
         super().__init__(f'{str(func)} is not a coroutine function')
+
 
 class MissingResourceException(Exception):
     def __init__(self, xml: str, path: str):

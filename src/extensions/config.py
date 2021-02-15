@@ -59,7 +59,7 @@ class ConfigExtension(BotExtension):
     # Commands #
     ############
 
-    @BotExtension.command("reload_config", desciption="Reload config from disk")
+    @BotExtension.command("reload_config", description="Reload config from disk")
     async def cmd_reload_config(self, msg: discord.Message):
         log.info(f'Reloading config')
         # Reload config
@@ -67,14 +67,14 @@ class ConfigExtension(BotExtension):
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
 
-    @BotExtension.command("save_config", desciption="Save config on disk")
+    @BotExtension.command("save_config", description="Save config on disk")
     async def cmd_save_config(self, msg: discord.Message):
         log.info(f'Saving config')
         self.bot.save_config()
         log.info(f'Done')
         await msg.channel.send(res.get("messages.done"))
 
-    @BotExtension.command("get_config_value", desciption="Print config value (in json)")
+    @BotExtension.command("get_config_value", description="Print config value (in json)")
     async def cmd_get_config_value(self, msg: discord.Message, path: str):
         embed = self.bot.base_embed("Overlord Configuration", f"⚙ {path} value", '', self.__color__)
         try:
@@ -85,7 +85,7 @@ class ConfigExtension(BotExtension):
         except KeyError:
             await msg.channel.send(res.get("messages.invalid_config_path"))
 
-    @BotExtension.command("alter_config", desciption="Set config value (in json, use quote to wrap complex values)")
+    @BotExtension.command("alter_config", description="Set config value (in json, use quote to wrap complex values)")
     async def cmd_alter_config(self, msg: discord.Message, path: str, value: str):
         old_config = self.raw_config
         try:

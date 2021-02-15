@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -17,6 +17,7 @@ __author__ = 'Mathtin'
 from sqlalchemy import Column, Integer, VARCHAR, BigInteger, Unicode
 from .base import BaseModel
 
+
 class User(BaseModel):
     __tablename__ = 'users'
 
@@ -28,5 +29,6 @@ class User(BaseModel):
 
     def __repr__(self):
         s = super().__repr__()[:-2]
-        f = ",did={0.did!r},name={0.name!r},disc={0.disc!r},display_name={0.display_name!r},roles={0.roles!r}".format(self)
+        f = ",did={0.did!r},name={0.name!r},disc={0.disc!r},display_name={0.display_name!r},roles={0.roles!r}".format(
+            self)
         return s + f + ")>"

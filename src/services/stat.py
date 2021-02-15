@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -16,32 +16,32 @@ __author__ = 'Mathtin'
 
 import logging
 
-import db as DB
-import db.converters as conv
-import db.queries as q
+import src.db as DB
+import src.db.converters as conv
+import src.db.queries as q
 
 from typing import Dict
 from .event import EventService
 
 log = logging.getLogger('stat-service')
 
+
 ##########################
 # Service implementation #
 ##########################
 
 class StatService(object):
-
     # State
     user_stat_type_map: Dict[str, int]
 
     # Members passed via constructor
     events: EventService
-    db:     DB.DBSession
+    db: DB.DBPersistSession
 
-    def __init__(self, db: DB.DBSession, events: EventService) -> None:
+    def __init__(self, db: DB.DBPersistSession, events: EventService) -> None:
         self.db = db
         self.events = events
-        self.user_stat_type_map = {row.name:row.id for row in self.db.query(DB.UserStatType)}
+        self.user_stat_type_map = {row.name: row.id for row in self.db.query(DB.UserStatType)}
 
     def check_stat_name(self, name: str) -> None:
         if name not in self.user_stat_type_map:
@@ -69,12 +69,12 @@ class StatService(object):
         event_id = self.events.type_id(event)
         self.db.query(DB.UserStat).filter_by(type_id=stat_id).delete()
         self.db.commit()
-        select_query = query(event_id, [('type_id',stat_id)])
+        select_query = query(event_id, [('type_id', stat_id)])
         insert_query = q.insert_user_stat_from_select(select_query)
         self.db.execute(insert_query)
         self.db.commit()
 
-    def reload_stat(self, name: str):
+    def reload_stat(self, name: str) -> None:
         self.check_stat_name(name)
         if hasattr(self, f'reload_{name}_stat'):
             hook = getattr(self, f'reload_{name}_stat')
@@ -82,27 +82,26 @@ class StatService(object):
         else:
             self.reload_stat_default()
 
-    def reload_stat_default(self):
+    def reload_stat_default(self) -> None:
         pass
 
-    def reload_membership_stat(self):
+    def reload_membership_stat(self) -> None:
         self._reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
 
-    def reload_new_message_count_stat(self):
+    def reload_new_message_count_stat(self) -> None:
         self._reload_stat(q.select_message_count_per_user, 'new_message_count', 'new_message')
 
-    def reload_delete_message_count_stat(self):
+    def reload_delete_message_count_stat(self) -> None:
         self._reload_stat(q.select_message_count_per_user, 'delete_message_count', 'message_delete')
 
-    def reload_edit_message_count_stat(self):
+    def reload_edit_message_count_stat(self) -> None:
         self._reload_stat(q.select_message_count_per_user, 'edit_message_count', 'message_edit')
 
-    def reload_new_reaction_count_stat(self):
+    def reload_new_reaction_count_stat(self) -> None:
         self._reload_stat(q.select_reaction_count_per_user, 'new_reaction_count', 'new_reaction')
 
-    def reload_delete_reaction_count_stat(self):
+    def reload_delete_reaction_count_stat(self) -> None:
         self._reload_stat(q.select_reaction_count_per_user, 'delete_reaction_count', 'reaction_delete')
 
-    def reload_vc_time_stat(self):
+    def reload_vc_time_stat(self) -> None:
         self._reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
-

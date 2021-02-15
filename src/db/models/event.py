@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -19,6 +19,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql.schema import Index
 from .base import BaseModel
+
 
 class EventType(BaseModel):
     __tablename__ = 'event_types'
@@ -36,9 +37,9 @@ class Event(object):
     __tablename__ = None
 
     @declared_attr
-    def type_id(cls): 
+    def type_id(cls):
         return Column(Integer, ForeignKey('event_types.id', ondelete='CASCADE'), nullable=False)
-    
+
     @declared_attr
     def user_id(cls):
         return Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
@@ -46,10 +47,10 @@ class Event(object):
     @declared_attr
     def type(cls):
         return relationship("EventType", lazy="select")
-        
+
     @declared_attr
     def user(cls):
-        return relationship("User", lazy="select", primaryjoin=cls.__tablename__+".c.user_id == users.c.id")
+        return relationship("User", lazy="select", primaryjoin=cls.__tablename__ + ".c.user_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
@@ -59,7 +60,7 @@ class Event(object):
 
 class MemberEvent(Event, BaseModel):
     __tablename__ = 'member_events'
-    __table_args__ = (Index('cix_member_events', "user_id", "created_at"), )
+    __table_args__ = (Index('cix_member_events', "user_id", "created_at"),)
 
 
 class MessageEvent(Event, BaseModel):
@@ -68,24 +69,26 @@ class MessageEvent(Event, BaseModel):
     message_id = Column(BigInteger, nullable=False, index=True)
     channel_id = Column(BigInteger, nullable=False, index=True)
 
-    __table_args__ = (Index('cix_message_events', "user_id"), )
+    __table_args__ = (Index('cix_message_events', "user_id"),)
 
     def __repr__(self):
         s = super().__repr__()[:-2]
         f = ",message_id={0.message_id!r},channel_id={0.channel_id!r}".format(self)
         return s + f + ")>"
 
+
 class VoiceChatEvent(Event, BaseModel):
     __tablename__ = 'vc_events'
 
     channel_id = Column(BigInteger, nullable=False, index=True)
 
-    __table_args__ = (Index('cix_vc_events', "user_id", "channel_id", "created_at"), )
+    __table_args__ = (Index('cix_vc_events', "user_id", "channel_id", "created_at"),)
 
     def __repr__(self):
         s = super().__repr__()[:-2]
         f = ",channel_id={0.channel_id!r}".format(self)
         return s + f + ")>"
+
 
 class ReactionEvent(Event, BaseModel):
     __tablename__ = 'reaction_events'
@@ -94,7 +97,7 @@ class ReactionEvent(Event, BaseModel):
 
     message_event = relationship("MessageEvent", lazy="select")
 
-    __table_args__ = (Index('cix_reaction_events', "message_event_id"), )
+    __table_args__ = (Index('cix_reaction_events', "message_event_id"),)
 
     def __repr__(self):
         s = super().__repr__()[:-2]

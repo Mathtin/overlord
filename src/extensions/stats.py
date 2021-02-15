@@ -116,7 +116,7 @@ class StatsExtension(BotExtension):
     # Commands #
     ############
 
-    @BotExtension.command("recalculate_stats", desciption="Recalculate whole guild stats")
+    @BotExtension.command("recalculate_stats", description="Recalculate whole guild stats")
     async def cmd_recalculate_stats(self, msg: discord.Message):
         # Tranaction begins
         async with self.sync():
@@ -129,7 +129,7 @@ class StatsExtension(BotExtension):
             await msg.channel.send(res.get("messages.done"))
 
 
-    @BotExtension.command("get_user_stats", desciption="Fetches user stats from db")
+    @BotExtension.command("get_user_stats", description="Fetches user stats from db")
     async def cmd_get_user_stats(self, msg: discord.Message, ov_user: OverlordMember):
         member = ov_user.discord
         user = ov_user.db
@@ -155,7 +155,7 @@ class StatsExtension(BotExtension):
         await msg.channel.send(embed=embed)
 
     
-    @BotExtension.command("get_stat_names", desciption="Print stat names")
+    @BotExtension.command("get_stat_names", description="Print stat names")
     async def cmd_get_stat_names(self, msg: discord.Message):
         desc = f'Stat code names available at the moment'
         embed = self.bot.base_embed("Overlord Stats", f"Stat names", desc, self.__color__)
@@ -165,7 +165,7 @@ class StatsExtension(BotExtension):
         await msg.channel.send(embed=embed)
 
 
-    @BotExtension.command("get_user_stat", desciption="Fetches user stats from db (for specified user)")
+    @BotExtension.command("get_user_stat", description="Fetches user stats from db (for specified user)")
     async def cmd_get_user_stat(self, msg: discord.Message, user: DB.User, stat_name: str):
         try:
             answer = _build_stat_line(self.s_stats, user, stat_name)
@@ -175,7 +175,7 @@ class StatsExtension(BotExtension):
             return
 
 
-    @BotExtension.command("set_user_stat", desciption="Sets user stat value in db")
+    @BotExtension.command("set_user_stat", description="Sets user stat value in db")
     async def cmd_set_user_stat(self, msg: discord.Message, user: DB.User, stat_name: str, value: int):
         if value < 0:
             await msg.channel.send(res.get("messages.warning").format("negative stat value!"))

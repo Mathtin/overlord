@@ -14,5 +14,5 @@
 
 __author__ = 'Mathtin'
 
-from .session import DBSession
+from .session import DBPersistSession
 from .models import *

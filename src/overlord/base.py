@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
+# ........../\./\...___......|\.|..../...\.........#
+# ........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
+# ......../....../--\|.|.|.|i|..|....\.../.........#
 #        Mathtin (c)                              #
 ###################################################
 #   Project: Overlord discord bot                 #
@@ -14,27 +14,27 @@
 
 __author__ = 'Mathtin'
 
+import asyncio
+import logging
 import os
 import sys
 import traceback
-import asyncio
-import logging
+from typing import Any, List, Optional, Union
 
 import discord
-import db as DB
 
-from util import limit_traceback
-from util.config import ConfigManager
-from util.exceptions import InvalidConfigException, NotCoroutineException
-from util.extbot import is_dm_message, filter_roles, quote_msg, is_text_channel, qualified_name
-from util.logger import DiscordLogConfig
-from util.resources import R
-from typing import Any, List, Optional, Union
-from services import EventService, RoleService, StatService, UserService
-
+import src.db as DB
+from src.services import EventService, RoleService, StatService, UserService
+from src.util import limit_traceback
+from src.util.config import ConfigManager
+from src.util.exceptions import InvalidConfigException, NotCoroutineException
+from src.util.extbot import is_dm_message, filter_roles, is_text_channel, qualified_name
+from src.util.logger import DiscordLogConfig
+from src.util.resources import R
 from .types import OverlordRootConfig
 
 log = logging.getLogger('overlord-bot')
+
 
 #############################
 # Base class implementation #
@@ -55,13 +55,13 @@ class OverlordBase(discord.Client):
     cnf_manager: ConfigManager
     config: OverlordRootConfig
     log_config: DiscordLogConfig
-    db: DB.DBSession
+    db: DB.DBPersistSession
 
     # Values initiated on_ready
     guild: discord.Guild
     control_channel: discord.TextChannel
-    error_channel: discord.TextChannel
-    maintainer: discord.User
+    error_channel: Optional[discord.TextChannel]
+    maintainer: discord.Member
     me: discord.Member
 
     # Services
@@ -70,14 +70,15 @@ class OverlordBase(discord.Client):
     s_events: EventService
     s_stats: StatService
 
-    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBSession) -> None:
+    def __init__(self, cnf_manager: ConfigManager, db_session: DB.DBPersistSession) -> None:
+        # Internal fields
         self._async_lock = asyncio.Lock()
         self._initialized = False
+        self.error_channel = None
 
+        # User supplied fields
         self.cnf_manager = cnf_manager
         self.reload_sections()
-        if self.config is None:
-            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         self.db = db_session
 
         # Init base class
@@ -97,12 +98,6 @@ class OverlordBase(discord.Client):
         self.error_channel_id = int(os.getenv('DISCORD_ERROR_CHANNEL'))
         self.maintainer_id = int(os.getenv('MAINTAINER_DISCORD_ID'))
 
-        # Preset values initiated on_ready
-        self.guild = None
-        self.control_channel = None
-        self.error_channel = None
-        self.me = None
-
         # Services
         self.s_roles = RoleService(self.db)
         self.s_users = UserService(self.db, self.s_roles)
@@ -115,7 +110,7 @@ class OverlordBase(discord.Client):
 
     @property
     def extensions(self) -> List[Any]:
-        pass
+        raise NotImplementedError()
 
     @property
     def prefix(self) -> str:
@@ -154,7 +149,7 @@ class OverlordBase(discord.Client):
     # Embeds #
     ##########
 
-    def new_embed(self, title, body, footer:str=None, header:str=None, color:int=0xd75242):
+    def new_embed(self, title, body, footer: str = None, header: str = None, color: int = 0xd75242):
         header = header or R.EMBED.HEADER.DEFAULT
         footer = footer or R.EMBED.FOOTER.DEFAULT
         embed = discord.Embed(title=title, description=body, color=color)
@@ -162,27 +157,27 @@ class OverlordBase(discord.Client):
         embed.set_footer(text=footer, icon_url=self.me.avatar_url)
         return embed
 
-    def new_error_report(self, name: str, details: str, traceback: str=None, color: int=0xd75242):
+    def new_error_report(self, name: str, details: str, traceback_: Optional[List[str]] = None, color: int = 0xd75242):
         header = R.EMBED.HEADER.ERROR_REPORT
-        title = f'❗ {R.EMBED.TITLE.ERROR}: {name}'
+        title = f'❗ {name}'
         embed = self.new_embed(title=title, body=details, header=header, color=color)
-        if traceback is not None:
-            traceback_limited = limit_traceback(traceback, "src", 6)
-            embed.add_field(name=R.NAME.COMMON.TRACEBACK, value=traceback_limited, inline=False)
+        if traceback_ is not None:
+            traceback_limited = limit_traceback(traceback_, "src", 6)
+            embed.add_field(name=R.NAME.COMMON.TRACEBACK, value='\n'.join(traceback_limited), inline=False)
         return embed
 
-    def new_warn_report(self, name: str, details: str, color: int=0xd75242):
+    def new_warn_report(self, name: str, details: str, color: int = 0xd75242):
         header = R.EMBED.HEADER.WARN_REPORT
-        title = f'⚠ {R.EMBED.TITLE.WARNING}: {name}'
+        title = f'⚠ {name}'
         embed = self.new_embed(title=title, body=details, header=header, color=color)
         return embed
 
-    def new_info_report(self, name: str, details: str, color: int=0xd75242):
+    def new_info_report(self, name: str, details: str, color: int = 0xd75242):
         header = R.EMBED.HEADER.INFO_REPORT
-        title = f'📰 {R.EMBED.TITLE.INFO}: {name}'
+        title = f'📰 {name}'
         embed = self.new_embed(title=title, body=details, header=header, color=color)
         return embed
-        
+
     ################
     # Sync methods #
     ################
@@ -211,8 +206,11 @@ class OverlordBase(discord.Client):
 
     def reload_sections(self) -> None:
         self.config = self.get_config_section(OverlordRootConfig)
+        if self.config is None:
+            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         self.log_config = self.get_config_section(DiscordLogConfig)
-
+        if self.log_config is None:
+            raise InvalidConfigException("DiscordLogConfig section not found", "root")
 
     #################
     # Async methods #
@@ -233,8 +231,8 @@ class OverlordBase(discord.Client):
     async def send_warning(self, from_: str, msg: str) -> None:
         warn_report = self.new_warn_report(from_, msg)
         if self.error_channel is not None:
-            await self.error_channel.send(warn_report)
-        await self.maintainer.send(warn_report)
+            await self.error_channel.send(embed=warn_report)
+        await self.maintainer.send(embed=warn_report)
         return
 
     async def sync_users(self) -> None:
@@ -254,43 +252,42 @@ class OverlordBase(discord.Client):
         log.info(f'Syncing is done')
 
     async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
-            try:
-                if '#' in user_mention:
-                    user = self.s_users.get_by_qualified_name(user_mention)
-                elif user_mention.startswith('<@'):
-                    id = int(user_mention[2:-1])
-                    return await self.fetch_user(id)
-                else:
-                    user = self.s_users.get_by_display_name(user_mention)
-                if user is None:
-                    return None
-                return await self.fetch_user(user.did)
-            except discord.NotFound:
+        try:
+            if '#' in user_mention:
+                user = self.s_users.get_by_qualified_name(user_mention)
+            elif user_mention.startswith('<@'):
+                return await self.fetch_user(int(user_mention[2:-1]))
+            else:
+                user = self.s_users.get_by_display_name(user_mention)
+            if user is None:
                 return None
-            except ValueError:
-                return None
+            return await self.fetch_user(user.did)
+        except discord.NotFound:
+            return None
+        except ValueError:
+            return None
 
     async def resolve_text_channel(self, channel_mention: str) -> Optional[discord.TextChannel]:
-            if '<' in channel_mention:
-                channel = [c for c in self.guild.text_channels if c.mention == channel_mention]
-                return channel[0] if channel else None
-            if '#' in channel_mention:
-                channel_name = channel_mention[1:]
-            else:
-                channel_name = channel_mention
-            channel = [c for c in self.guild.text_channels if c.name == channel_name]
+        if '<' in channel_mention:
+            channel = [c for c in self.guild.text_channels if c.mention == channel_mention]
             return channel[0] if channel else None
+        if '#' in channel_mention:
+            channel_name = channel_mention[1:]
+        else:
+            channel_name = channel_mention
+        channel = [c for c in self.guild.text_channels if c.name == channel_name]
+        return channel[0] if channel else None
 
     async def resolve_voice_channel(self, channel_mention: str) -> Optional[discord.VoiceChannel]:
-            if '<' in channel_mention:
-                channel = [c for c in self.guild.voice_channels if c.mention == channel_mention]
-                return channel[0] if channel else None
-            if '#' in channel_mention:
-                channel_name = channel_mention[1:]
-            else:
-                channel_name = channel_mention
-            channel = [c for c in self.guild.voice_channels if c.name == channel_name]
+        if '<' in channel_mention:
+            channel = [c for c in self.guild.voice_channels if c.mention == channel_mention]
             return channel[0] if channel else None
+        if '#' in channel_mention:
+            channel_name = channel_mention[1:]
+        else:
+            channel_name = channel_mention
+        channel = [c for c in self.guild.voice_channels if c.name == channel_name]
+        return channel[0] if channel else None
 
     async def logout(self) -> None:
         await super().logout()
@@ -299,8 +296,6 @@ class OverlordBase(discord.Client):
         log.info(f'Altering configuration')
         self.cnf_manager.alter(config)
         self.reload_sections()
-        if self.config is None:
-            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
 
     async def safe_alter_config(self, config: str) -> Optional[Exception]:
@@ -308,7 +303,7 @@ class OverlordBase(discord.Client):
         try:
             await self.alter_config(config)
         except (InvalidConfigException, TypeError) as e:
-            log.warn(f'Invalid config data: {e}. Reverting.')
+            log.warning(f'Invalid config data: {e}. Reverting.')
             await self.alter_config(old_config)
             return e
         return None
@@ -317,8 +312,6 @@ class OverlordBase(discord.Client):
         log.info(f'Updating configuration')
         self.save_config()
         self.reload_sections()
-        if self.config is None:
-            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
 
     async def safe_update_config(self) -> Optional[Exception]:
@@ -326,7 +319,7 @@ class OverlordBase(discord.Client):
         try:
             await self.update_config()
         except (InvalidConfigException, TypeError) as e:
-            log.warn(f'Invalid config data. Reverting.')
+            log.warning(f'Invalid config data. Reverting.')
             await self.alter_config(old_config)
             return e
         return None
@@ -335,8 +328,6 @@ class OverlordBase(discord.Client):
         log.info(f'Altering configuration')
         self.cnf_manager.reload()
         self.reload_sections()
-        if self.config is None:
-            raise InvalidConfigException("OverlordRootConfig section not found", "root")
         await self.on_config_update()
 
     #########
@@ -363,7 +354,7 @@ class OverlordBase(discord.Client):
 
         if self.error_channel is not None and event != 'on_ready':
             await self.error_channel.send(embed=channel_report)
-        
+
         await self.maintainer.send(embed=maintainer_report)
 
         if ex_type is InvalidConfigException:
@@ -377,7 +368,7 @@ class OverlordBase(discord.Client):
         """
             Async ready event handler
 
-            Completly initialize bot state
+            Completely initialize bot state
         """
         # Find guild
         self.guild = self.get_guild(self.guild_id)
@@ -392,7 +383,7 @@ class OverlordBase(discord.Client):
         if channel is None:
             raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
         if not is_text_channel(channel):
-            raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_CONTROL_CHANNEL')
+            raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel", 'DISCORD_CONTROL_CHANNEL')
         log.info(f'Attached to {channel.name} as control channel ({channel.id})')
         self.control_channel = channel
 
@@ -402,7 +393,8 @@ class OverlordBase(discord.Client):
             if channel is None:
                 raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
             if not is_text_channel(channel):
-                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",'DISCORD_ERROR_CHANNEL')
+                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",
+                                             'DISCORD_ERROR_CHANNEL')
             log.info(f'Attached to {channel.name} as error channel ({channel.id})')
             self.error_channel = channel
 
@@ -412,14 +404,14 @@ class OverlordBase(discord.Client):
         except discord.NotFound:
             raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
         except discord.Forbidden:
-            raise InvalidConfigException(f'Error cannot send messagees to maintainer', 'MAINTAINER_DISCORD_ID')
+            raise InvalidConfigException(f'Error cannot send messages to maintainer', 'MAINTAINER_DISCORD_ID')
         log.info(f'Maintainer is {qualified_name(self.maintainer)} ({self.maintainer.id})')
 
         # Sync roles and users
         await self.sync_users()
 
         self._initialized = True
-        
+
     async def on_config_update(self) -> None:
         self.check_config()
         self.update_command_cache()
