@@ -28,7 +28,7 @@ from services import EventService, RoleService, StatService, UserService
 from util import limit_traceback
 from util.config import ConfigManager
 from util.exceptions import InvalidConfigException, NotCoroutineException
-from util.extbot import is_dm_message, filter_roles, is_text_channel, qualified_name
+from util.extbot import is_dm_message, filter_roles, qualified_name
 from util.logger import DiscordLogConfig
 from util.resources import R
 from .types import OverlordRootConfig
@@ -47,8 +47,6 @@ class OverlordBase(discord.Client):
     # Members loaded from ENV
     token: str
     guild_id: int
-    control_channel_id: int
-    error_channel_id: int
     maintainer_id: int
 
     # Members passed via constructor
@@ -60,7 +58,7 @@ class OverlordBase(discord.Client):
     # Values initiated on_ready
     guild: discord.Guild
     control_channel: discord.TextChannel
-    error_channel: Optional[discord.TextChannel]
+    log_channel: Optional[discord.TextChannel]
     maintainer: discord.Member
     me: discord.Member
 
@@ -74,7 +72,7 @@ class OverlordBase(discord.Client):
         # Internal fields
         self._async_lock = asyncio.Lock()
         self._initialized = False
-        self.error_channel = None
+        self.log_channel = None
 
         # User supplied fields
         self.cnf_manager = cnf_manager
@@ -94,8 +92,6 @@ class OverlordBase(discord.Client):
         # Load env values
         self.token = os.getenv('DISCORD_TOKEN')
         self.guild_id = int(os.getenv('DISCORD_GUILD'))
-        self.control_channel_id = int(os.getenv('DISCORD_CONTROL_CHANNEL'))
-        self.error_channel_id = int(os.getenv('DISCORD_ERROR_CHANNEL'))
         self.maintainer_id = int(os.getenv('MAINTAINER_DISCORD_ID'))
 
         # Services
@@ -129,7 +125,7 @@ class OverlordBase(discord.Client):
         return not state.afk or not self.config.ignore_afk_vc
 
     def is_special_channel_id(self, channel_id: int) -> bool:
-        return channel_id == self.control_channel.id or channel_id == self.error_channel.id
+        return channel_id == self.control_channel.id or channel_id == self.log_channel.id
 
     def get_role(self, role_name: str) -> Optional[discord.Role]:
         return self.s_roles.get(role_name)
@@ -223,15 +219,15 @@ class OverlordBase(discord.Client):
 
     async def send_error(self, from_: str, msg: str) -> None:
         error_report = self.new_error_report(from_, msg)
-        if self.error_channel is not None:
-            await self.error_channel.send(embed=error_report)
+        if self.log_channel is not None:
+            await self.log_channel.send(embed=error_report)
         await self.maintainer.send(embed=error_report)
         return
 
     async def send_warning(self, from_: str, msg: str) -> None:
         warn_report = self.new_warn_report(from_, msg)
-        if self.error_channel is not None:
-            await self.error_channel.send(embed=warn_report)
+        if self.log_channel is not None:
+            await self.log_channel.send(embed=warn_report)
         await self.maintainer.send(embed=warn_report)
         return
 
@@ -352,8 +348,8 @@ class OverlordBase(discord.Client):
         maintainer_report = self.new_error_report(name, str(ex), tb)
         channel_report = self.new_error_report(name, str(ex) + '\n' + reported_to)
 
-        if self.error_channel is not None and event != 'on_ready':
-            await self.error_channel.send(embed=channel_report)
+        if self.log_channel is not None and event != 'on_ready':
+            await self.log_channel.send(embed=channel_report)
 
         await self.maintainer.send(embed=maintainer_report)
 
@@ -376,28 +372,6 @@ class OverlordBase(discord.Client):
             raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
         log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
 
-        self.me = await self.guild.fetch_member(self.user.id)
-
-        # Attach control channel
-        channel = self.get_channel(self.control_channel_id)
-        if channel is None:
-            raise InvalidConfigException(f'Control channel id is invalid', 'DISCORD_CONTROL_CHANNEL')
-        if not is_text_channel(channel):
-            raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel", 'DISCORD_CONTROL_CHANNEL')
-        log.info(f'Attached to {channel.name} as control channel ({channel.id})')
-        self.control_channel = channel
-
-        # Attach error channel
-        if self.error_channel_id:
-            channel = self.get_channel(self.error_channel_id)
-            if channel is None:
-                raise InvalidConfigException(f'Error channel id is invalid', 'DISCORD_ERROR_CHANNEL')
-            if not is_text_channel(channel):
-                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",
-                                             'DISCORD_ERROR_CHANNEL')
-            log.info(f'Attached to {channel.name} as error channel ({channel.id})')
-            self.error_channel = channel
-
         # Resolve maintainer
         try:
             self.maintainer = await self.guild.fetch_member(self.maintainer_id)
@@ -406,6 +380,8 @@ class OverlordBase(discord.Client):
         except discord.Forbidden:
             raise InvalidConfigException(f'Error cannot send messages to maintainer', 'MAINTAINER_DISCORD_ID')
         log.info(f'Maintainer is {qualified_name(self.maintainer)} ({self.maintainer.id})')
+
+        self.me = await self.guild.fetch_member(self.user.id)
 
         # Sync roles and users
         await self.sync_users()

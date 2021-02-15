@@ -19,7 +19,7 @@
       <string type="common" lang="en" name="channel">Channel</string>
       <string type="common" lang="en" name="error">Error</string>
       <string type="common" lang="en" name="info">Information</string>
-      <string type="common" lang="en" name="error-channel">Error channel</string>
+      <string type="common" lang="en" name="log-channel">Logging channel</string>
       <string type="common" lang="en" name="control-channel">Control channel</string>
       <string type="common" lang="en" name="maintainer">Maintainer</string>
       <!-- User stat names -->

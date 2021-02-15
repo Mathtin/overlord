@@ -187,13 +187,13 @@ class BotExtension(object):
         name = ex_type.__name__
 
         reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.bot.maintainer.mention}'
-        details = f'{str(ex)}\n**{R.NAME.COMMON.EXTENSION} {ext_name}**'
+        details = f'{str(ex)}\n**{R.NAME.COMMON.EXTENSION} {ext_name}**, disabled'
 
         maintainer_report = self.bot.new_error_report(name, details, tb)
         channel_report = self.bot.new_error_report(name, str(ex) + '\n' + reported_to)
 
-        if self.bot.error_channel is not None and event != 'on_ready':
-            await self.bot.error_channel.send(embed=channel_report)
+        if self.bot.log_channel is not None and event != 'on_ready':
+            await self.bot.log_channel.send(embed=channel_report)
 
         await self.bot.maintainer.send(embed=maintainer_report)
 

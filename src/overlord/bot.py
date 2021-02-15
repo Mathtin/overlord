@@ -22,7 +22,7 @@ import discord
 
 import db as DB
 from extensions import BotExtension
-from util import get_coroutine_attrs, parse_control_message
+from util import get_coroutine_attrs, parse_control_message, is_text_channel
 from util.config import ConfigManager
 from util.exceptions import InvalidConfigException
 from util.extbot import qualified_name, is_dm_message
@@ -142,13 +142,35 @@ class Overlord(OverlordBase):
             await self._run_call_plan('on_ready')
             # Check config value
             await self.on_config_update()
+
+            # Attach control channel
+            channel = self.get_channel(self.config.control.channel)
+            if channel is None:
+                raise InvalidConfigException(f'Control channel id is invalid', self.config.control.path('channel'))
+            if not is_text_channel(channel):
+                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",
+                                             self.config.control.path('channel'))
+            log.info(f'Attached to {channel.name} as control channel ({channel.id})')
+            self.control_channel = channel
+
+            # Attach error channel
+            if self.log_config.channel != 0:
+                channel = self.get_channel(self.log_config.channel)
+                if channel is None:
+                    raise InvalidConfigException(f'Error channel id is invalid', self.log_config.path('channel'))
+                if not is_text_channel(channel):
+                    raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",
+                                                 self.log_config.path('channel'))
+                log.info(f'Attached to {channel.name} as logging channel ({channel.id})')
+                self.log_channel = channel
+
             # Message for pterodactyl panel
             print(self.config.egg_done)
             start_report = f'{R.NAME.COMMON.GUILD}: {self.guild.name}\n'
             start_report += f'{R.NAME.COMMON.MAINTAINER}: {self.maintainer.mention}\n'
             start_report += f'{R.NAME.COMMON.CONTROL_CHANNEL}: {self.control_channel.mention}\n'
-            if self.error_channel is not None:
-                start_report += f'{R.NAME.COMMON.ERROR_CHANNEL}: {self.error_channel.mention}\n'
+            if self.log_channel is not None:
+                start_report += f'{R.NAME.COMMON.LOG_CHANNEL}: {self.log_channel.mention}\n'
             embed = self.new_info_report(R.MESSAGE.STATUS.STARTED, start_report)
             await self.maintainer.send(embed=embed)
 
