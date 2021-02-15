@@ -55,3 +55,7 @@ Issues and pull requests are highly welcomed!
 # Author
 
 Copyright (c) 2020 Daniel [Mathtin](https://github.com/Mathtin/) Shiko
+
+### Contributors
+
+ - Danila [DeadBlasoul](https://github.com/DeadBlasoul/) Popov
