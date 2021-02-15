@@ -66,8 +66,8 @@ class ConfigManager(object):
         value_prim = ConfigView.deconstruct_obj(value)
         return ConfigManager.serialize_obj(value_prim)
 
-    def set_raw(self, path: str, assigment: str) -> None:
-        value_dict = self.parser.parse(assigment)
+    def set_raw(self, path: str, assignment: str) -> None:
+        value_dict = self.parser.parse(assignment)
         # Set root
         if path == '.':
             self._merge_dict(self.raw_dict, value_dict)

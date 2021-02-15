@@ -76,7 +76,7 @@ def main(argv):
     if 'sqlite' in url:
         import db.queries as q
         q.MODE = q.MODE_SQLITE
-    session = DBPersistSession(url, autocommit=False)
+    session = DBPersistSession(url)
     session.sync_table(EventType, 'name', EVENT_TYPES)
     session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
 

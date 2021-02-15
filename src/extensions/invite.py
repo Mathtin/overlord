@@ -106,7 +106,7 @@ class InviteExtension(BotExtension):
             await self.handle_invite(member.discord, new_invite)
         self._invites = invites_after
 
-    async def on_member_remove(self, member: OverlordMember):
+    async def on_member_remove(self, _):
         self._invites = await self.bot.guild.invites()
 
     ############

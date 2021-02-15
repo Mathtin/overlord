@@ -47,42 +47,44 @@ def date_to_secs(col):
         return date_to_secs_mysql(col)
 
 
-def get_user_by_did(db: DBPersistSession, id: int) -> User:
-    return db.query(User).filter(User.did == id).first()
+def get_user_by_did(db: DBPersistSession, id_: int) -> User:
+    return db.query(User).filter(User.did == id_).first()
 
 
-def get_msg_by_did(db: DBPersistSession, id: int) -> MessageEvent:
-    return db.query(MessageEvent).filter(MessageEvent.message_id == id).first()
+def get_msg_by_did(db: DBPersistSession, id_: int) -> MessageEvent:
+    return db.query(MessageEvent).filter(MessageEvent.message_id == id_).first()
 
 
-def get_last_member_event_by_did(db: DBPersistSession, id: int) -> MessageEvent:
+def get_last_member_event_by_did(db: DBPersistSession, id_: int) -> MessageEvent:
     return db.query(MemberEvent).join(User) \
-        .filter(User.did == id) \
+        .filter(User.did == id_) \
         .order_by(MemberEvent.created_at.desc()).first()
 
 
-def get_last_member_event_by_id(db: DBPersistSession, id: int) -> MessageEvent:
+def get_last_member_event_by_id(db: DBPersistSession, id_: int) -> MessageEvent:
     return db.query(MemberEvent) \
-        .filter(MemberEvent.user_id == id) \
+        .filter(MemberEvent.user_id == id_) \
         .order_by(MemberEvent.created_at.desc()).first()
 
 
-def get_last_vc_event_by_id(db: DBPersistSession, id: int, channel_id: int) -> VoiceChatEvent:
+def get_last_vc_event_by_id(db: DBPersistSession, id_: int, channel_id: int) -> VoiceChatEvent:
     return db.query(VoiceChatEvent) \
-        .filter(and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id)) \
+        .filter(and_(VoiceChatEvent.user_id == id_, VoiceChatEvent.channel_id == channel_id)) \
         .order_by(VoiceChatEvent.created_at.desc()).first()
 
 
-def get_last_vc_event_by_id_and_type_id(db: DBPersistSession, id: int, channel_id: int, type_id: int) -> VoiceChatEvent:
+def get_last_vc_event_by_id_and_type_id(db: DBPersistSession, id_: int, channel_id: int,
+                                        type_id: int) -> VoiceChatEvent:
     return db.query(VoiceChatEvent) \
-        .filter(
-        and_(VoiceChatEvent.user_id == id, VoiceChatEvent.channel_id == channel_id, VoiceChatEvent.type_id == type_id)) \
+        .filter(and_(VoiceChatEvent.user_id == id_,
+                     VoiceChatEvent.channel_id == channel_id,
+                     VoiceChatEvent.type_id == type_id)) \
         .order_by(VoiceChatEvent.created_at.desc()).first()
 
 
-def get_user_stat_by_id(db: DBPersistSession, id: int, type_id: int) -> UserStat:
+def get_user_stat_by_id(db: DBPersistSession, id_: int, type_id: int) -> UserStat:
     return db.query(UserStat) \
-        .filter(and_(UserStat.user_id == id, UserStat.type_id == type_id)).first()
+        .filter(and_(UserStat.user_id == id_, UserStat.type_id == type_id)).first()
 
 
 def select_membership_time_per_user(type_id: int, lit_values: list) -> Select:

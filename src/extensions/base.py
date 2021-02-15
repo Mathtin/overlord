@@ -172,7 +172,7 @@ class BotExtension(object):
     # Default Handlers #
     ####################
 
-    async def on_error(self, event, *args, **kwargs) -> None:
+    async def on_error(self, event, *_, **__) -> None:
         """
             Async error event handler
 

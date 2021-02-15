@@ -64,19 +64,21 @@
    <messages>
 
       <!-- status messages -->
-      <string type="status" lang="en" name="committing">Commiting changes...</string>
+      <string type="status" lang="en" name="committing">Committing changes...</string>
       <string type="status" lang="en" name="busy">Sorry, I'm very busy right now</string>
       <string type="status" lang="en" name="ping">Pong!</string>
       <string type="status" lang="en" name="sync-users">Synchronizing users</string>
-      <string type="status" lang="en" name="update-ranks">Updating user ranks</string>
-      <string type="status" lang="en" name="update-rank">Updating rank</string>
+      <string type="status" lang="en" name="updating-ranks">Updating user ranks</string>
+      <string type="status" lang="en" name="updating-rank">Updating rank</string>
       <string type="status" lang="en" name="db-clear-channel">Clearing message history from database</string>
       <string type="status" lang="en" name="db-load-channel">Loading message history</string>
+      <string type="status" lang="en" name="db-drop-table">Clearing table</string>
       <string type="status" lang="en" name="clear-stats">Clearing stats</string>
       <string type="status" lang="en" name="calc-stats">Calculating stats</string>
       <string type="status" lang="en" name="stop-extension">Disabling extension</string>
       <string type="status" lang="en" name="reported-to">Reported to</string>
       <string type="status" lang="en" name="started">Bot started successfully</string>
+      <string type="status" lang="en" name="success">Operation completed successfully</string>
 
       <!-- basic error messages -->
       <string type="error" lang="en" name="internal">Internal error</string>
@@ -105,12 +107,15 @@
       
       <!-- config error messages -->
       <string type="config-error" lang="en" name="invalid-path">Invalid config path</string>
-      <string type="config-error" lang="en" name="parse-fail">Failed to parse value</string>
+      <string type="config-error" lang="en" name="parse-fail">Failed to parse config value</string>
       
       <!-- rank error messages -->
       <string type="error-other" lang="en" name="invalid-rank">Invalid rank</string>
       <string type="error-other" lang="en" name="unknown-rank">No such rank</string>
       <string type="error-other" lang="en" name="duplicate-rank">Rank already exists</string>
+      <string type="error-other" lang="en" name="duplicate-weight">Rank with same weight already exists</string>
+      <string type="error-other" lang="en" name="unknown-stat">No such stat</string>
+      <string type="error-other" lang="en" name="negative-stat-value">Stat value should be positive</string>
    </messages>
    
 </resources>

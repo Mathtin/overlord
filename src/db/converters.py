@@ -34,7 +34,7 @@ def role_to_row(role: d.Role) -> Dict[str, Any]:
 
 def roles_to_rows(roles: list) -> List[Dict[str, Any]]:
     rows = [role_to_row(r) for r in roles]
-    rows = sorted(rows, key=lambda i: i['did'])
+    rows = sorted(rows, key=lambda o: o['did'])
     for i in range(len(rows)):
         rows[i]['idx'] = i
     return rows

@@ -15,7 +15,6 @@
 __author__ = 'Mathtin'
 
 from logging import getLogger
-from datetime import datetime
 from typing import Type, Optional, Any, Dict, List
 
 from sqlalchemy import create_engine, update, engine as SQLEngine

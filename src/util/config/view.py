@@ -35,7 +35,9 @@ class ConfigView(object):
     # Instance fields
     _path_prefix: str
 
-    def __init__(self, values: Dict[str, Any] = {}, path_prefix: str = '') -> None:
+    def __init__(self, values: typing.Optional[Dict[str, Any]] = None, path_prefix: str = '') -> None:
+        if values is None:
+            values = {}
         self._path_prefix = path_prefix
         # Build {_field_constructor_map} for each class implementation
         if self._field_constructor_map is None:

@@ -14,10 +14,10 @@
 
 __author__ = 'Mathtin'
 
-from enum import unique
 from sqlalchemy import Column, VARCHAR, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import UniqueConstraint
+
 from .base import BaseModel
 
 

@@ -126,7 +126,7 @@ def parse_control_message(prefix: str, message: discord.Message) -> Optional[Lis
     if msg_prefix != prefix or msg_suffix == "":
         return None
 
-    lines = [l.strip() for l in msg_suffix.splitlines()]
+    lines = [line.strip() for line in msg_suffix.splitlines()]
     res = shlex.split(lines[0])
     lines = lines[1:]
     merging = False

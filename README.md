@@ -14,7 +14,7 @@ Bot frontend functionality represented by extensions:
   - Invite
   - Stats
 
-Each extension provides a set of commands and background tasks usefull for managing your discord guild as well as discord bot itself. Every extension has own help page containing brief description and command usage provided by this extension.
+Each extension provides a set of commands and background tasks useful for managing your discord guild as well as discord bot itself. Every extension has own help page containing brief description and command usage provided by this extension.
 
 ### Usage
 

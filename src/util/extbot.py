@@ -14,10 +14,11 @@
 
 __author__ = 'Mathtin'
 
-import os
-from typing import Any, Callable, Dict, List, Awaitable, Optional, Tuple, Union
-import discord
 import asyncio
+import os
+from typing import Any, Callable, Dict, List, Awaitable, Optional, Union
+
+import discord
 
 from .exceptions import InvalidConfigException, NotCoroutineException
 
@@ -93,11 +94,11 @@ def qualified_name(user: Union[discord.User, discord.Member]) -> str:
 
 
 def quote_msg(msg: str) -> str:
-    return '\n'.join([f'> `{l}`' for l in msg.replace("`", "\\`").splitlines()])
+    return '\n'.join([f'> `{line}`' for line in msg.replace("`", "\\`").splitlines()])
 
 
 def code_msg(msg: str) -> str:
-    return '\n'.join([f'`{l}`' for l in msg.replace("`", "\\`").splitlines()])
+    return '\n'.join([f'`{line}`' for line in msg.replace("`", "\\`").splitlines()])
 
 
 def get_channel_env_var_name(n) -> str:

@@ -78,7 +78,7 @@ class StringResourceView(object):
             self.section = section
             self.type = type_
 
-        def __getattr__(self, name: str):
+        def __getattr__(self, name: str) -> str:
             return self.section.view.get(f'{self.section.section}.{self.type}.{name}')
 
     class SectionView(object):

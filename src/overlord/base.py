@@ -139,8 +139,8 @@ class OverlordBase(discord.Client):
             return True
         return len(filter_roles(user, self.config.control.roles)) > 0
 
-    def extension_idx(self, ext: Any) -> None:
-        pass
+    def extension_idx(self, ext: Any) -> int:
+        raise NotImplementedError()
 
     def get_config_section(self, section_type: Any) -> Any:
         return self.cnf_manager.find_section(section_type)
