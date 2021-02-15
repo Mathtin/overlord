@@ -19,14 +19,14 @@ from typing import Optional, List, Tuple, Dict
 
 import discord
 
-import src.db as DB
-from src.overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit, OverlordMessage
-from src.services.role import RoleService
-from src.services.stat import StatService
-from src.util import ConfigView, FORMATTERS
-from src.util.exceptions import InvalidConfigException
-from src.util.extbot import filter_roles, is_role_applied, qualified_name
-from src.util.resources import R
+import db as DB
+from overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit, OverlordMessage
+from services.role import RoleService
+from services.stat import StatService
+from util import ConfigView, FORMATTERS
+from util.exceptions import InvalidConfigException
+from util.extbot import filter_roles, is_role_applied, qualified_name
+from util.resources import R
 from .base import BotExtension
 
 log = logging.getLogger('ranking-extension')

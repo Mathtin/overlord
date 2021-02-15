@@ -18,10 +18,10 @@ import logging
 
 import discord
 
-from src.util.resources import R
-from src.util import code_msg
-from src.util.exceptions import InvalidConfigException
-from src.util.extbot import embed_long_message
+from util.resources import R
+from util import code_msg
+from util.exceptions import InvalidConfigException
+from util.extbot import embed_long_message
 from .base import BotExtension
 
 log = logging.getLogger('config-extension')

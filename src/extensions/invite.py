@@ -19,8 +19,8 @@ from typing import Dict, List, Optional
 
 import discord
 
-from src.overlord.types import OverlordMember
-from src.util import InvalidConfigException, ConfigView
+from overlord.types import OverlordMember
+from util import InvalidConfigException, ConfigView
 from .base import BotExtension
 
 log = logging.getLogger('config-extension')

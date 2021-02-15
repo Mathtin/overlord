@@ -16,9 +16,9 @@ __author__ = 'Mathtin'
 
 import logging
 
-import src.db as DB
-import src.db.converters as conv
-import src.db.queries as q
+import db as DB
+import db.converters as conv
+import db.queries as q
 
 from typing import Dict
 from .event import EventService

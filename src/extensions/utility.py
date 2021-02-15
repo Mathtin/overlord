@@ -19,10 +19,10 @@ import re
 
 import discord
 
-import src.db as DB
+import db as DB
 from .base import BotExtension
-from src.util.resources import R
-from src.util import is_dm_message
+from util.resources import R
+from util import is_dm_message
 
 log = logging.getLogger('utility-extension')
 

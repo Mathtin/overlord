@@ -20,14 +20,14 @@ from typing import Dict, List, Callable, Awaitable, Optional, Union
 
 import discord
 
-import src.db as DB
-from src.extensions.base import BotExtension
-from src.util import get_coroutine_attrs, parse_control_message
-from src.util.config import ConfigManager
-from src.util.exceptions import InvalidConfigException
-from src.util.extbot import qualified_name, is_dm_message
-from src.util.extbot import skip_bots, after_initialized, guild_member_event
-from src.util.resources import R
+import db as DB
+from extensions import BotExtension
+from util import get_coroutine_attrs, parse_control_message
+from util.config import ConfigManager
+from util.exceptions import InvalidConfigException
+from util.extbot import qualified_name, is_dm_message
+from util.extbot import skip_bots, after_initialized, guild_member_event
+from util.resources import R
 from .base import OverlordBase
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, \
     OverlordRole, OverlordVCState

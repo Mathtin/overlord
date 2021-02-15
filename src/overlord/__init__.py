@@ -20,4 +20,3 @@ from .types import OverlordMessageDelete, OverlordMessageEdit, OverlordRole
 from .types import OverlordTask, OverlordUser, OverlordReaction
 from .types import OverlordControlConfig, OverlordRootConfig
 from .command import OverlordCommand
-from .bot import Overlord

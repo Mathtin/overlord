@@ -17,8 +17,8 @@ __author__ = 'Mathtin'
 import logging
 
 import discord
-import src.db as DB
-import src.db.converters as conv
+import db as DB
+import db.converters as conv
 
 from typing import Dict, List, Optional
 

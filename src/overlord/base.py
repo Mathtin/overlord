@@ -23,14 +23,14 @@ from typing import Any, List, Optional, Union
 
 import discord
 
-import src.db as DB
-from src.services import EventService, RoleService, StatService, UserService
-from src.util import limit_traceback
-from src.util.config import ConfigManager
-from src.util.exceptions import InvalidConfigException, NotCoroutineException
-from src.util.extbot import is_dm_message, filter_roles, is_text_channel, qualified_name
-from src.util.logger import DiscordLogConfig
-from src.util.resources import R
+import db as DB
+from services import EventService, RoleService, StatService, UserService
+from util import limit_traceback
+from util.config import ConfigManager
+from util.exceptions import InvalidConfigException, NotCoroutineException
+from util.extbot import is_dm_message, filter_roles, is_text_channel, qualified_name
+from util.logger import DiscordLogConfig
+from util.resources import R
 from .types import OverlordRootConfig
 
 log = logging.getLogger('overlord-bot')

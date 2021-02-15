@@ -20,8 +20,8 @@ from typing import Any, Dict, List
 import discord as DIS
 from discord.ext import tasks
 
-import src.db as DB
-from src.util import ConfigView
+import db as DB
+from util import ConfigView
 
 
 ###################

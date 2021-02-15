@@ -19,12 +19,14 @@ import sys
 import argparse
 
 from dotenv import load_dotenv
+load_dotenv()
 
 from util import ConfigView, ConfigManager
 from util.logger import LoggerRootConfig, update_config as update_logger
 from db import DBPersistSession, EventType, UserStatType
 from db.predefined import EVENT_TYPES, USER_STAT_TYPES
-from overlord import Overlord, OverlordRootConfig
+from overlord import OverlordRootConfig
+from overlord.bot import Overlord
 from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
 from extensions import RankingRootConfig, InviteRootConfig
 
@@ -60,8 +62,6 @@ class Configuration(ConfigManager):
 
 
 def main(argv):
-    # Load env variables
-    load_dotenv()
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Overlord Discord Bot')

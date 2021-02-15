@@ -23,12 +23,12 @@ from typing import Dict, List, Optional, Callable, Awaitable
 import discord
 from discord.errors import InvalidArgument
 
-from src.overlord.base import OverlordBase
-from src.overlord.command import OverlordCommand
-from src.overlord.types import OverlordTask
-from src.util import get_coroutine_attrs
-from src.util.exceptions import InvalidConfigException
-from src.util.resources import R
+from overlord.base import OverlordBase
+from overlord.command import OverlordCommand
+from overlord.types import OverlordTask
+from util import get_coroutine_attrs
+from util.exceptions import InvalidConfigException
+from util.resources import R
 
 log = logging.getLogger('overlord-extension')
 

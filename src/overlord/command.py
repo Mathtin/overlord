@@ -19,9 +19,9 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Type, get_typ
 import discord as DIS
 from discord.errors import InvalidArgument
 
-import src.db as DB
-from src.util import check_coroutine
-from src.util.resources import R
+import db as DB
+from util import check_coroutine
+from util.resources import R
 from .types import OverlordMember
 
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}

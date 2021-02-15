@@ -18,12 +18,12 @@ import logging
 
 import discord
 
-import src.db as DB
-from src.overlord import OverlordMessage, OverlordVCState, OverlordMember
-from src.services import StatService
-from src.util import FORMATTERS
-from src.util.extbot import qualified_name
-from src.util.resources import R
+import db as DB
+from overlord import OverlordMessage, OverlordVCState, OverlordMember
+from services import StatService
+from util import FORMATTERS
+from util.extbot import qualified_name
+from util.resources import R
 from .base import BotExtension
 
 log = logging.getLogger('stats-extension')
