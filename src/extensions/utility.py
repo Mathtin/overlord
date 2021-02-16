@@ -133,7 +133,6 @@ class UtilityExtension(BotExtension):
             await msg.channel.send(R.MESSAGE.STATUS.BUSY)
         else:
             await msg.channel.send(R.MESSAGE.STATUS.PING)
-        raise RuntimeError('WOWOW')
 
     @BotExtension.command("sync", description="Synchronize db data with guild data in terms of users and roles")
     async def cmd_sync_roles(self, msg: discord.Message):
