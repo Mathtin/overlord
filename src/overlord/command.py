@@ -207,12 +207,12 @@ class OverlordCommand(IOverlordCommand):
     @staticmethod
     @SaveFor(OverlordMember)
     async def _resolve_ov_member_w_fb(fb: DIS.Message, ext: Any, user_mention: str) -> Optional[OverlordMember]:
-        user = await ext.bot.resolve_user(user_mention)
+        user = await OverlordCommand._resolve_db_user_w_fb(fb, ext, user_mention)
         if user is None:
             await fb.channel.send(R.MESSAGE.DB_ERROR.UNKNOWN_USER)
             return None
         try:
-            member = await ext.bot.guild.fetch_member(user.id)
+            member = await ext.bot.guild.fetch_member(user.did)
         except DIS.NotFound:
             await fb.channel.send(R.MESSAGE.D_ERROR.USER_NOT_MEMBER)
             return None

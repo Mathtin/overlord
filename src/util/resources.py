@@ -48,41 +48,44 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def TRACEBACK(self) -> str:
-                return self._section.get(self._type_name, "traceback")
+                return self.get("traceback")
         
             @property
             def EXTENSION(self) -> str:
-                return self._section.get(self._type_name, "extension")
+                return self.get("extension")
         
             @property
             def GUILD(self) -> str:
-                return self._section.get(self._type_name, "guild")
+                return self.get("guild")
         
             @property
             def CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "channel")
+                return self.get("channel")
         
             @property
             def ERROR(self) -> str:
-                return self._section.get(self._type_name, "error")
+                return self.get("error")
         
             @property
             def INFO(self) -> str:
-                return self._section.get(self._type_name, "info")
+                return self.get("info")
         
             @property
             def LOG_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "log-channel")
+                return self.get("log-channel")
         
             @property
             def CONTROL_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "control-channel")
+                return self.get("control-channel")
         
             @property
             def MAINTAINER(self) -> str:
-                return self._section.get(self._type_name, "maintainer")
+                return self.get("maintainer")
         
     
         class XUserStat(object):
@@ -91,45 +94,48 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def MEMBERSHIP(self) -> str:
-                return self._section.get(self._type_name, "membership")
+                return self.get("membership")
         
             @property
             def NEW_MESSAGE_COUNT(self) -> str:
-                return self._section.get(self._type_name, "new-message-count")
+                return self.get("new-message-count")
         
             @property
             def DELETE_MESSAGE_COUNT(self) -> str:
-                return self._section.get(self._type_name, "delete-message-count")
+                return self.get("delete-message-count")
         
             @property
             def EDIT_MESSAGE_COUNT(self) -> str:
-                return self._section.get(self._type_name, "edit-message-count")
+                return self.get("edit-message-count")
         
             @property
             def NEW_REACTION_COUNT(self) -> str:
-                return self._section.get(self._type_name, "new-reaction-count")
+                return self.get("new-reaction-count")
         
             @property
             def DELETE_REACTION_COUNT(self) -> str:
-                return self._section.get(self._type_name, "delete-reaction-count")
+                return self.get("delete-reaction-count")
         
             @property
             def VC_TIME(self) -> str:
-                return self._section.get(self._type_name, "vc-time")
+                return self.get("vc-time")
         
             @property
             def MIN_WEIGHT(self) -> str:
-                return self._section.get(self._type_name, "min-weight")
+                return self.get("min-weight")
         
             @property
             def MAX_WEIGHT(self) -> str:
-                return self._section.get(self._type_name, "max-weight")
+                return self.get("max-weight")
         
             @property
             def EXACT_WEIGHT(self) -> str:
-                return self._section.get(self._type_name, "exact-weight")
+                return self.get("exact-weight")
         
     
         _section_name = "names"
@@ -151,25 +157,28 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def DEFAULT(self) -> str:
-                return self._section.get(self._type_name, "default")
+                return self.get("default")
         
             @property
             def ERROR_REPORT(self) -> str:
-                return self._section.get(self._type_name, "error-report")
+                return self.get("error-report")
         
             @property
             def WARN_REPORT(self) -> str:
-                return self._section.get(self._type_name, "warn-report")
+                return self.get("warn-report")
         
             @property
             def INFO_REPORT(self) -> str:
-                return self._section.get(self._type_name, "info-report")
+                return self.get("info-report")
         
             @property
             def LOG_REPORT(self) -> str:
-                return self._section.get(self._type_name, "log-report")
+                return self.get("log-report")
         
     
         class XFooter(object):
@@ -178,9 +187,12 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def DEFAULT(self) -> str:
-                return self._section.get(self._type_name, "default")
+                return self.get("default")
         
     
         class XTitle(object):
@@ -189,57 +201,60 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def SUCCESS(self) -> str:
-                return self._section.get(self._type_name, "success")
+                return self.get("success")
         
             @property
             def ERROR(self) -> str:
-                return self._section.get(self._type_name, "error")
+                return self.get("error")
         
             @property
             def WARNING(self) -> str:
-                return self._section.get(self._type_name, "warning")
+                return self.get("warning")
         
             @property
             def INFO(self) -> str:
-                return self._section.get(self._type_name, "info")
+                return self.get("info")
         
             @property
             def TRACEBACK(self) -> str:
-                return self._section.get(self._type_name, "traceback")
+                return self.get("traceback")
         
             @property
             def SUMMARY(self) -> str:
-                return self._section.get(self._type_name, "summary")
+                return self.get("summary")
         
             @property
             def CALL_ARGS(self) -> str:
-                return self._section.get(self._type_name, "call-args")
+                return self.get("call-args")
         
             @property
             def COMMANDS_LIST(self) -> str:
-                return self._section.get(self._type_name, "commands-list")
+                return self.get("commands-list")
         
             @property
             def STAT_TYPE_LIST(self) -> str:
-                return self._section.get(self._type_name, "stat-type-list")
+                return self.get("stat-type-list")
         
             @property
             def STATS_LIST(self) -> str:
-                return self._section.get(self._type_name, "stats-list")
+                return self.get("stats-list")
         
             @property
             def RANK_TABLE(self) -> str:
-                return self._section.get(self._type_name, "rank-table")
+                return self.get("rank-table")
         
             @property
             def CONFIG_VALUE(self) -> str:
-                return self._section.get(self._type_name, "config-value")
+                return self.get("config-value")
         
             @property
             def EXTENSION_STATUS_LIST(self) -> str:
-                return self._section.get(self._type_name, "extension-status-list")
+                return self.get("extension-status-list")
         
     
         _section_name = "embeds"
@@ -263,65 +278,68 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def COMMITTING(self) -> str:
-                return self._section.get(self._type_name, "committing")
+                return self.get("committing")
         
             @property
             def BUSY(self) -> str:
-                return self._section.get(self._type_name, "busy")
+                return self.get("busy")
         
             @property
             def PING(self) -> str:
-                return self._section.get(self._type_name, "ping")
+                return self.get("ping")
         
             @property
             def SYNC_USERS(self) -> str:
-                return self._section.get(self._type_name, "sync-users")
+                return self.get("sync-users")
         
             @property
             def UPDATING_RANKS(self) -> str:
-                return self._section.get(self._type_name, "updating-ranks")
+                return self.get("updating-ranks")
         
             @property
             def UPDATING_RANK(self) -> str:
-                return self._section.get(self._type_name, "updating-rank")
+                return self.get("updating-rank")
         
             @property
             def DB_CLEAR_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "db-clear-channel")
+                return self.get("db-clear-channel")
         
             @property
             def DB_LOAD_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "db-load-channel")
+                return self.get("db-load-channel")
         
             @property
             def DB_DROP_TABLE(self) -> str:
-                return self._section.get(self._type_name, "db-drop-table")
+                return self.get("db-drop-table")
         
             @property
             def CLEAR_STATS(self) -> str:
-                return self._section.get(self._type_name, "clear-stats")
+                return self.get("clear-stats")
         
             @property
             def CALC_STATS(self) -> str:
-                return self._section.get(self._type_name, "calc-stats")
+                return self.get("calc-stats")
         
             @property
             def STOP_EXTENSION(self) -> str:
-                return self._section.get(self._type_name, "stop-extension")
+                return self.get("stop-extension")
         
             @property
             def REPORTED_TO(self) -> str:
-                return self._section.get(self._type_name, "reported-to")
+                return self.get("reported-to")
         
             @property
             def STARTED(self) -> str:
-                return self._section.get(self._type_name, "started")
+                return self.get("started")
         
             @property
             def SUCCESS(self) -> str:
-                return self._section.get(self._type_name, "success")
+                return self.get("success")
         
     
         class XError(object):
@@ -330,21 +348,24 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def INTERNAL(self) -> str:
-                return self._section.get(self._type_name, "internal")
+                return self.get("internal")
         
             @property
             def NO_ACCESS(self) -> str:
-                return self._section.get(self._type_name, "no-access")
+                return self.get("no-access")
         
             @property
             def INVALID_ARGUMENT(self) -> str:
-                return self._section.get(self._type_name, "invalid-argument")
+                return self.get("invalid-argument")
         
             @property
             def UNKNOWN_COMMAND(self) -> str:
-                return self._section.get(self._type_name, "unknown-command")
+                return self.get("unknown-command")
         
     
         class XDError(object):
@@ -353,57 +374,60 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def UNKNOWN_USER(self) -> str:
-                return self._section.get(self._type_name, "unknown-user")
+                return self.get("unknown-user")
         
             @property
             def INVALID_USER(self) -> str:
-                return self._section.get(self._type_name, "invalid-user")
+                return self.get("invalid-user")
         
             @property
             def INVALID_USER_MENTION(self) -> str:
-                return self._section.get(self._type_name, "invalid-user-mention")
+                return self.get("invalid-user-mention")
         
             @property
             def UNKNOWN_MEMBER(self) -> str:
-                return self._section.get(self._type_name, "unknown-member")
+                return self.get("unknown-member")
         
             @property
             def INVALID_MEMBER(self) -> str:
-                return self._section.get(self._type_name, "invalid-member")
+                return self.get("invalid-member")
         
             @property
             def INVALID_MEMBER_MENTION(self) -> str:
-                return self._section.get(self._type_name, "invalid-member-mention")
+                return self.get("invalid-member-mention")
         
             @property
             def USER_NOT_MEMBER(self) -> str:
-                return self._section.get(self._type_name, "user-not-member")
+                return self.get("user-not-member")
         
             @property
             def UNKNOWN_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "unknown-channel")
+                return self.get("unknown-channel")
         
             @property
             def INVALID_CHANNEL(self) -> str:
-                return self._section.get(self._type_name, "invalid-channel")
+                return self.get("invalid-channel")
         
             @property
             def CHANNEL_NOT_TEXT(self) -> str:
-                return self._section.get(self._type_name, "channel-not-text")
+                return self.get("channel-not-text")
         
             @property
             def CHANNEL_NOT_VOICE(self) -> str:
-                return self._section.get(self._type_name, "channel-not-voice")
+                return self.get("channel-not-voice")
         
             @property
             def UNKNOWN_ROLE(self) -> str:
-                return self._section.get(self._type_name, "unknown-role")
+                return self.get("unknown-role")
         
             @property
             def INVALID_ROLE(self) -> str:
-                return self._section.get(self._type_name, "invalid-role")
+                return self.get("invalid-role")
         
     
         class XDbError(object):
@@ -412,13 +436,16 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def UNKNOWN_USER(self) -> str:
-                return self._section.get(self._type_name, "unknown-user")
+                return self.get("unknown-user")
         
             @property
             def INVALID_USER(self) -> str:
-                return self._section.get(self._type_name, "invalid-user")
+                return self.get("invalid-user")
         
     
         class XConfigError(object):
@@ -427,13 +454,16 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def INVALID_PATH(self) -> str:
-                return self._section.get(self._type_name, "invalid-path")
+                return self.get("invalid-path")
         
             @property
             def PARSE_FAIL(self) -> str:
-                return self._section.get(self._type_name, "parse-fail")
+                return self.get("parse-fail")
         
     
         class XErrorOther(object):
@@ -442,29 +472,32 @@ class XStrings(object):
             def __init__(self, section) -> None:
                 self._section = section
         
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
             @property
             def INVALID_RANK(self) -> str:
-                return self._section.get(self._type_name, "invalid-rank")
+                return self.get("invalid-rank")
         
             @property
             def UNKNOWN_RANK(self) -> str:
-                return self._section.get(self._type_name, "unknown-rank")
+                return self.get("unknown-rank")
         
             @property
             def DUPLICATE_RANK(self) -> str:
-                return self._section.get(self._type_name, "duplicate-rank")
+                return self.get("duplicate-rank")
         
             @property
             def DUPLICATE_WEIGHT(self) -> str:
-                return self._section.get(self._type_name, "duplicate-weight")
+                return self.get("duplicate-weight")
         
             @property
             def UNKNOWN_STAT(self) -> str:
-                return self._section.get(self._type_name, "unknown-stat")
+                return self.get("unknown-stat")
         
             @property
             def NEGATIVE_STAT_VALUE(self) -> str:
-                return self._section.get(self._type_name, "negative-stat-value")
+                return self.get("negative-stat-value")
         
     
         _section_name = "messages"

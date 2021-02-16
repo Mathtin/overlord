@@ -49,14 +49,14 @@ log = logging.getLogger('stats-extension')
 #################
 
 def _build_stat_line(s_stats: StatService, user: DB.User, stat: str) -> str:
-    stat_name = R.get(f"name.user_stat.{stat}")
+    stat_name = R.NAME.USER_STAT.get(stat.replace('_', '-'))
     stat_val = s_stats.get(user, stat)
     stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
     return f'{stat_name}: {stat_val_f}'
 
 
 def _add_stat_field(embed: discord.Embed, s_stats: StatService, user: DB.User, stat: str) -> None:
-    stat_name = R.get(f"name.user_stat.{stat}")
+    stat_name = R.NAME.USER_STAT.get(stat.replace('_', '-'))
     stat_val = s_stats.get(user, stat)
     stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
     embed.add_field(name=stat_name, value=stat_val_f, inline=False)
@@ -177,7 +177,7 @@ class StatsExtension(BotExtension):
         desc = f'Stat code names available at the moment'
         embed = self.bot.new_embed(f"Stat names", desc, header="Overlord Stats", color=self.__color__)
         for stat in self.s_stats.user_stat_type_map:
-            stat_name = R.get(f"name.user_stat.{stat}")
+            stat_name = R.NAME.USER_STAT.get(stat.replace('_', '-'))
             embed.add_field(name=stat_name, value=f'`{stat}`', inline=False)
         await msg.channel.send(embed=embed)
 

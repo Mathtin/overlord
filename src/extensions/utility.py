@@ -141,6 +141,11 @@ class UtilityExtension(BotExtension):
             await self.bot.sync_users()
             await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
 
+    @BotExtension.command("switch_lang", description="Switch bot language")
+    async def switch_lang(self, msg: discord.Message, lang: str):
+        R.switch_lang(lang)
+        await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
+
     @BotExtension.command("clear_all", description="Clears db data")
     async def clear_data(self, msg: discord.Message):
         models = [DB.MemberEvent, DB.MessageEvent, DB.VoiceChatEvent, DB.ReactionEvent, DB.UserStat, DB.User, DB.Role]

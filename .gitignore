@@ -1,5 +1,6 @@
 # Project related
 .vscode/
+.idea/
 config.json
 *.db
 *.log.*

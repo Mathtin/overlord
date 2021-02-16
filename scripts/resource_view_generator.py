@@ -105,6 +105,7 @@ class TypeViewGenerator(CodeGenerator):
     def _generate_code(self) -> None:
         self._code = []
         self._gen_class_header()
+        self._gen_get()
         for string_name in self._strings:
             self._gen_property(string_name)
 
@@ -119,12 +120,20 @@ class TypeViewGenerator(CodeGenerator):
             )
         ) + ['']
 
+    def _gen_get(self) -> None:
+        self._code += indent_all(
+            gen_function(
+                'get', args=['self', 'string_name'], ret_type=str,
+                body=['return self._section.get(self._type_name, string_name)']
+            )
+        ) + ['']
+
     def _gen_property(self, name: str) -> None:
         self._code += indent_all(
             ['@property'] +
             gen_function(
                 gen_property_name(name), args=['self'], ret_type=str,
-                body=[f'return self._section.get(self._type_name, "{name}")']
+                body=[f'return self.get("{name}")']
             )
         ) + ['']
 

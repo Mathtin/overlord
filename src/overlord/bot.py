@@ -254,17 +254,15 @@ class Overlord(discord.Client):
     # Resolvers #
     #############
 
-    async def resolve_user(self, user_mention: str) -> Optional[discord.User]:
+    async def resolve_user(self, user_mention: str) -> Optional[DB.User]:
         try:
             if '#' in user_mention:
-                user = self.s_users.get_by_qualified_name(user_mention)
+                return self.s_users.get_by_qualified_name(user_mention)
             elif user_mention.startswith('<@'):
-                return await self.fetch_user(int(user_mention[2:-1]))
+                d_user = await self.fetch_user(int(user_mention[2:-1]))
+                return self.s_users.get(d_user)
             else:
-                user = self.s_users.get_by_display_name(user_mention)
-            if user is None:
-                return None
-            return await self.fetch_user(user.did)
+                return self.s_users.get_by_display_name(user_mention)
         except discord.NotFound:
             return None
         except ValueError:

@@ -80,8 +80,8 @@ class DBPersistSession(object):
         except DataError as e:
             log.error(f'`{__name__}` {e}')
             raise
-        self._session.close()
-        self._session = None
+        # self._session.close()
+        # self._session = None
 
     ###############################
     # Model based session methods #
