@@ -34,7 +34,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import Dict, List, Callable, Awaitable, Optional, Union, Any
+from typing import Dict, List, Callable, Awaitable, Optional, Union, Any, Tuple
 
 import discord
 
@@ -219,13 +219,23 @@ class Overlord(discord.Client):
         embed.set_footer(text=footer, icon_url=self.me.avatar_url)
         return embed
 
-    def new_error_report(self, name: str, details: str, traceback_: Optional[List[str]] = None, color: int = 0xd75242):
+    def new_error_report(self, name: str, details: str,
+                         traceback_: Optional[List[str]] = None,
+                         args: Optional[Tuple[Any]] = None,
+                         kwargs: Optional[Dict[str, Any]] = None,
+                         color: int = 0xd75242):
         header = R.EMBED.HEADER.ERROR_REPORT
         title = f'❗ {name}'
         embed = self.new_embed(title=title, body=details, header=header, color=color)
         if traceback_ is not None:
             traceback_limited = limit_traceback(traceback_, "src", 6)
-            embed.add_field(name=R.NAME.COMMON.TRACEBACK, value='\n'.join(traceback_limited), inline=False)
+            tb_line = '\n'.join(traceback_limited)
+            embed.add_field(name=R.NAME.COMMON.TRACEBACK, value=f'```python\n{tb_line}\n```', inline=False)
+        if args or kwargs:
+            call_args = [f'[{i}] {a}' for i, a in enumerate(args)]
+            call_kwargs = [f'[{k}] {a}' for k, a in kwargs.items()]
+            call_arg_report = '\n'.join(call_args + call_kwargs)
+            embed.add_field(name=R.EMBED.TITLE.CALL_ARGS, value=f'```python\n{call_arg_report}\n```')
         return embed
 
     def new_warn_report(self, name: str, details: str, color: int = 0xd75242):
@@ -420,7 +430,7 @@ class Overlord(discord.Client):
 
             Sends stacktrace to error channel
         """
-        logging.exception(f'Error on event: {event}')
+        logging.exception(f'Error on event: {event}, args: {args}, kwargs: {kwargs}')
 
         ex_type = sys.exc_info()[0]
         ex = sys.exc_info()[1]
@@ -429,7 +439,7 @@ class Overlord(discord.Client):
 
         reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.maintainer.mention}'
 
-        maintainer_report = self.new_error_report(name, str(ex), tb)
+        maintainer_report = self.new_error_report(name, str(ex), tb, args, kwargs)
         channel_report = self.new_error_report(name, str(ex) + '\n' + reported_to)
 
         if self.log_channel is not None and event != 'on_ready':

@@ -202,14 +202,14 @@ class BotExtension(IBotExtension):
     # Default Handlers #
     ####################
 
-    async def on_error(self, event, *_, **__) -> None:
+    async def on_error(self, event, *args, **kwargs) -> None:
         """
             Async error event handler
 
             Sends stacktrace to error channel
         """
         ext_name = type(self).__name__
-        logging.exception(f'Error from {ext_name} extension on event: {event}')
+        logging.exception(f'Error from {ext_name} extension on event: {event}, args: {args}, kwargs: {kwargs}')
 
         ex_type = sys.exc_info()[0]
         ex = sys.exc_info()[1]
@@ -217,9 +217,9 @@ class BotExtension(IBotExtension):
         name = ex_type.__name__
 
         reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.bot.maintainer.mention}'
-        details = f'{str(ex)}\n{R.NAME.COMMON.EXTENSION} **{ext_name}** disabled'
+        details = f'{str(ex)}\n\n**{self.__extname__}** disabled'
 
-        maintainer_report = self.bot.new_error_report(name, details, tb)
+        maintainer_report = self.bot.new_error_report(name, details, tb, args, kwargs)
         channel_report = self.bot.new_error_report(name, str(ex) + '\n' + reported_to)
 
         if self.bot.log_channel is not None and event != 'on_ready':

@@ -45,6 +45,7 @@
 
       <!-- other titles -->
       <string type="title" lang="en" name="summary">Overlord Summary</string>
+      <string type="title" lang="en" name="call-args">Event call arguments</string>
       <string type="title" lang="en" name="commands-list">Available commands</string>
       <string type="title" lang="en" name="stat-type-list">Available stat names</string>
       <string type="title" lang="en" name="stats-list">Available stats</string>
