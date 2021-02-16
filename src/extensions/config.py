@@ -37,7 +37,7 @@ from util.resources import R
 from util import code_msg
 from util.exceptions import InvalidConfigException
 from util.extbot import embed_long_message
-from .base import BotExtension
+from overlord.extension import BotExtension
 
 log = logging.getLogger('config-extension')
 

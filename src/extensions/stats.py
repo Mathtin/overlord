@@ -39,7 +39,7 @@ from services import StatService
 from util import FORMATTERS
 from util.extbot import qualified_name
 from util.resources import R
-from .base import BotExtension
+from overlord.extension import BotExtension
 
 log = logging.getLogger('stats-extension')
 

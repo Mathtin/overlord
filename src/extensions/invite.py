@@ -36,7 +36,7 @@ import discord
 
 from overlord.types import OverlordMember
 from util import InvalidConfigException, ConfigView
-from .base import BotExtension
+from overlord.extension import BotExtension
 
 log = logging.getLogger('config-extension')
 

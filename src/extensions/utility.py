@@ -35,7 +35,7 @@ import re
 import discord
 
 import db as DB
-from .base import BotExtension
+from overlord.extension import BotExtension
 from util.resources import R
 from util import is_dm_message
 
@@ -155,6 +155,19 @@ class UtilityExtension(BotExtension):
             await self.bot.sync_users()
             log.info(f'Done')
             await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
+
+    @BotExtension.command("status", description="Prints bot state summary")
+    async def extension_status(self, msg: discord.Message):
+        report = f'{R.NAME.COMMON.GUILD}: {self.bot.guild.name}\n'
+        report += f'{R.NAME.COMMON.MAINTAINER}: {self.bot.maintainer.mention}\n'
+        report += f'{R.NAME.COMMON.CONTROL_CHANNEL}: {self.bot.control_channel.mention}\n'
+        if self.bot.log_channel is not None:
+            report += f'{R.NAME.COMMON.LOG_CHANNEL}: {self.bot.log_channel.mention}\n'
+        embed = self.bot.new_info_report(R.EMBED.TITLE.SUMMARY, report)
+        # Report extensions
+        ext_details = [f'✅ {ext.name}' if ext.enabled else f'❌ {ext.name}' for ext in self.bot.extensions]
+        embed.add_field(name=R.EMBED.TITLE.EXTENSION_STATUS_LIST, value='\n'.join(ext_details), inline=False)
+        await msg.channel.send(embed=embed)
 
     @BotExtension.command("dump_channel", description="Fetches whole channel data into db (overwriting)")
     async def cmd_dump_channel(self, msg: discord.Message, channel: discord.TextChannel):

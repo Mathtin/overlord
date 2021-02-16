@@ -32,6 +32,9 @@ __author__ = "Mathtin"
 from .types import OverlordVCState
 from .types import OverlordGenericObject, OverlordMember, OverlordMessage
 from .types import OverlordMessageDelete, OverlordMessageEdit, OverlordRole
-from .types import OverlordTask, OverlordUser, OverlordReaction
+from .types import OverlordUser, OverlordReaction
 from .types import OverlordControlConfig, OverlordRootConfig
+from .task import OverlordTask
 from .command import OverlordCommand
+from .bot import Overlord
+

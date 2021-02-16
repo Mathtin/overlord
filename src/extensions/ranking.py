@@ -42,7 +42,7 @@ from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
 from util.extbot import filter_roles, is_role_applied, qualified_name
 from util.resources import R
-from .base import BotExtension
+from overlord.extension import BotExtension
 
 log = logging.getLogger('ranking-extension')
 
@@ -87,7 +87,7 @@ class RankingRootConfig(ConfigView):
 
 class RankingExtension(BotExtension):
 
-    __extname__ = 'Ranking Extension'
+    __extname__ = '🎖 Ranking Extension'
     __description__ = 'Member ranking system based on stats (check Stats Extension)'
     __color__ = 0xc84e3f
 

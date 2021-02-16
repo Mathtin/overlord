@@ -37,10 +37,12 @@ from typing import Dict, List, Optional, Callable, Awaitable
 
 import discord
 from discord.errors import InvalidArgument
+from discord.ext.tasks import Loop
 
-from overlord.base import OverlordBase
+from overlord.bot import Overlord
+from overlord.task import OverlordTask
 from overlord.command import OverlordCommand
-from overlord.types import OverlordTask
+from overlord.types import IBotExtension
 from util import get_coroutine_attrs
 from util.exceptions import InvalidConfigException
 from util.resources import R
@@ -52,25 +54,27 @@ log = logging.getLogger('overlord-extension')
 # Bot Extension Base Class #
 ############################
 
-class BotExtension(object):
+class BotExtension(IBotExtension):
 
     __priority__ = 0
     __extname__ = 'Base Extension'
     __description__ = 'Base bot extension class'
     __color__ = 0x7B838A
 
+    _skip_init_lock = ['on_config_update', 'on_ready', 'on_error']
+
     # Members passed via constructor
-    bot: OverlordBase
+    bot: Overlord
 
     # State members
     _enabled: bool
     _tasks: List[OverlordTask]
     _commands: Dict[str, OverlordCommand]
     _command_handlers: Dict[str, Callable[..., Awaitable[None]]]
-    _task_instances: List[asyncio.AbstractEventLoop]
+    _task_instances: List[Loop]
     _async_lock: asyncio.Lock
 
-    def __init__(self, bot: OverlordBase, priority=None) -> None:
+    def __init__(self, bot: Overlord, priority=None) -> None:
         super().__init__()
         self.bot = bot
         self._enabled = False
@@ -97,6 +101,28 @@ class BotExtension(object):
         if self.priority > 63 or self.priority < 0:
             raise InvalidArgument(f'priority should be less then 63 and bigger or equal then 0, got: {priority}')
 
+    async def run_handler(self, coroutine: Callable[..., Awaitable[None]], *args, **kwargs):
+        try:
+            await coroutine(*args, **kwargs)
+        except asyncio.CancelledError:
+            pass
+        except InvalidConfigException as e:
+            raise e
+        except Exception:
+            try:
+                await self.on_error(coroutine.__name__, *args, **kwargs)
+            except asyncio.CancelledError:
+                pass
+
+    def _handler(self, func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+        async def wrapped(*args, **kwargs):
+            if not self._enabled:
+                return
+            if func.__name__ not in BotExtension._skip_init_lock:
+                await self.bot.init_lock()
+            await self.run_handler(func, *args, **kwargs)
+        return wrapped
+
     @staticmethod
     def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> \
             Callable[[Callable[..., Awaitable[None]]], OverlordTask]:
@@ -118,21 +144,6 @@ class BotExtension(object):
             return OverlordCommand(func, name=name, description=description)
 
         return decorator
-
-    @staticmethod
-    def _handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
-        async def wrapped(*args, **kwargs):
-            if not func.__self__._enabled:
-                return
-            await func.__self__.bot.init_lock()
-            try:
-                await func(*args, **kwargs)
-            except InvalidConfigException as e:
-                raise e
-            except:
-                await func.__self__.on_error(func.__name__, *args, **kwargs)
-
-        return wrapped
 
     @property
     def name(self):
@@ -183,18 +194,22 @@ class BotExtension(object):
     def priority(self) -> int:
         return self.__priority__
 
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
     ####################
     # Default Handlers #
     ####################
 
-    async def on_error(self, event, *_, **__) -> None:
+    async def on_error(self, event, *args, **kwargs) -> None:
         """
             Async error event handler
 
             Sends stacktrace to error channel
         """
         ext_name = type(self).__name__
-        logging.exception(f'Error from {ext_name} extension on event: {event}')
+        logging.exception(f'Error from {ext_name} extension on event: {event}, args: {args}, kwargs: {kwargs}')
 
         ex_type = sys.exc_info()[0]
         ex = sys.exc_info()[1]
@@ -202,9 +217,9 @@ class BotExtension(object):
         name = ex_type.__name__
 
         reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.bot.maintainer.mention}'
-        details = f'{str(ex)}\n**{R.NAME.COMMON.EXTENSION} {ext_name}**, disabled'
+        details = f'{str(ex)}\n\n**{self.__extname__}** disabled'
 
-        maintainer_report = self.bot.new_error_report(name, details, tb)
+        maintainer_report = self.bot.new_error_report(name, details, tb, args, kwargs)
         channel_report = self.bot.new_error_report(name, str(ex) + '\n' + reported_to)
 
         if self.bot.log_channel is not None and event != 'on_ready':
