@@ -186,8 +186,15 @@ class IBotExtension(object):
     def cmd_handler(self, name: str) -> Optional[Callable[..., Awaitable[None]]]:
         raise NotImplementedError()
 
+    async def run_handler(self, coroutine: Callable[..., Awaitable[None]], *args, **kwargs):
+        raise NotImplementedError()
+
     @property
     def priority(self) -> int:
+        raise NotImplementedError()
+
+    @property
+    def enabled(self) -> bool:
         raise NotImplementedError()
 
     ####################

@@ -37,6 +37,7 @@ from typing import Dict, List, Optional, Callable, Awaitable
 
 import discord
 from discord.errors import InvalidArgument
+from discord.ext.tasks import Loop
 
 from overlord.bot import Overlord
 from overlord.task import OverlordTask
@@ -70,7 +71,7 @@ class BotExtension(IBotExtension):
     _tasks: List[OverlordTask]
     _commands: Dict[str, OverlordCommand]
     _command_handlers: Dict[str, Callable[..., Awaitable[None]]]
-    _task_instances: List[asyncio.AbstractEventLoop]
+    _task_instances: List[Loop]
     _async_lock: asyncio.Lock
 
     def __init__(self, bot: Overlord, priority=None) -> None:
@@ -100,19 +101,26 @@ class BotExtension(IBotExtension):
         if self.priority > 63 or self.priority < 0:
             raise InvalidArgument(f'priority should be less then 63 and bigger or equal then 0, got: {priority}')
 
+    async def run_handler(self, coroutine: Callable[..., Awaitable[None]], *args, **kwargs):
+        try:
+            await coroutine(*args, **kwargs)
+        except asyncio.CancelledError:
+            pass
+        except InvalidConfigException as e:
+            raise e
+        except Exception:
+            try:
+                await self.on_error(coroutine.__name__, *args, **kwargs)
+            except asyncio.CancelledError:
+                pass
+
     def _handler(self, func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
         async def wrapped(*args, **kwargs):
             if not self._enabled:
                 return
             if func.__name__ not in BotExtension._skip_init_lock:
                 await self.bot.init_lock()
-            try:
-                await func(*args, **kwargs)
-            except InvalidConfigException as e:
-                raise e
-            except:
-                await self.on_error(func.__name__, *args, **kwargs)
-
+            await self.run_handler(func, *args, **kwargs)
         return wrapped
 
     @staticmethod
@@ -185,6 +193,10 @@ class BotExtension(IBotExtension):
     @property
     def priority(self) -> int:
         return self.__priority__
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
 
     ####################
     # Default Handlers #

@@ -33,6 +33,7 @@ import asyncio
 from typing import Callable, Awaitable, Dict, Optional, Union
 
 from discord.ext import tasks
+from discord.ext.tasks import Loop
 
 from overlord.types import IOverlordTask
 
@@ -58,7 +59,7 @@ class OverlordTask(IOverlordTask):
             'reconnect': reconnect
         }
 
-    def task(self, ext) -> asyncio.AbstractEventLoop:
+    def task(self, ext) -> Loop:
         self.kwargs['loop'] = asyncio.get_running_loop()
 
         async def method(*args, **kwargs):

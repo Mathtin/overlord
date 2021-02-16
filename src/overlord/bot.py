@@ -67,9 +67,9 @@ class Overlord(discord.Client):
     _cmd_cache: Dict[str, Callable[..., Awaitable[None]]]
 
     # Members loaded from ENV
-    token: str
-    guild_id: int
-    maintainer_id: int
+    _token: str
+    _guild_id: int
+    _maintainer_id: int
 
     # Members passed via constructor
     cnf_manager: ConfigManager
@@ -117,9 +117,9 @@ class Overlord(discord.Client):
         self.db = db_session
 
         # Load env values
-        self.token = os.getenv('DISCORD_TOKEN')
-        self.guild_id = int(os.getenv('DISCORD_GUILD'))
-        self.maintainer_id = int(os.getenv('MAINTAINER_DISCORD_ID'))
+        self._token = os.getenv('DISCORD_TOKEN')
+        self._guild_id = int(os.getenv('DISCORD_GUILD'))
+        self._maintainer_id = int(os.getenv('MAINTAINER_DISCORD_ID'))
 
         # Attach services
         self.s_roles = RoleService(self.db)
@@ -298,7 +298,7 @@ class Overlord(discord.Client):
     #######################
 
     def run(self) -> None:
-        super().run(self.token)
+        super().run(self._token)
 
     def save_config(self) -> None:
         log.info(f'Saving configuration on disk')
@@ -452,13 +452,13 @@ class Overlord(discord.Client):
         """
         async with self.sync():
             # Attach guild
-            self.guild = self.get_guild(self.guild_id)
+            self.guild = self.get_guild(self._guild_id)
             if self.guild is None:
                 raise InvalidConfigException("Discord server id is invalid", "DISCORD_GUILD")
             log.info(f'{self.user} is connected to the following guild: {self.guild.name}(id: {self.guild.id})')
             # Resolve maintainer
             try:
-                self.maintainer = await self.guild.fetch_member(self.maintainer_id)
+                self.maintainer = await self.guild.fetch_member(self._maintainer_id)
             except discord.NotFound:
                 raise InvalidConfigException(f'Error maintainer id is invalid', 'MAINTAINER_DISCORD_ID')
             except discord.Forbidden:
@@ -484,6 +484,9 @@ class Overlord(discord.Client):
         if self.log_channel is not None:
             start_report += f'{R.NAME.COMMON.LOG_CHANNEL}: {self.log_channel.mention}\n'
         embed = self.new_info_report(R.MESSAGE.STATUS.STARTED, start_report)
+        # Report extensions
+        ext_details = [f'✅ {ext.name}' if ext.enabled else f'❌ {ext.name}' for ext in self._extensions]
+        embed.add_field(name=R.EMBED.TITLE.EXTENSION_STATUS_LIST, value='\n'.join(ext_details), inline=False)
         await self.maintainer.send(embed=embed)
 
     async def on_config_update(self) -> None:

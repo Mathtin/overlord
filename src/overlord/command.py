@@ -37,8 +37,7 @@ from discord.errors import InvalidArgument
 import db as DB
 from util import check_coroutine
 from util.resources import R
-from .types import OverlordMember, IOverlordCommand
-
+from .types import OverlordMember, IOverlordCommand, IBotExtension
 
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
 
@@ -100,7 +99,7 @@ class OverlordCommand(IOverlordCommand):
         aliases_line = f'Aliases: {aliases_str}'
         return '\n'.join([usage_line, description_line, aliases_line])
 
-    def handler(self, ext):
+    def handler(self, ext: IBotExtension):
         async def wrapped_func(message: DIS.Message, prefix: str, argv: List[str]):
             cmd = argv[0]
             argv = argv[1:]
@@ -113,13 +112,7 @@ class OverlordCommand(IOverlordCommand):
                 usage_str = 'Usage: ' + self.usage(prefix, cmd)
                 await message.channel.send(usage_str)
                 return
-            try:
-                await self.func(ext, message, *argv)
-            except KeyboardInterrupt:
-                raise
-            except:
-                await ext.on_error(self.func.__name__, message, prefix, argv)
-
+            await ext.run_handler(self.func, ext, message, *argv)
         return wrapped_func
 
     async def _convert_argv(self, msg: DIS.Message, ext: Any, argv: List[str]) -> Optional[List[Any]]:

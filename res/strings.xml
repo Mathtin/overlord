@@ -44,11 +44,13 @@
       <string type="title" lang="en" name="traceback">Traceback</string>
 
       <!-- other titles -->
+      <string type="title" lang="en" name="summary">Overlord Summary</string>
       <string type="title" lang="en" name="commands-list">Available commands</string>
       <string type="title" lang="en" name="stat-type-list">Available stat names</string>
       <string type="title" lang="en" name="stats-list">Available stats</string>
       <string type="title" lang="en" name="rank-table">Rank table</string>
       <string type="title" lang="en" name="config-value">Config value</string>
+      <string type="title" lang="en" name="extension-status-list">Attached extensions status</string>
    </embeds>
 
    <messages>
