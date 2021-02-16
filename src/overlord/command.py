@@ -37,7 +37,8 @@ from discord.errors import InvalidArgument
 import db as DB
 from util import check_coroutine
 from util.resources import R
-from .types import OverlordMember
+from .types import OverlordMember, IOverlordCommand
+
 
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
 
@@ -51,17 +52,12 @@ class SaveFor(object):
         return func
 
 
-class OverlordCommand(object):
+class OverlordCommand(IOverlordCommand):
 
-    optional_prefix = 'opt_'
-
-    func: Callable[..., Awaitable[None]]
-    name: str
-    description: str
-    req_f_args: List[str]
-    f_args: List[str]
-    hints: Dict[str, Type[Any]]
-    args_str: str
+    _req_f_args: List[str]
+    _f_args: List[str]
+    _hints: Dict[str, Type[Any]]
+    _args_str: str
 
     def __init__(self, func, name: str, description='') -> None:
         super().__init__()
@@ -71,17 +67,17 @@ class OverlordCommand(object):
         self.description = description
         f_args = func.__code__.co_varnames[:func.__code__.co_argcount]
         assert len(f_args) >= 2
-        self.f_args = f_args[2:]
-        self.hints = {k: v for k, v in get_type_hints(func).items() if k in self.f_args}
-        self.req_f_args = []
+        self._f_args = f_args[2:]
+        self._hints = {k: v for k, v in get_type_hints(func).items() if k in self._f_args}
+        self._req_f_args = []
         args = []
         optionals = False
-        for a in self.f_args:
+        for a in self._f_args:
             arg = a
-            if a in self.hints:
-                arg += f': {self.hints[a].__name__}'
+            if a in self._hints:
+                arg += f': {self._hints[a].__name__}'
             if not a.lower().startswith(self.optional_prefix):
-                self.req_f_args.append(a)
+                self._req_f_args.append(a)
                 args.append(f'{{{arg}}}')
             elif optionals:
                 raise InvalidArgument(
@@ -89,15 +85,15 @@ class OverlordCommand(object):
             else:
                 optionals = True
                 args.append(f'[{arg[len(self.optional_prefix):]}]')
-        self.args_str = ' '.join(args)
+        self._args_str = ' '.join(args)
 
     def usage(self, prefix: str, cmd_name: str) -> str:
-        return f'{prefix}{cmd_name} {self.args_str}'
+        return f'{prefix}{cmd_name} {self._args_str}'
 
     def help(self, prefix: str, aliases: List[str]) -> str:
         if not aliases:
             return 'This command is disabled. Please, add appropriate config'
-        usage_line = f'Usage: `{prefix}{aliases[0]} {self.args_str}`' if self.args_str \
+        usage_line = f'Usage: `{prefix}{aliases[0]} {self._args_str}`' if self._args_str \
             else f'Usage: `{prefix}{aliases[0]}`'
         description_line = f'{self.description}'
         aliases_str = ', '.join([f'`{prefix}{a}`' for a in aliases[1:]])
@@ -108,7 +104,7 @@ class OverlordCommand(object):
         async def wrapped_func(message: DIS.Message, prefix: str, argv: List[str]):
             cmd = argv[0]
             argv = argv[1:]
-            if len(self.req_f_args) > len(argv) or len(argv) > len(self.f_args):
+            if len(self._req_f_args) > len(argv) or len(argv) > len(self._f_args):
                 usage_str = 'Usage: ' + self.usage(prefix, cmd)
                 await message.channel.send(usage_str)
                 return
@@ -129,9 +125,9 @@ class OverlordCommand(object):
     async def _convert_argv(self, msg: DIS.Message, ext: Any, argv: List[str]) -> Optional[List[Any]]:
         res = [a for a in argv]
         for i in range(len(res)):
-            name = self.f_args[i]
-            if name in self.hints:
-                arg = await self._convert_arg(msg, ext, name, res[i], self.hints[name])
+            name = self._f_args[i]
+            if name in self._hints:
+                arg = await self._convert_arg(msg, ext, name, res[i], self._hints[name])
                 if arg is None:
                     return None
                 res[i] = arg

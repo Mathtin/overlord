@@ -35,7 +35,7 @@ import re
 import discord
 
 import db as DB
-from .base import BotExtension
+from overlord.extension import BotExtension
 from util.resources import R
 from util import is_dm_message
 

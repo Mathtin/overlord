@@ -38,9 +38,10 @@ from typing import Dict, List, Optional, Callable, Awaitable
 import discord
 from discord.errors import InvalidArgument
 
-from overlord.base import OverlordBase
+from overlord.bot import Overlord
+from overlord.task import OverlordTask
 from overlord.command import OverlordCommand
-from overlord.types import OverlordTask
+from overlord.types import IBotExtension
 from util import get_coroutine_attrs
 from util.exceptions import InvalidConfigException
 from util.resources import R
@@ -52,15 +53,17 @@ log = logging.getLogger('overlord-extension')
 # Bot Extension Base Class #
 ############################
 
-class BotExtension(object):
+class BotExtension(IBotExtension):
 
     __priority__ = 0
     __extname__ = 'Base Extension'
     __description__ = 'Base bot extension class'
     __color__ = 0x7B838A
 
+    _skip_init_lock = ['on_config_update', 'on_ready', 'on_error']
+
     # Members passed via constructor
-    bot: OverlordBase
+    bot: Overlord
 
     # State members
     _enabled: bool
@@ -70,7 +73,7 @@ class BotExtension(object):
     _task_instances: List[asyncio.AbstractEventLoop]
     _async_lock: asyncio.Lock
 
-    def __init__(self, bot: OverlordBase, priority=None) -> None:
+    def __init__(self, bot: Overlord, priority=None) -> None:
         super().__init__()
         self.bot = bot
         self._enabled = False
@@ -97,6 +100,21 @@ class BotExtension(object):
         if self.priority > 63 or self.priority < 0:
             raise InvalidArgument(f'priority should be less then 63 and bigger or equal then 0, got: {priority}')
 
+    def _handler(self, func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+        async def wrapped(*args, **kwargs):
+            if not self._enabled:
+                return
+            if func.__name__ not in BotExtension._skip_init_lock:
+                await self.bot.init_lock()
+            try:
+                await func(*args, **kwargs)
+            except InvalidConfigException as e:
+                raise e
+            except:
+                await self.on_error(func.__name__, *args, **kwargs)
+
+        return wrapped
+
     @staticmethod
     def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> \
             Callable[[Callable[..., Awaitable[None]]], OverlordTask]:
@@ -118,21 +136,6 @@ class BotExtension(object):
             return OverlordCommand(func, name=name, description=description)
 
         return decorator
-
-    @staticmethod
-    def _handler(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
-        async def wrapped(*args, **kwargs):
-            if not func.__self__._enabled:
-                return
-            await func.__self__.bot.init_lock()
-            try:
-                await func(*args, **kwargs)
-            except InvalidConfigException as e:
-                raise e
-            except:
-                await func.__self__.on_error(func.__name__, *args, **kwargs)
-
-        return wrapped
 
     @property
     def name(self):

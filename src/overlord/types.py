@@ -30,10 +30,9 @@ SOFTWARE.
 __author__ = "Mathtin"
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Callable, Awaitable, Optional
 
 import discord as DIS
-from discord.ext import tasks
 
 import db as DB
 from util import ConfigView
@@ -90,36 +89,9 @@ class OverlordReaction(OverlordGenericObject):
     discord: DIS.PartialEmoji
 
 
-#################################
-# Bot Extension Utility Classes #
-#################################
-
-class OverlordTask(object):
-
-    def __init__(self, func, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> None:
-        super().__init__()
-        self.func = func
-        self.kwargs = {
-            'seconds': seconds,
-            'minutes': minutes,
-            'hours': hours,
-            'count': count,
-            'reconnect': reconnect
-        }
-
-    def task(self, ext) -> asyncio.AbstractEventLoop:
-        self.kwargs['loop'] = asyncio.get_running_loop()
-
-        async def method(*args, **kwargs):
-            try:
-                await self.func(ext, *args, **kwargs)
-            except KeyboardInterrupt:
-                raise
-            except:
-                await ext.on_error(self.func.__name__, *args, **kwargs)
-
-        return tasks.loop(**self.kwargs)(method)
-
+###########
+# Configs #
+###########
 
 class OverlordControlConfig(ConfigView):
     """
@@ -151,3 +123,79 @@ class OverlordRootConfig(ConfigView):
     ignore_afk_vc: bool = True
     egg_done: str = "change this part"
     command: Dict[str, List[str]] = {}
+
+
+##############
+# Interfaces #
+##############
+
+class IOverlordTask(object):
+
+    def task(self, ext) -> asyncio.AbstractEventLoop:
+        raise NotImplementedError()
+
+
+class IOverlordCommand(object):
+
+    optional_prefix = 'opt_'
+
+    func: Callable[..., Awaitable[None]]
+    name: str
+    description: str
+
+    def usage(self, prefix: str, cmd_name: str) -> str:
+        raise NotImplementedError()
+
+    def help(self, prefix: str, aliases: List[str]) -> str:
+        raise NotImplementedError()
+
+    def handler(self, ext):
+        raise NotImplementedError()
+
+
+class IBotExtension(object):
+
+    @staticmethod
+    def task(*, seconds=0, minutes=0, hours=0, count=None, reconnect=True) -> \
+            Callable[[Callable[..., Awaitable[None]]], IOverlordTask]:
+        raise NotImplementedError()
+
+    @staticmethod
+    def command(name, description='') -> Callable[[Callable[..., Awaitable[None]]], IOverlordCommand]:
+        raise NotImplementedError()
+
+    @property
+    def name(self):
+        raise NotImplementedError()
+
+    def start(self) -> None:
+        raise NotImplementedError()
+
+    def stop(self) -> None:
+        raise NotImplementedError()
+
+    def sync(self) -> asyncio.Lock:
+        raise NotImplementedError()
+
+    def help_embed(self, name) -> DIS.Embed:
+        raise NotImplementedError()
+
+    def cmd(self, name: str) -> Optional[IOverlordCommand]:
+        raise NotImplementedError()
+
+    def cmd_handler(self, name: str) -> Optional[Callable[..., Awaitable[None]]]:
+        raise NotImplementedError()
+
+    @property
+    def priority(self) -> int:
+        raise NotImplementedError()
+
+    ####################
+    # Default Handlers #
+    ####################
+
+    async def on_error(self, event, *_, **__) -> None:
+        raise NotImplementedError()
+
+    async def on_ready(self) -> None:
+        raise NotImplementedError()

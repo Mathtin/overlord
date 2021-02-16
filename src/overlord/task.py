@@ -29,8 +29,44 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from .utility import UtilityExtension
-from .config import ConfigExtension
-from .ranking import RankingExtension, RankingRootConfig
-from .stats import StatsExtension
-from .invite import InviteExtension, InviteRootConfig
+import asyncio
+from typing import Callable, Awaitable, Dict, Optional, Union
+
+from discord.ext import tasks
+
+from overlord.types import IOverlordTask
+
+
+class OverlordTask(IOverlordTask):
+
+    func: Callable[..., Awaitable[None]]
+    kwargs: Dict[str, Union[Optional[int], asyncio.AbstractEventLoop]]
+
+    def __init__(self, func: Callable[..., Awaitable[None]],
+                 seconds: int = 0,
+                 minutes: int = 0,
+                 hours: int = 0,
+                 count: Optional[int] = None,
+                 reconnect: bool = True) -> None:
+        super().__init__()
+        self.func = func
+        self.kwargs = {
+            'seconds': seconds,
+            'minutes': minutes,
+            'hours': hours,
+            'count': count,
+            'reconnect': reconnect
+        }
+
+    def task(self, ext) -> asyncio.AbstractEventLoop:
+        self.kwargs['loop'] = asyncio.get_running_loop()
+
+        async def method(*args, **kwargs):
+            try:
+                await self.func(ext, *args, **kwargs)
+            except KeyboardInterrupt:
+                raise
+            except:
+                await ext.on_error(self.func.__name__, *args, **kwargs)
+
+        return tasks.loop(**self.kwargs)(method)
