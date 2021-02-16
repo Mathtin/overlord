@@ -38,7 +38,7 @@ from overlord import OverlordMessage, OverlordVCState, OverlordMember
 from services import StatService
 from util import FORMATTERS
 from util.extbot import qualified_name
-from util.resources import R
+from util.resources import STRINGS as R
 from overlord.extension import BotExtension
 
 log = logging.getLogger('stats-extension')

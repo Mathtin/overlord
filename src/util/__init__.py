@@ -32,7 +32,7 @@ __author__ = "Mathtin"
 from .extbot import *
 from .config import ConfigView, ConfigParser, ConfigManager
 from .exceptions import InvalidConfigException, NotCoroutineException
-from .resources import R
+from .resources import STRINGS as R
 
 import importlib
 import shlex

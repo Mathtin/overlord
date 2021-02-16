@@ -36,7 +36,7 @@ from discord.errors import InvalidArgument
 
 import db as DB
 from util import check_coroutine
-from util.resources import R
+from util.resources import STRINGS as R
 from .types import OverlordMember, IOverlordCommand, IBotExtension
 
 _type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}

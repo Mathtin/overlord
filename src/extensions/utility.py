@@ -36,7 +36,7 @@ import discord
 
 import db as DB
 from overlord.extension import BotExtension
-from util.resources import R
+from util.resources import STRINGS as R
 from util import is_dm_message
 
 log = logging.getLogger('utility-extension')

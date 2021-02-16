@@ -1,16 +1,43 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+MIT License
+
+Copyright (c) 2020-present Daniel [Mathtin] Shiko <wdaniil@mail.ru>
+Project: Overlord discord bot
+Contributors: Danila [DeadBlasoul] Popov <dead.blasoul@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+__author__ = "DeadBlasoul"
+
+import logging
 import os
 import sys
-import logging
-import json
-import copy
-from typing import Dict, List, Union, Tuple, Type, Any, Iterator
+from typing import Dict, List, Type, Any
 from xml.etree import ElementTree
+
 from license import license_py_file
 
 log = logging.getLogger('srv-gen')
-
-STRING_RESOURCE_FILE = 'res/strings.xml'
-VIEW_FILE = './resources.py'
 
 NoneType = type(None)
 
@@ -58,7 +85,7 @@ class CodeGenerator(object):
     @property
     def code(self) -> str:
         """Returns generated source code"""
-        pass
+        raise NotImplementedError()
 
 
 class TypeViewGenerator(CodeGenerator):
@@ -258,7 +285,10 @@ class StringResourceViewGenerator(CodeGenerator):
                              f'self._strings_path = res_path("{self._name}.xml")',
                              'if not os.path.isfile(self._strings_path):',
                              indent(f'raise MissingResourceException(self._strings_path, "{self._name}.xml")'),
-                             'self._root = ET.parse(self._strings_path).getroot()',
+                             'self._root = ET.parse(self._strings_path).getroot()'
+                         ] + [
+                             f'self.{s.property_name} = {self._class_name}.{s.class_name}(self)' for s in self._sections
+                         ] + [
                              'self.switch_lang(lang)'
                          ])
         )
@@ -294,11 +324,11 @@ class StringResourceViewGenerator(CodeGenerator):
 
 
 def extract_distinct_declaration(xml_file_path) -> Dict[str, Dict[str, List[str]]]:
-    if not os.path.isfile(STRING_RESOURCE_FILE):
+    if not os.path.isfile(xml_file_path):
         raise Exception(f'There is no resource file via path "{xml_file_path}"')
 
-    log.info(f'Loading {STRING_RESOURCE_FILE}')
-    root = ElementTree.parse(STRING_RESOURCE_FILE).getroot()
+    log.info(f'Loading {xml_file_path}')
+    root = ElementTree.parse(xml_file_path).getroot()
 
     declaration = {}
     for section in root:
@@ -317,14 +347,16 @@ def extract_distinct_declaration(xml_file_path) -> Dict[str, Dict[str, List[str]
     return declaration
 
 
-def main(argv):
-    declaration = extract_distinct_declaration(STRING_RESOURCE_FILE)
+def main(_):
+    xml = 'res/strings.xml'
+    output = 'src/util/resources.py'
+    declaration = extract_distinct_declaration(xml)
     generator = StringResourceViewGenerator('strings', declaration)
 
-    with open('src/util/resources.py', 'w') as file:
+    with open(output, 'w') as file:
         file.write(gen_header() + '\n\n' + generator.code)
 
-    license_py_file('src/util/resources.py')
+    license_py_file(output)
 
 
 if __name__ == '__main__':

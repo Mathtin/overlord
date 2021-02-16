@@ -46,7 +46,7 @@ from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import qualified_name, is_dm_message, filter_roles, is_text_channel
 from util.extbot import skip_bots, after_initialized, guild_member_event
 from util.logger import DiscordLogConfig
-from util.resources import R
+from util.resources import STRINGS as R
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, \
     OverlordRole, OverlordVCState, IBotExtension, OverlordRootConfig
 

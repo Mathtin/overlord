@@ -45,7 +45,7 @@ from overlord.command import OverlordCommand
 from overlord.types import IBotExtension
 from util import get_coroutine_attrs
 from util.exceptions import InvalidConfigException
-from util.resources import R
+from util.resources import STRINGS as R
 
 log = logging.getLogger('overlord-extension')
 

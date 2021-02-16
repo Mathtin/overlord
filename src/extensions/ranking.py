@@ -41,7 +41,7 @@ from services.stat import StatService
 from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
 from util.extbot import filter_roles, is_role_applied, qualified_name
-from util.resources import R
+from util.resources import STRINGS as R
 from overlord.extension import BotExtension
 
 log = logging.getLogger('ranking-extension')
