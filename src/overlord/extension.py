@@ -217,7 +217,7 @@ class BotExtension(IBotExtension):
         name = ex_type.__name__
 
         reported_to = f'{R.MESSAGE.STATUS.REPORTED_TO} {self.bot.maintainer.mention}'
-        details = f'{str(ex)}\n**{R.NAME.COMMON.EXTENSION} {ext_name}**, disabled'
+        details = f'{str(ex)}\n{R.NAME.COMMON.EXTENSION} **{ext_name}** disabled'
 
         maintainer_report = self.bot.new_error_report(name, details, tb)
         channel_report = self.bot.new_error_report(name, str(ex) + '\n' + reported_to)
