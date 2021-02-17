@@ -12,6 +12,8 @@
       <string type="common" lang="en" name="log-channel">Logging channel</string>
       <string type="common" lang="en" name="control-channel">Control channel</string>
       <string type="common" lang="en" name="maintainer">Maintainer</string>
+      <string type="common" lang="en" name="state">State</string>
+      <string type="common" lang="en" name="progress">Progress</string>
       <!-- User stat names -->
       <string type="user-stat" lang="en" name="membership">Membership period</string>
       <string type="user-stat" lang="en" name="new-message-count">New message count</string>
@@ -66,12 +68,22 @@
       <string type="status" lang="en" name="db-clear-channel">Clearing message history from database</string>
       <string type="status" lang="en" name="db-load-channel">Loading message history</string>
       <string type="status" lang="en" name="db-drop-table">Clearing table</string>
+      <string type="status" lang="en" name="db-drop">Clearing database</string>
       <string type="status" lang="en" name="clear-stats">Clearing stats</string>
       <string type="status" lang="en" name="calc-stats">Calculating stats</string>
       <string type="status" lang="en" name="stop-extension">Disabling extension</string>
       <string type="status" lang="en" name="reported-to">Reported to</string>
       <string type="status" lang="en" name="started">Bot started successfully</string>
       <string type="status" lang="en" name="success">Operation completed successfully</string>
+      <string type="status" lang="en" name="elapsed">Elapsed time</string>
+
+      <string type="state" lang="en" name="finished">Done</string>
+      <string type="state" lang="en" name="in-progress">In progress</string>
+      <string type="state" lang="en" name="failed">Failed</string>
+      <string type="state" lang="en" name="success">Done</string>
+      <string type="state" lang="en" name="not-started">Not started</string>
+      <string type="state" lang="en" name="unknown">Unknown state</string>
+      <string type="state" lang="en" name="skipped">Skipped</string>
 
       <!-- basic error messages -->
       <string type="error" lang="en" name="internal">Internal error</string>

@@ -87,6 +87,14 @@ class XStrings(object):
             def MAINTAINER(self) -> str:
                 return self.get("maintainer")
         
+            @property
+            def STATE(self) -> str:
+                return self.get("state")
+        
+            @property
+            def PROGRESS(self) -> str:
+                return self.get("progress")
+        
     
         class XUserStat(object):
             _type_name = "user-stat"
@@ -318,6 +326,10 @@ class XStrings(object):
                 return self.get("db-drop-table")
         
             @property
+            def DB_DROP(self) -> str:
+                return self.get("db-drop")
+        
+            @property
             def CLEAR_STATS(self) -> str:
                 return self.get("clear-stats")
         
@@ -340,6 +352,48 @@ class XStrings(object):
             @property
             def SUCCESS(self) -> str:
                 return self.get("success")
+        
+            @property
+            def ELAPSED(self) -> str:
+                return self.get("elapsed")
+        
+    
+        class XState(object):
+            _type_name = "state"
+        
+            def __init__(self, section) -> None:
+                self._section = section
+        
+            def get(self, string_name) -> str:
+                return self._section.get(self._type_name, string_name)
+        
+            @property
+            def FINISHED(self) -> str:
+                return self.get("finished")
+        
+            @property
+            def IN_PROGRESS(self) -> str:
+                return self.get("in-progress")
+        
+            @property
+            def FAILED(self) -> str:
+                return self.get("failed")
+        
+            @property
+            def SUCCESS(self) -> str:
+                return self.get("success")
+        
+            @property
+            def NOT_STARTED(self) -> str:
+                return self.get("not-started")
+        
+            @property
+            def UNKNOWN(self) -> str:
+                return self.get("unknown")
+        
+            @property
+            def SKIPPED(self) -> str:
+                return self.get("skipped")
         
     
         class XError(object):
@@ -502,6 +556,7 @@ class XStrings(object):
     
         _section_name = "messages"
         STATUS: XStatus
+        STATE: XState
         ERROR: XError
         D_ERROR: XDError
         DB_ERROR: XDbError
@@ -511,6 +566,7 @@ class XStrings(object):
         def __init__(self, res) -> None:
             self._res = res
             self.STATUS = XStrings.XMessage.XStatus(self)
+            self.STATE = XStrings.XMessage.XState(self)
             self.ERROR = XStrings.XMessage.XError(self)
             self.D_ERROR = XStrings.XMessage.XDError(self)
             self.DB_ERROR = XStrings.XMessage.XDbError(self)

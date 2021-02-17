@@ -31,11 +31,14 @@ __author__ = "Mathtin"
 
 import asyncio
 import os
-from typing import Any, Callable, Dict, List, Awaitable, Optional, Union
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Awaitable, Optional, Union, Tuple
 
 import discord
 
+from .common import pretty_seconds
 from .exceptions import InvalidConfigException, NotCoroutineException
+from .resources import STRINGS as R
 
 
 ##################################
@@ -231,3 +234,113 @@ def embed_long_message(embed: discord.Embed, message: str) -> None:
                 cur = line
     if cur:
         embed.add_field(name=SEP, value=cur, inline=False)
+
+
+class ProgressEmbed(object):
+
+    NOT_STARTED = 0
+    IN_PROGRESS = 1
+    FINISHED = 2
+    SKIPPED = 3
+    FAILED = -1
+
+    _embed: discord.Embed
+    _msg: Optional[discord.Message]
+    _date: Optional[datetime]
+    _steps: List[Tuple[str, int]]
+    _current_step: int
+    _name: str
+    _state: int
+
+    def __init__(self, name: str, base: discord.Embed) -> None:
+        self._embed = base
+        self._name = name
+        self._msg = None
+        self._date = None
+        self._steps = []
+        self._current_step = 0
+        self._state = ProgressEmbed.NOT_STARTED
+
+    def add_step(self, name: str) -> None:
+        self._steps.append((name, ProgressEmbed.NOT_STARTED))
+
+    def _format_embed(self) -> None:
+        self._embed.title = self._format_step(self._name, self._state)
+        self._embed.description = '\n'.join([self._format_step(*s) for s in self._steps])
+        elapsed = int((datetime.now() - self._date).total_seconds())
+        self._embed.description += f'\n\n{R.NAME.COMMON.STATE}: **{self.state}**\n'
+        self._embed.description += f'{R.MESSAGE.STATUS.ELAPSED}: {pretty_seconds(elapsed)}'
+
+    async def update(self) -> None:
+        if self._msg is None:
+            raise RuntimeError("Call to start() is missing")
+        self._format_embed()
+        await self._msg.edit(embed=self._embed)
+
+    async def start(self, channel: discord.TextChannel) -> None:
+        if not self._steps:
+            raise ValueError("No steps provided")
+        self._date = datetime.now()
+        self._steps[0] = (self._steps[0][0], ProgressEmbed.IN_PROGRESS)
+        self._current_step = 0
+        self._state = ProgressEmbed.IN_PROGRESS
+        self._format_embed()
+        self._msg = await channel.send(embed=self._embed)
+
+    async def _next_step(self, status: int) -> None:
+        if self._current_step >= len(self._steps):
+            raise ValueError("No more steps")
+        c_step = self._current_step
+        self._steps[c_step] = (self._steps[c_step][0], status)
+        self._current_step = c_step + 1
+        if self._current_step < len(self._steps):
+            c_step = self._current_step
+            self._steps[c_step] = (self._steps[c_step][0], ProgressEmbed.IN_PROGRESS)
+
+    async def skip_step(self, update: bool = False) -> None:
+        await self._next_step(ProgressEmbed.SKIPPED)
+        if update:
+            await self.update()
+
+    async def next_step(self, failed: bool = False, update: bool = True) -> None:
+        status = ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED
+        await self._next_step(status)
+        if update:
+            await self.update()
+
+    async def finish(self, failed: bool = False) -> None:
+        status = ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED
+        c_step = self._current_step
+        self._steps[c_step] = (self._steps[c_step][0], status)
+        for step in range(c_step + 1, len(self._steps)):
+            self._steps[step] = (self._steps[step][0], ProgressEmbed.SKIPPED)
+        self._state = status
+        await self.update()
+
+    @property
+    def state(self) -> str:
+        if self._state == ProgressEmbed.NOT_STARTED:
+            return R.MESSAGE.STATE.NOT_STARTED
+        elif self._state == ProgressEmbed.IN_PROGRESS:
+            return R.MESSAGE.STATE.IN_PROGRESS
+        elif self._state == ProgressEmbed.FINISHED:
+            return R.MESSAGE.STATE.FINISHED
+        elif self._state == ProgressEmbed.SKIPPED:
+            return R.MESSAGE.STATE.SKIPPED
+        elif self._state == ProgressEmbed.FAILED:
+            return R.MESSAGE.STATE.FAILED
+        return R.MESSAGE.STATE.UNKNOWN
+
+    @staticmethod
+    def _format_step(name: str, status: int):
+        if status == ProgressEmbed.NOT_STARTED:
+            return f'⚪ {name}'
+        elif status == ProgressEmbed.IN_PROGRESS:
+            return f'🔄 {name}'
+        elif status == ProgressEmbed.FINISHED:
+            return f'✅ {name}'
+        elif status == ProgressEmbed.SKIPPED:
+            return f'✖ {name}'
+        elif status == ProgressEmbed.FAILED:
+            return f'❌ {name}'
+        return f'❔ {name}'

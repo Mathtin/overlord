@@ -40,11 +40,11 @@ import discord
 
 import db as DB
 from services import EventService, RoleService, StatService, UserService
-from util import get_coroutine_attrs, parse_control_message, limit_traceback
+from util import parse_control_message, limit_traceback
 from util.config import ConfigManager
 from util.exceptions import InvalidConfigException, NotCoroutineException
 from util.extbot import qualified_name, is_dm_message, filter_roles, is_text_channel
-from util.extbot import skip_bots, after_initialized, guild_member_event
+from util.extbot import skip_bots, after_initialized, guild_member_event, get_coroutine_attrs
 from util.logger import DiscordLogConfig
 from util.resources import STRINGS as R
 from .types import OverlordMessageDelete, OverlordMember, OverlordMessage, OverlordMessageEdit, OverlordReaction, \
@@ -164,16 +164,12 @@ class Overlord(discord.Client):
     ###########
 
     @property
-    def extensions(self) -> List[Any]:
-        raise NotImplementedError()
+    def extensions(self) -> List[IBotExtension]:
+        return self._extensions
 
     @property
     def prefix(self) -> str:
         return self.config.control.prefix
-
-    @property
-    def extensions(self) -> List[IBotExtension]:
-        return self._extensions
 
     def sync(self) -> asyncio.Lock:
         return self._async_lock

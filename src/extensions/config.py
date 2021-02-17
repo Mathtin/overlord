@@ -34,9 +34,8 @@ import logging
 import discord
 
 from util.resources import STRINGS as R
-from util import code_msg
 from util.exceptions import InvalidConfigException
-from util.extbot import embed_long_message
+from util.extbot import embed_long_message, code_msg
 from overlord.extension import BotExtension
 
 log = logging.getLogger('config-extension')

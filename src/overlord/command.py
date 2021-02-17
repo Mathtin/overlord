@@ -35,7 +35,7 @@ import discord as DIS
 from discord.errors import InvalidArgument
 
 import db as DB
-from util import check_coroutine
+from util.extbot import check_coroutine
 from util.resources import STRINGS as R
 from .types import OverlordMember, IOverlordCommand, IBotExtension
 

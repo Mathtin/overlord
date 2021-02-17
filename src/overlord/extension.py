@@ -43,8 +43,8 @@ from overlord.bot import Overlord
 from overlord.task import OverlordTask
 from overlord.command import OverlordCommand
 from overlord.types import IBotExtension
-from util import get_coroutine_attrs
 from util.exceptions import InvalidConfigException
+from util.extbot import ProgressEmbed, get_coroutine_attrs
 from util.resources import STRINGS as R
 
 log = logging.getLogger('overlord-extension')
@@ -189,6 +189,10 @@ class BotExtension(IBotExtension):
         if name in self._command_handlers:
             return self._command_handlers[name]
         return None
+
+    def new_progress(self, name: str):
+        embed = self.bot.new_embed('', '')
+        return ProgressEmbed(name, embed)
 
     @property
     def priority(self) -> int:
