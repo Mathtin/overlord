@@ -30,16 +30,15 @@ SOFTWARE.
 __author__ = "Mathtin"
 
 from datetime import datetime
-from sqlalchemy.orm.query import Query
-from sqlalchemy.sql.dml import Insert, Update
-from sqlalchemy.sql.elements import literal_column
-from sqlalchemy.sql.selectable import Select
+from typing import Any, Tuple, List
+
+from sqlalchemy import func, and_, literal_column
+from sqlalchemy.sql import Select, Insert, Update
 from sqlalchemy.sql.expression import cast
+from sqlalchemy.sql.expression import insert, select, update
 from sqlalchemy.sql.sqltypes import Integer
-from sqlalchemy import func, insert, select, update, and_
 
 from .models import *
-from .session import DBPersistSession
 
 
 def date_to_secs_sqlite(col):
@@ -62,83 +61,116 @@ def date_to_secs(col):
         return date_to_secs_mysql(col)
 
 
-def get_user_by_did(db: DBPersistSession, id_: int) -> User:
-    return db.query(User).filter(User.did == id_).first()
+def select_event_type(event_type: str) -> Select:
+    return select(EventType).where(EventType.name == event_type)
 
 
-def get_msg_by_did(db: DBPersistSession, id_: int) -> MessageEvent:
-    return db.query(MessageEvent).filter(MessageEvent.message_id == id_).first()
+def select_event_types() -> Select:
+    return select(EventType)
 
 
-def get_last_member_event_by_did(db: DBPersistSession, id_: int) -> MessageEvent:
-    return db.query(MemberEvent).join(User) \
-        .filter(User.did == id_) \
-        .order_by(MemberEvent.created_at.desc()).first()
+def select_user_by_did(did: int) -> Select:
+    return select(User).where(User.did == did)
 
 
-def get_last_member_event_by_id(db: DBPersistSession, id_: int) -> MessageEvent:
-    return db.query(MemberEvent) \
-        .filter(MemberEvent.user_id == id_) \
-        .order_by(MemberEvent.created_at.desc()).first()
+def select_msg_by_did(did: int) -> Select:
+    return select(MessageEvent).where(MessageEvent.message_id == did)
 
 
-def get_last_vc_event_by_id(db: DBPersistSession, id_: int, channel_id: int) -> VoiceChatEvent:
-    return db.query(VoiceChatEvent) \
-        .filter(and_(VoiceChatEvent.user_id == id_, VoiceChatEvent.channel_id == channel_id)) \
-        .order_by(VoiceChatEvent.created_at.desc()).first()
+def select_last_member_event_by_user_did(user_did: int) -> Select:
+    return select(MemberEvent) \
+        .join(User) \
+        .where(User.did == user_did) \
+        .order_by(MemberEvent.created_at.desc())
 
 
-def get_last_vc_event_by_id_and_type_id(db: DBPersistSession, id_: int, channel_id: int,
-                                        type_id: int) -> VoiceChatEvent:
-    return db.query(VoiceChatEvent) \
-        .filter(and_(VoiceChatEvent.user_id == id_,
-                     VoiceChatEvent.channel_id == channel_id,
-                     VoiceChatEvent.type_id == type_id)) \
-        .order_by(VoiceChatEvent.created_at.desc()).first()
+def select_last_member_event_by_user_id(user_id: int) -> Select:
+    return select(MemberEvent) \
+        .where(MemberEvent.user_id == user_id) \
+        .order_by(MemberEvent.created_at.desc())
 
 
-def get_user_stat_by_id(db: DBPersistSession, id_: int, type_id: int) -> UserStat:
-    return db.query(UserStat) \
-        .filter(and_(UserStat.user_id == id_, UserStat.type_id == type_id)).first()
+def select_any_last_vc_event_by_user_id(user_id: int, channel_id: int) -> Select:
+    return select(VoiceChatEvent) \
+        .where(and_(VoiceChatEvent.user_id == user_id, VoiceChatEvent.channel_id == channel_id)) \
+        .order_by(VoiceChatEvent.created_at.desc())
 
 
-def select_membership_time_per_user(type_id: int, lit_values: list) -> Select:
+def select_last_vc_event_by_user_id(channel_id: int, event_name: str, user_id: int) -> Select:
+    return select(VoiceChatEvent) \
+        .join(EventType) \
+        .where(and_(VoiceChatEvent.user_id == user_id,
+                    VoiceChatEvent.channel_id == channel_id,
+                    EventType.name == event_name)) \
+        .order_by(VoiceChatEvent.created_at.desc())
+
+
+def select_user_stat_by_user_id(stat_name: str, user_id: int) -> Select:
+    return select(UserStat) \
+        .join(UserStatType) \
+        .where(and_(UserStat.user_id == user_id,
+                    UserStatType.name == stat_name))
+
+
+def select_membership_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
+    if lit_values is None:
+        lit_values = []
     join_time = date_to_secs(func.max(MemberEvent.created_at))
     current_time = int(datetime.now().timestamp())
     membership_value = cast((current_time - join_time) / 86400, Integer).label('value')
-    lit_columns = [literal_column(str(v)).label(l) for (l, v) in lit_values]
-    select_columns = [membership_value, MemberEvent.user_id] + lit_columns
-    return select(select_columns).where(and_(MemberEvent.type_id == type_id, User.roles != None)).group_by(
-        MemberEvent.user_id)
+    return select([membership_value, MemberEvent.user_id] +
+                  [literal_column(str(v)).label(label) for label, v in lit_values]) \
+        .join(User) \
+        .join(EventType) \
+        .where(and_(EventType.name == 'member_join',
+                    User.roles.isnot(None))) \
+        .group_by(MemberEvent.user_id)
 
 
-def select_message_count_per_user(type_id: int, lit_values: list) -> Select:
+def select_message_event_count_per_user(event_name: str, lit_values: List[Tuple[str, Any]] = None) -> Select:
+    if lit_values is None:
+        lit_values = []
     value_column = func.count(MessageEvent.id).label('value')
-    lit_columns = [literal_column(str(v)).label(l) for (l, v) in lit_values]
-    select_columns = [value_column, MessageEvent.user_id] + lit_columns
-    return select(select_columns).where(MessageEvent.type_id == type_id).group_by(MessageEvent.user_id)
+    return select([value_column, MessageEvent.user_id] +
+                  [literal_column(str(v)).label(label) for label, v in lit_values]) \
+        .join(EventType) \
+        .where(EventType.name == event_name) \
+        .group_by(MessageEvent.user_id)
 
 
-def select_reaction_count_per_user(type_id: int, lit_values: list) -> Select:
+def select_reaction_event_count_per_user(event_name: str, lit_values: List[Tuple[str, Any]] = None) -> Select:
+    if lit_values is None:
+        lit_values = []
     value_column = func.count(ReactionEvent.id).label('value')
-    lit_columns = [literal_column(str(v)).label(l) for (l, v) in lit_values]
-    select_columns = [value_column, ReactionEvent.user_id] + lit_columns
-    return select(select_columns).where(ReactionEvent.type_id == type_id).group_by(ReactionEvent.user_id)
+    return select([value_column, ReactionEvent.user_id] +
+                  [literal_column(str(v)).label(label) for label, v in lit_values]) \
+        .join(EventType) \
+        .where(EventType.name == event_name) \
+        .group_by(ReactionEvent.user_id)
 
 
-def select_vc_time_per_user(type_id: int, lit_values: list) -> Select:
+def select_vc_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
+    if lit_values is None:
+        lit_values = []
     join_time = date_to_secs(VoiceChatEvent.created_at)
     left_time = date_to_secs(VoiceChatEvent.updated_at)
     value_column = func.sum(left_time - join_time).label('value')
-    lit_columns = [literal_column(str(v)).label(l) for (l, v) in lit_values]
-    select_columns = [value_column, VoiceChatEvent.user_id] + lit_columns
-    return select(select_columns).where(VoiceChatEvent.type_id == type_id).group_by(VoiceChatEvent.user_id)
+    return select([value_column, VoiceChatEvent.user_id] +
+                  [literal_column(str(v)).label(label) for label, v in lit_values]) \
+        .join(EventType) \
+        .where(EventType.name == 'vc_join') \
+        .group_by(VoiceChatEvent.user_id)
 
 
-def insert_user_stat_from_select(select_query: Query) -> Insert:
-    return insert(UserStat, inline=True).from_select(['value', 'user_id', 'type_id'], select_query)
+def insert_user_stat_from_select(select_query: Select, values: list = None) -> Insert:
+    if values is None:
+        values = ['value', 'user_id', 'type_id']
+    return insert(UserStat).inline().from_select(values, select_query)
 
 
-def update_inc_user_member_stat(stat_id: int) -> Update:
-    return update(UserStat).values(value=UserStat.value + 1) \
-        .where(UserStat.type_id == stat_id)
+def update_inc_user_member_stat(stat_name: str) -> Update:
+    return update(UserStat) \
+        .values(value=UserStat.value + 1) \
+        .where(UserStat.type_id == select(UserStatType)
+               .where(UserStatType.name == stat_name)
+               .scalar_subquery())
