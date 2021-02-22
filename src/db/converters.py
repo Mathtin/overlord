@@ -29,10 +29,12 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from typing import Any, Dict, List
-import discord as d
-from .models import User, MessageEvent
 from datetime import datetime
+from typing import Any, Dict, List
+
+import discord as d
+
+from .models import User, MessageEvent
 
 
 #
@@ -47,7 +49,7 @@ def role_to_row(role: d.Role) -> Dict[str, Any]:
     }
 
 
-def roles_to_rows(roles: list) -> List[Dict[str, Any]]:
+def roles_to_rows(roles: List[d.Role]) -> List[Dict[str, Any]]:
     rows = [role_to_row(r) for r in roles]
     rows = sorted(rows, key=lambda o: o['did'])
     for i in range(len(rows)):
@@ -55,7 +57,7 @@ def roles_to_rows(roles: list) -> List[Dict[str, Any]]:
     return rows
 
 
-def role_mask(user: d.Member, role_map: dict) -> str:
+def role_mask(user: d.Member, role_map: Dict[int, Dict[str, Any]]) -> str:
     mask = ['0'] * len(role_map)
     for role in user.roles:
         idx = role_map[role.id]['idx']
@@ -77,7 +79,7 @@ def user_row(user: d.User) -> Dict[str, Any]:
     }
 
 
-def member_row(user: d.Member, role_map: dict) -> Dict[str, Any]:
+def member_row(user: d.Member, role_map: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
     return {
         'did': user.id,
         'name': user.name,
@@ -88,7 +90,7 @@ def member_row(user: d.Member, role_map: dict) -> Dict[str, Any]:
     }
 
 
-def member_join_row(user: User, joined: datetime, events: dict) -> Dict[str, Any]:
+def member_join_row(user: User, joined: datetime, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["member_join"],
         'user_id': user.id,
@@ -96,7 +98,7 @@ def member_join_row(user: User, joined: datetime, events: dict) -> Dict[str, Any
     }
 
 
-def user_leave_row(user: User, events: dict) -> Dict[str, Any]:
+def user_leave_row(user: User, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["member_leave"],
         'user_id': user.id
@@ -107,7 +109,7 @@ def user_leave_row(user: User, events: dict) -> Dict[str, Any]:
 # Messages
 #
 
-def new_message_to_row(user_id: int, msg: d.Message, events: dict) -> Dict[str, Any]:
+def new_message_to_row(user_id: int, msg: d.Message, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["new_message"],
         'user_id': user_id,
@@ -117,7 +119,7 @@ def new_message_to_row(user_id: int, msg: d.Message, events: dict) -> Dict[str, 
     }
 
 
-def message_edit_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
+def message_edit_row(msg: MessageEvent, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["message_edit"],
         'user_id': msg.user.id,
@@ -126,7 +128,7 @@ def message_edit_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
     }
 
 
-def message_delete_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
+def message_delete_row(msg: MessageEvent, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["message_delete"],
         'user_id': msg.user.id,
@@ -139,7 +141,7 @@ def message_delete_row(msg: MessageEvent, events: dict) -> Dict[str, Any]:
 # VC
 #
 
-def vc_join_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str, Any]:
+def vc_join_row(user: User, channel: d.VoiceChannel, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["vc_join"],
         'user_id': user.id,
@@ -147,7 +149,7 @@ def vc_join_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str, 
     }
 
 
-def vc_leave_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str, Any]:
+def vc_leave_row(user: User, channel: d.VoiceChannel, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["vc_leave"],
         'user_id': user.id,
@@ -159,7 +161,7 @@ def vc_leave_row(user: User, channel: d.VoiceChannel, events: dict) -> Dict[str,
 # Reaction
 #
 
-def new_reaction_to_row(user: User, msg: MessageEvent, events: dict) -> Dict[str, Any]:
+def new_reaction_to_row(user: User, msg: MessageEvent, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["new_reaction"],
         'user_id': user.id,
@@ -167,7 +169,7 @@ def new_reaction_to_row(user: User, msg: MessageEvent, events: dict) -> Dict[str
     }
 
 
-def reaction_delete_row(user: User, msg: MessageEvent, events: dict) -> Dict[str, Any]:
+def reaction_delete_row(user: User, msg: MessageEvent, events: Dict[str, int]) -> Dict[str, Any]:
     return {
         'type_id': events["reaction_delete"],
         'user_id': user.id,

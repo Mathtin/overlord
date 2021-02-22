@@ -39,14 +39,15 @@ from util.extbot import check_coroutine
 from util.resources import STRINGS as R
 from .types import OverlordMember, IOverlordCommand, IBotExtension
 
-_type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, Any, str], Awaitable[Optional[str]]]] = {}
+_type_arg_converter_map: Dict[Type[Any], Callable[[DIS.Message, IBotExtension, str], Awaitable[Optional[str]]]] = {}
 
 
 class SaveFor(object):
     def __init__(self, type_) -> None:
         self.type = type_
 
-    def __call__(self, func: Callable[..., Any]):
+    def __call__(self, func: Callable[[DIS.Message, IBotExtension, str], Awaitable[Optional[str]]]) -> \
+            Callable[[DIS.Message, IBotExtension, str], Awaitable[Optional[str]]]:
         _type_arg_converter_map[self.type] = func
         return func
 

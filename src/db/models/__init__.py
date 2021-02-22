@@ -33,3 +33,6 @@ from .event import EventType, MemberEvent, MessageEvent, VoiceChatEvent, Reactio
 from .role import Role
 from .user import User
 from .stat import UserStatType, UserStat
+
+INFO_MODELS = [EventType, UserStatType]
+RELATION_MODELS = [Role, User, MemberEvent, MessageEvent, ReactionEvent, VoiceChatEvent, UserStat]

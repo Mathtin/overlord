@@ -67,21 +67,15 @@ class UtilityExtension(BotExtension):
             page = len(self.bot.extensions)
         elif emoji == u'◀':
             page -= 1
-        else:  # if emoji == u'▶'
+        elif emoji == u'▶':
             page += 1
+        else:
+            return
         ext = self.bot.resolve_extension(page)
         if ext is not None:
             i = self.bot.extension_idx(ext)
             e_count = len(self.bot.extensions)
             await msg.edit(embed=ext.help_embed(f"Overlord Help page [{i + 1}/{e_count}]"))
-        if is_dm_message(msg):
-            return
-        for reaction in msg.reactions:
-            users = await reaction.users().flatten()
-            for user in users:
-                if user == self.bot.me:
-                    continue
-                await reaction.remove(user)
 
     #########
     # Hooks #
@@ -156,15 +150,14 @@ class UtilityExtension(BotExtension):
     async def clear_data(self, msg: discord.Message):
         log.warning("Clearing database")
         progress = self.new_progress(f'{R.MESSAGE.STATUS.DB_DROP}')
-        models = [DB.ReactionEvent, DB.MessageEvent, DB.VoiceChatEvent, DB.MemberEvent, DB.UserStat, DB.User, DB.Role]
-        for model in models:
+        for model in reversed(DB.RELATION_MODELS):
             progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {model.table_name()}')
         progress.add_step(R.MESSAGE.STATUS.SYNC_USERS)
         await progress.start(msg.channel)
         await self.bot.send_warning(self.__extname__, "Clearing database")
         try:
             async with self.bot.sync():
-                for model in models:
+                for model in reversed(DB.RELATION_MODELS):
                     log.warning(f"Clearing table `{model.table_name()}`")
                     self.bot.db.query(model).delete()
                     self.bot.db.commit()
