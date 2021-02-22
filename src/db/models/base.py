@@ -44,7 +44,8 @@ class BaseModel(Base):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=now(), onupdate=now())
 
     def __repr__(self):
-        return "<{0.__class__.__name__}(id={0.id!r})>".format(self)
+        return "<{0.__class__.__name__}(id={0.id!r},created_at={0.created_at!r},updated_at={0.updated_at!r})>"\
+            .format(self)
 
     @classmethod
     def table_name(cls):

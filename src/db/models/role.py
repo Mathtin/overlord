@@ -42,5 +42,5 @@ class Role(BaseModel):
 
     def __repr__(self):
         s = super().__repr__()[:-2]
-        f = ",name={0.name!r},description={0.description!r},idx={0.idx!r}".format(self)
+        f = ",did={0.did!r},name={0.name!r},idx={0.idx!r}".format(self)
         return s + f + ")>"

@@ -33,8 +33,8 @@ from datetime import datetime
 from typing import Any, Tuple, List
 
 from sqlalchemy import func, and_, literal_column
-from sqlalchemy.sql import Select, Insert, Update
-from sqlalchemy.sql.expression import cast
+from sqlalchemy.sql import Select, Insert, Update, Delete
+from sqlalchemy.sql.expression import cast, delete
 from sqlalchemy.sql.expression import insert, select, update
 from sqlalchemy.sql.sqltypes import Integer
 
@@ -61,6 +61,14 @@ def date_to_secs(col):
         return date_to_secs_mysql(col)
 
 
+##################
+# SELECT QUERIES #
+##################
+
+def select_role(role_name: str) -> Select:
+    return select(Role).where(Role.name == role_name)
+
+
 def select_event_type(event_type: str) -> Select:
     return select(EventType).where(EventType.name == event_type)
 
@@ -71,6 +79,14 @@ def select_event_types() -> Select:
 
 def select_user_by_did(did: int) -> Select:
     return select(User).where(User.did == did)
+
+
+def select_user_by_display_name(display_name: str) -> Select:
+    return select(User).where(User.display_name == display_name)
+
+
+def select_user_by_q_name(name: str, disc: int) -> Select:
+    return select(User).where(User.name == name, User.disc == disc)
 
 
 def select_msg_by_did(did: int) -> Select:
@@ -162,10 +178,35 @@ def select_vc_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
         .group_by(VoiceChatEvent.user_id)
 
 
+##################
+# INSERT QUERIES #
+##################
+
 def insert_user_stat_from_select(select_query: Select, values: list = None) -> Insert:
     if values is None:
         values = ['value', 'user_id', 'type_id']
     return insert(UserStat).inline().from_select(values, select_query)
+
+
+##################
+# UPDATE QUERIES #
+##################
+
+def update_all_users_absent() -> Update:
+    return update(User) \
+        .values(roles=None, display_name=None)
+
+
+def update_user_absent(id_: int) -> Update:
+    return update(User) \
+        .values(roles=None, display_name=None) \
+        .where(User.id == id_)
+
+
+def update_user_absent_by_did(did: int) -> Update:
+    return update(User) \
+        .values(roles=None, display_name=None) \
+        .where(User.did == did)
 
 
 def update_inc_user_member_stat(stat_name: str) -> Update:
@@ -174,3 +215,12 @@ def update_inc_user_member_stat(stat_name: str) -> Update:
         .where(UserStat.type_id == select(UserStatType)
                .where(UserStatType.name == stat_name)
                .scalar_subquery())
+
+
+##################
+# DELETE QUERIES #
+##################
+
+def delete_absent_users() -> Delete:
+    return delete(User) \
+        .where(roles=None, display_name=None)
