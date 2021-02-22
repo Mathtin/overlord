@@ -29,5 +29,5 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from .session import DBPersistSession
+from .session import DBSessionProvider
 from .models import *
