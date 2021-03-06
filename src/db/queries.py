@@ -30,7 +30,7 @@ SOFTWARE.
 __author__ = "Mathtin"
 
 from datetime import datetime
-from typing import Any, Tuple, List
+from typing import Any, Tuple, List, Type
 
 from sqlalchemy import func, and_, literal_column
 from sqlalchemy.sql import Select, Insert, Update, Delete
@@ -39,6 +39,7 @@ from sqlalchemy.sql.expression import insert, select, update
 from sqlalchemy.sql.sqltypes import Integer
 
 from .models import *
+from .models.base import BaseModel
 
 
 def date_to_secs_sqlite(col):
@@ -93,8 +94,8 @@ def select_user_by_q_name(name: str, disc: int) -> Select:
     return select(User).where(User.name == name, User.disc == disc)
 
 
-def select_msg_by_did(did: int) -> Select:
-    return select(MessageEvent).where(MessageEvent.message_id == did)
+def select_message_event_by_did(type_id: int, did: int) -> Select:
+    return select(MessageEvent).where(and_(MessageEvent.message_id == did, MessageEvent.type_id == type_id))
 
 
 def select_last_member_event_by_user_did(user_did: int) -> Select:
@@ -247,3 +248,7 @@ def delete_message_events_by_channel_id(channel_id: int) -> Delete:
 def delete_users_stat(type_id: int) -> Delete:
     return delete(UserStat) \
         .where(UserStat.type_id == type_id)
+
+
+def delete_all(model_type: Type[BaseModel]) -> Delete:
+    return delete(model_type)
