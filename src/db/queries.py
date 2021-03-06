@@ -77,6 +77,10 @@ def select_event_types() -> Select:
     return select(EventType)
 
 
+def select_stat_types() -> Select:
+    return select(UserStatType)
+
+
 def select_user_by_did(did: int) -> Select:
     return select(User).where(User.did == did)
 
@@ -97,19 +101,22 @@ def select_last_member_event_by_user_did(user_did: int) -> Select:
     return select(MemberEvent) \
         .join(User) \
         .where(User.did == user_did) \
-        .order_by(MemberEvent.created_at.desc())
+        .order_by(MemberEvent.created_at.desc()) \
+        .limit(1)
 
 
 def select_last_member_event_by_user_id(user_id: int) -> Select:
     return select(MemberEvent) \
         .where(MemberEvent.user_id == user_id) \
-        .order_by(MemberEvent.created_at.desc())
+        .order_by(MemberEvent.created_at.desc()) \
+        .limit(1)
 
 
 def select_any_last_vc_event_by_user_id(user_id: int, channel_id: int) -> Select:
     return select(VoiceChatEvent) \
         .where(and_(VoiceChatEvent.user_id == user_id, VoiceChatEvent.channel_id == channel_id)) \
-        .order_by(VoiceChatEvent.created_at.desc())
+        .order_by(VoiceChatEvent.created_at.desc()) \
+        .limit(1)
 
 
 def select_last_vc_event_by_user_id(channel_id: int, event_name: str, user_id: int) -> Select:
@@ -128,7 +135,7 @@ def select_user_stat_by_user_id(stat_name: str, user_id: int) -> Select:
                     UserStatType.name == stat_name))
 
 
-def select_membership_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
+def select_membership_time_per_user(event_name: str, lit_values: List[Tuple[str, Any]] = None) -> Select:
     if lit_values is None:
         lit_values = []
     join_time = date_to_secs(func.max(MemberEvent.created_at))
@@ -138,7 +145,7 @@ def select_membership_time_per_user(lit_values: List[Tuple[str, Any]] = None) ->
                   [literal_column(str(v)).label(label) for label, v in lit_values]) \
         .join(User) \
         .join(EventType) \
-        .where(and_(EventType.name == 'member_join',
+        .where(and_(EventType.name == event_name,
                     User.roles.isnot(None))) \
         .group_by(MemberEvent.user_id)
 
@@ -165,7 +172,7 @@ def select_reaction_event_count_per_user(event_name: str, lit_values: List[Tuple
         .group_by(ReactionEvent.user_id)
 
 
-def select_vc_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
+def select_vc_time_per_user(event_name: str, lit_values: List[Tuple[str, Any]] = None) -> Select:
     if lit_values is None:
         lit_values = []
     join_time = date_to_secs(VoiceChatEvent.created_at)
@@ -174,7 +181,7 @@ def select_vc_time_per_user(lit_values: List[Tuple[str, Any]] = None) -> Select:
     return select([value_column, VoiceChatEvent.user_id] +
                   [literal_column(str(v)).label(label) for label, v in lit_values]) \
         .join(EventType) \
-        .where(EventType.name == 'vc_join') \
+        .where(EventType.name == event_name) \
         .group_by(VoiceChatEvent.user_id)
 
 
@@ -209,12 +216,18 @@ def update_user_absent_by_did(did: int) -> Update:
         .where(User.did == did)
 
 
-def update_inc_user_member_stat(stat_name: str) -> Update:
+def update_inc_user_member_stat(user_id: int, type_id: int) -> Update:
     return update(UserStat) \
         .values(value=UserStat.value + 1) \
-        .where(UserStat.type_id == select(UserStatType)
-               .where(UserStatType.name == stat_name)
-               .scalar_subquery())
+        .where(and_(UserStat.user_id == user_id,
+                    UserStat.type_id == type_id))
+
+
+def update_dec_user_member_stat(user_id: int, type_id: int) -> Update:
+    return update(UserStat) \
+        .values(value=UserStat.value - 1) \
+        .where(and_(UserStat.user_id == user_id,
+                    UserStat.type_id == type_id))
 
 
 ##################
@@ -223,4 +236,14 @@ def update_inc_user_member_stat(stat_name: str) -> Update:
 
 def delete_absent_users() -> Delete:
     return delete(User) \
-        .where(roles=None, display_name=None)
+        .where(User.roles.is_(None), User.display_name.is_(None))
+
+
+def delete_message_events_by_channel_id(channel_id: int) -> Delete:
+    return delete(MessageEvent) \
+        .where(MessageEvent.channel_id == channel_id)
+
+
+def delete_users_stat(type_id: int) -> Delete:
+    return delete(UserStat) \
+        .where(UserStat.type_id == type_id)
