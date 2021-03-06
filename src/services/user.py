@@ -69,22 +69,22 @@ class UserService(DBService):
         return user.roles is None and user.display_name is None
 
     def get_sync(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
-        return self._detaching_one_or_none(q.select_user_by_did(d_user.id))
+        return self.get_optional_sync(q.select_user_by_did(d_user.id))
 
     async def get(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
-        return await self._a_detaching_one_or_none(q.select_user_by_did(d_user.id))
+        return await self.get_optional(q.select_user_by_did(d_user.id))
 
     def get_by_display_name_sync(self, display_name: str) -> Optional[DB.User]:
-        return self._detaching_one_or_none(q.select_user_by_display_name(display_name))
+        return self.get_optional_sync(q.select_user_by_display_name(display_name))
 
     async def get_by_display_name(self, display_name: str) -> Optional[DB.User]:
-        return await self._a_detaching_one_or_none(q.select_user_by_display_name(display_name))
+        return await self.get_optional(q.select_user_by_display_name(display_name))
 
     def get_by_q_name_sync(self, name: str, disc: int) -> Optional[DB.User]:
-        return self._detaching_one_or_none(q.select_user_by_q_name(name, disc))
+        return self.get_optional_sync(q.select_user_by_q_name(name, disc))
 
     async def get_by_q_name(self, name: str, disc: int) -> Optional[DB.User]:
-        return await self._a_detaching_one_or_none(q.select_user_by_q_name(name, disc))
+        return await self.get_optional(q.select_user_by_q_name(name, disc))
 
     def get_by_qualified_name_sync(self, qualified_name: str) -> Optional[DB.User]:
         return self.get_by_q_name_sync(*self.parse_qualified_name(qualified_name))
@@ -93,41 +93,41 @@ class UserService(DBService):
         return await self.get_by_q_name(*self.parse_qualified_name(qualified_name))
 
     def mark_everyone_absent_sync(self) -> None:
-        self._execute(q.update_all_users_absent())
+        self.execute_sync(q.update_all_users_absent())
 
     async def mark_everyone_absent(self) -> None:
-        await self._a_execute(q.update_all_users_absent())
+        await self.execute(q.update_all_users_absent())
 
     def merge_member_sync(self, d_user: discord.Member) -> DB.User:
-        return self._merge_detaching(DB.User, conv.member_row(d_user, self.roles.role_rows_did_map), 'did')
+        return self.merge_sync(DB.User, conv.member_row(d_user, self.roles.role_rows_did_map), 'did')
 
     async def merge_member(self, d_user: discord.Member) -> DB.User:
-        return await self._a_merge_detaching(DB.User, conv.member_row(d_user, self.roles.role_rows_did_map), 'did')
+        return await self.merge(DB.User, conv.member_row(d_user, self.roles.role_rows_did_map), 'did')
 
     def add_user_sync(self, d_user: discord.User) -> DB.User:
-        return self._add_detaching(DB.User, conv.user_row(d_user))
+        return self.create_sync(DB.User, conv.user_row(d_user))
 
     async def add_user(self, d_user: discord.User) -> DB.User:
-        return await self._a_add_detaching(DB.User, conv.user_row(d_user))
+        return await self.create(DB.User, conv.user_row(d_user))
 
     def remove_sync(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
         user = self.get_sync(d_user)
-        return user and self._delete_detaching(DB.User, user.id)
+        return user and self.delete_sync(DB.User, user.id)
 
     async def remove(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
         user = await self.get(d_user)
-        return user and await self._a_delete_detaching(DB.User, user.id)
+        return user and await self.delete(DB.User, user.id)
 
     def make_user_absent_sync(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
-        self._execute(q.update_user_absent_by_did(d_user.id))
+        self.execute_sync(q.update_user_absent_by_did(d_user.id))
         return self.get_sync(d_user)
 
     async def make_user_absent(self, d_user: Union[discord.User, discord.Member]) -> Optional[DB.User]:
-        await self._a_execute(q.update_user_absent_by_did(d_user.id))
+        await self.execute(q.update_user_absent_by_did(d_user.id))
         return await self.get(d_user)
 
     def remove_absent_sync(self) -> None:
-        self._execute(q.delete_absent_users())
+        self.execute_sync(q.delete_absent_users())
 
     async def remove_absent(self) -> None:
-        await self._a_execute(q.delete_absent_users())
+        await self.execute(q.delete_absent_users())

@@ -36,7 +36,10 @@ import db.converters as conv
 import db.queries as q
 
 from typing import Dict
+
+from db.predefined import USER_STAT_TYPES
 from .event import EventService
+from .service import DBService
 
 log = logging.getLogger('stat-service')
 
@@ -45,18 +48,20 @@ log = logging.getLogger('stat-service')
 # Service implementation #
 ##########################
 
-class StatService(object):
+class StatService(DBService):
     # State
     user_stat_type_map: Dict[str, int]
 
     # Members passed via constructor
     events: EventService
-    db: DB.DBPersistSession
 
-    def __init__(self, db: DB.DBPersistSession, events: EventService) -> None:
-        self.db = db
+    def __init__(self, db: DB.DBConnection, events: EventService) -> None:
+        super().__init__(db)
         self.events = events
-        self.user_stat_type_map = {row.name: row.id for row in self.db.query(DB.UserStatType)}
+        with self.sync_session() as session:
+            session.sync_table(model_type=DB.UserStatType, values=USER_STAT_TYPES, pk_col='name')
+            self.user_stat_type_map = {row.name: row.id for row in
+                                       session.execute(q.select_stat_types()).scalars().all()}
 
     def check_stat_name(self, name: str) -> None:
         if name not in self.user_stat_type_map:
@@ -65,58 +70,119 @@ class StatService(object):
     def type_id(self, stat_name) -> int:
         return self.user_stat_type_map[stat_name]
 
-    def get(self, user: DB.User, stat_name: str) -> int:
+    def get_sync(self, user: DB.User, stat_name: str) -> int:
         self.check_stat_name(stat_name)
-        stat = q.get_user_stat_by_id(self.db, user.id, self.type_id(stat_name))
+        stat = self.get_optional_sync(q.select_user_stat_by_user_id(stat_name, user.id))
         return stat.value if stat is not None else 0
 
-    def set(self, user: DB.User, stat_name: str, value: int) -> None:
-        type_id = self.type_id(stat_name)
-        stat = q.get_user_stat_by_id(self.db, user.id, type_id)
-        if stat is None:
-            empty_stat_row = conv.empty_user_stat_row(user.id, type_id)
-            stat = self.db.add(DB.UserStat, empty_stat_row)
-        stat.value = value
-        self.db.commit()
+    async def get(self, user: DB.User, stat_name: str) -> int:
+        self.check_stat_name(stat_name)
+        stat = await self.get_optional(q.select_user_stat_by_user_id(stat_name, user.id))
+        return stat.value if stat is not None else 0
 
-    def _reload_stat(self, query, stat: str, event: str) -> None:
-        stat_id = self.user_stat_type_map[stat]
-        event_id = self.events.type_id(event)
-        self.db.query(DB.UserStat).filter_by(type_id=stat_id).delete()
-        self.db.commit()
-        select_query = query(event_id, [('type_id', stat_id)])
-        insert_query = q.insert_user_stat_from_select(select_query)
-        self.db.execute(insert_query)
-        self.db.commit()
+    def set_sync(self, user: DB.User, stat_name: str, value: int) -> None:
+        with self.sync_session() as session:
+            with session.begin():
+                stat = session.execute(q.select_user_stat_by_user_id(stat_name, user.id)).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value = value
 
-    def reload_stat(self, name: str) -> None:
+    async def set(self, user: DB.User, stat_name: str, value: int) -> None:
+        async with self.session() as session:
+            async with session.begin():
+                stat = (await session.execute(q.select_user_stat_by_user_id(stat_name, user.id))).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = await session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value = value
+
+    def inc_sync(self, user: DB.User, stat_name: str) -> None:
+        self.execute_sync(q.update_inc_user_member_stat(user.id, self.type_id(stat_name)))
+
+    async def inc(self, user: DB.User, stat_name: str) -> None:
+        await self.execute(q.update_inc_user_member_stat(user.id, self.type_id(stat_name)))
+
+    def dec_sync(self, user: DB.User, stat_name: str) -> None:
+        self.execute_sync(q.update_dec_user_member_stat(user.id, self.type_id(stat_name)))
+
+    async def dec(self, user: DB.User, stat_name: str) -> None:
+        await self.execute(q.update_dec_user_member_stat(user.id, self.type_id(stat_name)))
+
+    def _reload_stat_sync(self, query, stat_name: str, event: str) -> None:
+        stat_id = self.type_id(stat_name)
+        with self.sync_session() as session:
+            with session.begin():
+                session.execute(q.delete_users_stat(stat_id))
+                select_query = query(event, [('type_id', stat_id)])
+                session.execute(q.insert_user_stat_from_select(select_query))
+
+    async def _reload_stat(self, query, stat_name: str, event: str) -> None:
+        stat_id = self.type_id(stat_name)
+        async with self.session() as session:
+            async with session.begin():
+                await session.execute(q.delete_users_stat(stat_id))
+                select_query = query(event, [('type_id', stat_id)])
+                await session.execute(q.insert_user_stat_from_select(select_query))
+
+    def reload_stat_sync(self, name: str) -> None:
+        self.check_stat_name(name)
+        if hasattr(self, f'reload_{name}_stat_sync'):
+            hook = getattr(self, f'reload_{name}_stat_sync')
+            hook()
+        else:
+            self.reload_stat_default_sync()
+
+    def reload_stat_default_sync(self) -> None:
+        pass
+
+    async def reload_stat(self, name: str) -> None:
         self.check_stat_name(name)
         if hasattr(self, f'reload_{name}_stat'):
             hook = getattr(self, f'reload_{name}_stat')
-            hook()
+            await hook()
         else:
-            self.reload_stat_default()
+            self.reload_stat_sync(name)
 
-    def reload_stat_default(self) -> None:
-        pass
+    def reload_membership_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_membership_time_per_user, 'membership', 'member_join')
 
-    def reload_membership_stat(self) -> None:
-        self._reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
+    async def reload_membership_stat(self) -> None:
+        await self._reload_stat(q.select_membership_time_per_user, 'membership', 'member_join')
 
-    def reload_new_message_count_stat(self) -> None:
-        self._reload_stat(q.select_message_count_per_user, 'new_message_count', 'new_message')
+    def reload_new_message_count_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_message_event_count_per_user, 'new_message_count', 'new_message')
 
-    def reload_delete_message_count_stat(self) -> None:
-        self._reload_stat(q.select_message_count_per_user, 'delete_message_count', 'message_delete')
+    async def reload_new_message_count_stat(self) -> None:
+        await self._reload_stat(q.select_message_event_count_per_user, 'new_message_count', 'new_message')
 
-    def reload_edit_message_count_stat(self) -> None:
-        self._reload_stat(q.select_message_count_per_user, 'edit_message_count', 'message_edit')
+    def reload_delete_message_count_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_message_event_count_per_user, 'delete_message_count', 'message_delete')
 
-    def reload_new_reaction_count_stat(self) -> None:
-        self._reload_stat(q.select_reaction_count_per_user, 'new_reaction_count', 'new_reaction')
+    async def reload_delete_message_count_stat(self) -> None:
+        await self._reload_stat(q.select_message_event_count_per_user, 'delete_message_count', 'message_delete')
 
-    def reload_delete_reaction_count_stat(self) -> None:
-        self._reload_stat(q.select_reaction_count_per_user, 'delete_reaction_count', 'reaction_delete')
+    def reload_edit_message_count_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_message_event_count_per_user, 'edit_message_count', 'message_edit')
 
-    def reload_vc_time_stat(self) -> None:
-        self._reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')
+    async def reload_edit_message_count_stat(self) -> None:
+        await self._reload_stat(q.select_message_event_count_per_user, 'edit_message_count', 'message_edit')
+
+    def reload_new_reaction_count_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_reaction_event_count_per_user, 'new_reaction_count', 'new_reaction')
+
+    async def reload_new_reaction_count_stat(self) -> None:
+        await self._reload_stat(q.select_reaction_event_count_per_user, 'new_reaction_count', 'new_reaction')
+
+    def reload_delete_reaction_count_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_reaction_event_count_per_user, 'delete_reaction_count', 'reaction_delete')
+
+    async def reload_delete_reaction_count_stat(self) -> None:
+        await self._reload_stat(q.select_reaction_event_count_per_user, 'delete_reaction_count', 'reaction_delete')
+
+    def reload_vc_time_stat_sync(self) -> None:
+        self._reload_stat_sync(q.select_vc_time_per_user, 'vc_time', 'vc_join')
+
+    async def reload_vc_time_stat(self) -> None:
+        await self._reload_stat(q.select_vc_time_per_user, 'vc_time', 'vc_join')

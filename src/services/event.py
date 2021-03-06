@@ -30,13 +30,15 @@ SOFTWARE.
 __author__ = "Mathtin"
 
 import logging
+from typing import Dict, Tuple, Optional
 
 import discord
+
 import db as DB
 import db.converters as conv
 import db.queries as q
-
-from typing import Dict, Tuple, Optional
+from db.predefined import EVENT_TYPES
+from .service import DBService
 
 log = logging.getLogger('event-service')
 
@@ -45,120 +47,199 @@ log = logging.getLogger('event-service')
 # Service implementation #
 ##########################
 
-class EventService(object):
+class EventService(DBService):
     # State
     event_type_map: Dict[str, int]
 
-    # Members passed via constructor
-    db: DB.DBPersistSession
-
-    def __init__(self, db: DB.DBPersistSession) -> None:
-        self.db = db
-        self.event_type_map = {row.name: row.id for row in self.db.query(DB.EventType)}
+    def __init__(self, db: DB.DBConnection) -> None:
+        super().__init__(db)
+        with self.sync_session() as session:
+            session.sync_table(model_type=DB.EventType, values=EVENT_TYPES, pk_col='name')
+            self.event_type_map = {row.name: row.id for row in
+                                   session.execute(q.select_event_types()).scalars().all()}
 
     def check_event_name(self, name: str) -> None:
         if name not in self.event_type_map:
             raise NameError(f"No such event name: {name}")
 
-    def get_last_vc_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
-        return q.get_last_vc_event_by_id(self.db, user.id, channel.id)
-
-    def get_last_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
-        return q.get_last_vc_event_by_id_and_type_id(self.db, user.id, channel.id, self.type_id("vc_join"))
-
-    def get_last_member_event(self, member: discord.Member) -> Optional[DB.MemberEvent]:
-        return q.get_last_member_event_by_did(self.db, member.id)
-
-    def get_last_user_member_event(self, user: DB.User) -> Optional[DB.MemberEvent]:
-        return q.get_last_member_event_by_id(self.db, user.id)
-
-    def get_message(self, did: int) -> Optional[DB.MessageEvent]:
-        return q.get_msg_by_did(self.db, did)
-
     def type_id(self, event_name: str) -> int:
         return self.event_type_map[event_name]
 
-    def repair_member_joined_event(self, member: discord.Member, user: DB.User) -> None:
-        last_event = self.get_last_user_member_event(user)
-        if last_event is None or last_event.type_id != self.type_id("member_join"):
-            e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-            last_event = self.db.add(DB.MemberEvent, e_row)
-        last_event.created_at = member.joined_at
-        self.db.commit()
+    ###########
+    # GETTERS #
+    ###########
 
-    def repair_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> None:
-        last_event = self.get_last_vc_event(user, channel)
-        if last_event is not None and last_event.type_id == self.type_id("vc_join"):
-            log.warning(f'Closing VC leave event not found for {user} in <{channel.name} (removing vc_join event)')
-            self.db.delete_model(last_event)
-            self.db.commit()
+    def get_last_vc_event_sync(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
+        return self.get_optional_sync(q.select_any_last_vc_event_by_user_id(user.id, channel.id))
 
-    def create_member_join_event(self, user: DB.User, member: discord.Member) -> DB.MemberEvent:
-        e_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-        res = self.db.add(DB.MemberEvent, e_row)
-        self.db.commit()
-        return res
+    async def get_last_vc_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
+        return await self.get_optional(q.select_any_last_vc_event_by_user_id(user.id, channel.id))
 
-    def create_user_leave_event(self, user: DB.User) -> DB.MemberEvent:
-        e_row = conv.user_leave_row(user, self.event_type_map)
-        res = self.db.add(DB.MemberEvent, e_row)
-        self.db.commit()
-        return res
+    def get_last_vc_join_event_sync(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
+        return self.get_optional_sync(q.select_last_vc_event_by_user_id(channel.id, 'vc_join', user.id))
 
-    def create_new_message_event(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
-        row = conv.new_message_to_row(user.id, message, self.event_type_map)
-        res = self.db.add(DB.MessageEvent, row)
-        self.db.commit()
-        return res
+    async def get_last_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> Optional[DB.VoiceChatEvent]:
+        return await self.get_optional(q.select_last_vc_event_by_user_id(channel.id, 'vc_join', user.id))
 
-    def create_message_edit_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
-        row = conv.message_edit_row(msg, self.event_type_map)
-        res = self.db.add(DB.MessageEvent, row)
-        self.db.commit()
-        return res
+    def get_last_member_event_sync(self, member: discord.Member) -> Optional[DB.MemberEvent]:
+        return self.get_optional_sync(q.select_last_member_event_by_user_did(member.id))
 
-    def create_message_delete_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
-        row = conv.message_delete_row(msg, self.event_type_map)
-        res = self.db.add(DB.MessageEvent, row)
-        self.db.commit()
-        return res
+    async def get_last_member_event(self, member: discord.Member) -> Optional[DB.MemberEvent]:
+        return await self.get_optional(q.select_last_member_event_by_user_did(member.id))
 
-    def create_new_reaction_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
-        row = conv.new_reaction_to_row(user, msg, self.event_type_map)
-        res = self.db.add(DB.ReactionEvent, row)
-        self.db.commit()
-        return res
+    def get_last_member_event_for_db_user_sync(self, user: DB.User) -> Optional[DB.MemberEvent]:
+        return self.get_optional_sync(q.select_last_member_event_by_user_id(user.id))
 
-    def create_reaction_delete_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
-        row = conv.reaction_delete_row(user, msg, self.event_type_map)
-        res = self.db.add(DB.ReactionEvent, row)
-        self.db.commit()
-        return res
+    async def get_last_member_event_for_db_user(self, user: DB.User) -> Optional[DB.MemberEvent]:
+        return await self.get_optional(q.select_last_member_event_by_user_id(user.id))
 
-    def create_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
-        e_row = conv.vc_join_row(user, channel, self.event_type_map)
-        res = self.db.add(DB.VoiceChatEvent, e_row)
-        self.db.commit()
-        return res
+    def get_message_by_did_sync(self, did: int) -> Optional[DB.MessageEvent]:
+        return self.get_optional_sync(q.select_msg_by_did(did))
 
-    def create_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
-        e_row = conv.vc_leave_row(user, channel, self.event_type_map)
-        res = self.db.add(DB.VoiceChatEvent, e_row)
-        self.db.commit()
-        return res
+    async def get_message_by_did(self, did: int) -> Optional[DB.MessageEvent]:
+        return await self.get_optional(q.select_msg_by_did(did))
 
-    def close_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> \
+    ################
+    # CONSTRUCTORS #
+    ################
+
+    def create_member_join_event_sync(self, user: DB.User, member: discord.Member) -> DB.MemberEvent:
+        return self.create_sync(DB.MemberEvent, conv.member_join_row(user, member.joined_at, self.event_type_map))
+
+    async def create_member_join_event(self, user: DB.User, member: discord.Member) -> DB.MemberEvent:
+        return await self.create(DB.MemberEvent, conv.member_join_row(user, member.joined_at, self.event_type_map))
+
+    def create_user_leave_event_sync(self, user: DB.User) -> DB.MemberEvent:
+        return self.create_sync(DB.MemberEvent, conv.user_leave_row(user, self.event_type_map))
+
+    async def create_user_leave_event(self, user: DB.User) -> DB.MemberEvent:
+        return await self.create(DB.MemberEvent, conv.user_leave_row(user, self.event_type_map))
+
+    def create_new_message_event_sync(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
+        return self.create_sync(DB.MessageEvent, conv.new_message_to_row(user.id, message, self.event_type_map))
+
+    async def create_new_message_event(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
+        return await self.create(DB.MessageEvent, conv.new_message_to_row(user.id, message, self.event_type_map))
+
+    def create_message_edit_event_sync(self, msg: DB.MessageEvent) -> DB.MessageEvent:
+        return self.create_sync(DB.MessageEvent, conv.message_edit_row(msg, self.event_type_map))
+
+    async def create_message_edit_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
+        return await self.create(DB.MessageEvent, conv.message_edit_row(msg, self.event_type_map))
+
+    def create_message_delete_event_sync(self, msg: DB.MessageEvent) -> DB.MessageEvent:
+        return self.create_sync(DB.MessageEvent, conv.message_delete_row(msg, self.event_type_map))
+
+    async def create_message_delete_event(self, msg: DB.MessageEvent) -> DB.MessageEvent:
+        return await self.create(DB.MessageEvent, conv.message_delete_row(msg, self.event_type_map))
+
+    def create_new_reaction_event_sync(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        return self.create_sync(DB.ReactionEvent, conv.new_reaction_to_row(user, msg, self.event_type_map))
+
+    async def create_new_reaction_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        return await self.create(DB.ReactionEvent, conv.new_reaction_to_row(user, msg, self.event_type_map))
+
+    def create_reaction_delete_event_sync(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        return self.create_sync(DB.ReactionEvent, conv.reaction_delete_row(user, msg, self.event_type_map))
+
+    async def create_reaction_delete_event(self, user: DB.User, msg: DB.MessageEvent) -> DB.ReactionEvent:
+        return await self.create(DB.ReactionEvent, conv.reaction_delete_row(user, msg, self.event_type_map))
+
+    def create_vc_join_event_sync(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
+        return self.create_sync(DB.VoiceChatEvent, conv.vc_join_row(user, channel, self.event_type_map))
+
+    async def create_vc_join_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
+        return await self.create(DB.VoiceChatEvent, conv.vc_join_row(user, channel, self.event_type_map))
+
+    def create_vc_leave_event_sync(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
+        return self.create_sync(DB.VoiceChatEvent, conv.vc_leave_row(user, channel, self.event_type_map))
+
+    async def create_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> DB.VoiceChatEvent:
+        return await self.create(DB.VoiceChatEvent, conv.vc_leave_row(user, channel, self.event_type_map))
+
+    #########
+    # OTHER #
+    #########
+
+    def clear_text_channel_history_sync(self, channel: discord.TextChannel) -> None:
+        self.execute_sync(q.delete_message_events_by_channel_id(channel.id))
+
+    async def clear_text_channel_history(self, channel: discord.TextChannel) -> None:
+        await self.execute(q.delete_message_events_by_channel_id(channel.id))
+
+    def repair_member_joined_event_sync(self, member: discord.Member, user: DB.User) -> None:
+        with self.sync_session() as session:
+            with session.begin():
+                last_event_stmt = q.select_last_member_event_by_user_id(user.id)
+                last_event = session.execute(last_event_stmt).scalar_one_or_none()
+                if last_event is None or last_event.type_id != self.type_id("member_join"):
+                    member_join_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
+                    last_event = session.add(model_type=DB.MemberEvent, value=member_join_row)
+                last_event.created_at = member.joined_at
+
+    async def repair_member_joined_event(self, member: discord.Member, user: DB.User) -> None:
+        async with self.session() as session:
+            async with session.begin():
+                last_event_stmt = q.select_last_member_event_by_user_id(user.id)
+                last_event = (await session.execute(last_event_stmt)).scalar_one_or_none()
+                if last_event is None or last_event.type_id != self.type_id("member_join"):
+                    member_join_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
+                    last_event = await session.add(model_type=DB.MemberEvent, value=member_join_row)
+                last_event.created_at = member.joined_at
+
+    def close_vc_join_event_sync(self,
+                                 user: DB.User,
+                                 channel: discord.VoiceChannel) -> \
             Optional[Tuple[DB.VoiceChatEvent, DB.VoiceChatEvent]]:
-        join_event = self.get_last_vc_event(user, channel)
-        if join_event is None or join_event.type_id != self.type_id("vc_join"):
-            log.warning(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
-            return None
-        # Save event + update previous
-        e_row = conv.vc_leave_row(user, channel, self.event_type_map)
-        leave_event = self.db.add(DB.VoiceChatEvent, e_row)
-        self.db.commit()
-        return join_event, leave_event
+        with self.sync_session() as session:
+            with session.begin():
+                join_event_stmt = q.select_any_last_vc_event_by_user_id(user.id, channel.id)
+                join_event = session.execute_sync(join_event_stmt).scalar_one_or_none()
+                if join_event is None or join_event.type_id != self.type_id("vc_join"):
+                    log.warning(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
+                    return None
+                # Save event + update previous
+                leave_event_row = conv.vc_leave_row(user, channel, self.event_type_map)
+                leave_event = session.add(model_type=DB.VoiceChatEvent, value=leave_event_row)
+            session.detach(join_event)
+            session.detach(leave_event)
+            return join_event, leave_event
 
-    def clear_text_channel_history(self, channel: discord.TextChannel) -> None:
-        self.db.query(DB.MessageEvent).filter_by(channel_id=channel.id).delete()
-        self.db.commit()
+    async def close_vc_join_event(self,
+                                  user: DB.User,
+                                  channel: discord.VoiceChannel) -> \
+            Optional[Tuple[DB.VoiceChatEvent, DB.VoiceChatEvent]]:
+        async with self.session() as session:
+            async with session.begin():
+                join_event_stmt = q.select_any_last_vc_event_by_user_id(user.id, channel.id)
+                join_event = (await session.execute(join_event_stmt)).scalar_one_or_none()
+                if join_event is None or join_event.type_id != self.type_id("vc_join"):
+                    log.warning(f'VC join event is absent for {user} in <{channel.name}! Skipping vc leave event!')
+                    return None
+                # Save event + update previous
+                leave_event_row = conv.vc_leave_row(user, channel, self.event_type_map)
+                leave_event = await session.add(model_type=DB.VoiceChatEvent, value=leave_event_row)
+                join_event.updated_at = leave_event.created_at
+            await session.detach(join_event)
+            await session.detach(leave_event)
+            return join_event, leave_event
+
+    def repair_vc_leave_event_sync(self, user: DB.User, channel: discord.VoiceChannel) -> None:
+        with self.sync_session() as session:
+            with session.begin():
+                last_event_stmt = q.select_any_last_vc_event_by_user_id(user.id, channel.id)
+                last_event = session.execute(last_event_stmt).scalar_one_or_none()
+                if last_event is not None and last_event.type_id == self.type_id("vc_join"):
+                    log.warning(f'Closing VC leave event not found for {user} in <{channel.name} (removing vc_join '
+                                f'event)')
+                    session.delete(model=last_event)
+
+    async def repair_vc_leave_event(self, user: DB.User, channel: discord.VoiceChannel) -> None:
+        async with self.session() as session:
+            async with session.begin():
+                last_event_stmt = q.select_any_last_vc_event_by_user_id(user.id, channel.id)
+                last_event = (await session.execute(last_event_stmt)).scalar_one_or_none()
+                if last_event is not None and last_event.type_id == self.type_id("vc_join"):
+                    log.warning(f'Closing VC leave event not found for {user} in <{channel.name} (removing vc_join '
+                                f'event)')
+                    await session.delete(model=last_event)

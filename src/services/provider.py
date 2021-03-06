@@ -50,8 +50,8 @@ class ServiceProvider(object):
 
         self._s_roles = RoleService(self._db)
         self._s_users = UserService(self._db, self._s_roles)
-        #self._s_events = EventService(self._db)
-        #self._s_stats = StatService(self._db, self._s_events)
+        self._s_events = EventService(self._db)
+        self._s_stats = StatService(self._db, self._s_events)
 
     @property
     def role(self) -> RoleService:
@@ -63,10 +63,8 @@ class ServiceProvider(object):
 
     @property
     def event(self) -> EventService:
-        #return self._s_events
-        return None
+        return self._s_events
 
     @property
     def stat(self) -> StatService:
-        #return self._s_stats
-        return None
+        return self._s_stats

@@ -64,13 +64,13 @@ class RoleService(DBService):
     def load_sync(self, roles: List[discord.Role]) -> None:
         role_rows = self._load_state(roles)
         # Sync table
-        with self._db.sync_session as session:
+        with self.sync_session() as session:
             session.sync_table(DB.Role, 'did', role_rows)
 
     async def load(self, roles: List[discord.Role]) -> None:
         role_rows = self._load_state(roles)
         # Sync table
-        async with self._db.async_session as session:
+        async with self.session() as session:
             await session.sync_table(DB.Role, role_rows, pk_col='did')
 
     def get_d_role(self, role_name: str) -> Optional[discord.Role]:
@@ -79,7 +79,7 @@ class RoleService(DBService):
         return None
 
     def get_role_sync(self, role_name: str) -> Optional[DB.Role]:
-        return self._detaching_one_or_none(q.select_role(role_name))
+        return self.get_optional_sync(q.select_role(role_name))
 
     async def get_role(self, role_name: str) -> Optional[DB.Role]:
-        return await self._a_detaching_one_or_none(q.select_role(role_name))
+        return await self.get_optional(q.select_role(role_name))
