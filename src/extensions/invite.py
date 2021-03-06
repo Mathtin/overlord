@@ -74,6 +74,10 @@ class InviteExtension(BotExtension):
     # Methods #
     ###########
 
+    @property
+    def s_roles(self):
+        return self.bot.services.role
+
     def find_invite(self, code) -> Optional[discord.Invite]:
         for inv in self._invites:
             if inv.code == code:
@@ -88,7 +92,7 @@ class InviteExtension(BotExtension):
         if invite.code not in self._invite_role_map:
             return
         role_names = self._invite_role_map[invite.code]
-        roles = [self.bot.s_roles.get(r) for r in role_names]
+        roles = [self.s_roles.get_d_role(r) for r in role_names]
         await member.add_roles(*roles)
 
     #########
@@ -104,7 +108,7 @@ class InviteExtension(BotExtension):
         if self.config is None:
             raise InvalidConfigException("InviteRootConfig section not found", "root")
         for role, code in self.config.role.items():
-            if self.bot.s_roles.get(role) is None:
+            if self.s_roles.get_d_role(role) is None:
                 raise InvalidConfigException(f"No such role: '{role}'", self.config.path('role'))
             if self.find_invite(code) is None:
                 raise InvalidConfigException(f"No such invite code: '{code}'", self.config.path(f'role.{role}'))

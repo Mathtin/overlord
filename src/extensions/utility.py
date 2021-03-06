@@ -36,7 +36,7 @@ import discord
 
 import db as DB
 from overlord.extension import BotExtension
-from util.extbot import is_dm_message
+from services import UserService, EventService, StatService, RoleService
 from util.resources import STRINGS as R
 
 log = logging.getLogger('utility-extension')
@@ -53,6 +53,26 @@ class UtilityExtension(BotExtension):
     __color__ = 0xa83fc8
 
     PAGE_NUM_REGEX = re.compile(r'\[(\d+)/(\d+)]')
+
+    #########
+    # Props #
+    #########
+
+    @property
+    def s_roles(self) -> RoleService:
+        return self.bot.services.role
+
+    @property
+    def s_users(self) -> UserService:
+        return self.bot.services.user
+
+    @property
+    def s_events(self) -> EventService:
+        return self.bot.services.event
+
+    @property
+    def s_stats(self) -> StatService:
+        return self.bot.services.stat
 
     ###########
     # Methods #
@@ -134,8 +154,7 @@ class UtilityExtension(BotExtension):
         progress.add_step(R.MESSAGE.STATUS.SYNC_USERS)
         await progress.start(msg.channel)
         try:
-            async with self.bot.sync():
-                await self.bot.sync_users()
+            await self.bot.sync_users()
         except Exception:
             await progress.finish(failed=True)
             raise
@@ -150,19 +169,34 @@ class UtilityExtension(BotExtension):
     async def clear_data(self, msg: discord.Message):
         log.warning("Clearing database")
         progress = self.new_progress(f'{R.MESSAGE.STATUS.DB_DROP}')
-        for model in reversed(DB.RELATION_MODELS):
-            progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {model.table_name()}')
+        progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.UserStat.table_name()}')
+        progress.add_step([f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.MemberEvent.table_name()}',
+                           f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.MessageEvent.table_name()}',
+                           f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.ReactionEvent.table_name()}',
+                           f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.VoiceChatEvent.table_name()}'])
+        progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.User.table_name()}')
+        progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.Role.table_name()}')
         progress.add_step(R.MESSAGE.STATUS.SYNC_USERS)
         await progress.start(msg.channel)
         await self.bot.send_warning(self.__extname__, "Clearing database")
         try:
             async with self.bot.sync():
-                for model in reversed(DB.RELATION_MODELS):
-                    log.warning(f"Clearing table `{model.table_name()}`")
-                    self.bot.db.query(model).delete()
-                    self.bot.db.commit()
-                    await progress.next_step()
-                await self.bot.sync_users()
+                log.warning(f"Clearing table `{DB.UserStat.table_name()}`")
+                await self.s_stats.clear_all()
+                await progress.next_step()
+                log.warning(f"Clearing tables `{DB.MemberEvent.table_name()}`, "
+                            f"`{DB.MessageEvent.table_name()}`, "
+                            f"`{DB.ReactionEvent.table_name()}`, "
+                            f"`{DB.VoiceChatEvent.table_name()}`")
+                await self.s_events.clear_all()
+                await progress.next_step()
+                log.warning(f"Clearing table `{DB.User.table_name()}`")
+                await self.s_users.clear_all()
+                await progress.next_step()
+                log.warning(f"Clearing table `{DB.Role.table_name()}`")
+                await self.s_roles.clear_all()
+                await progress.next_step()
+                await self.bot.sync_users(no_lock=True)
                 log.info(f'Done')
         except Exception:
             await progress.finish(failed=True)
@@ -199,7 +233,7 @@ class UtilityExtension(BotExtension):
 
                 # Drop full channel message history
                 log.warning(f'Dropping #{channel.name}({channel.id}) history')
-                self.bot.s_events.clear_text_channel_history(channel)
+                await self.s_events.clear_text_channel_history(channel)
 
                 # Load all messages
                 log.warning(f'Loading #{channel.name}({channel.id}) history')
@@ -211,16 +245,16 @@ class UtilityExtension(BotExtension):
                         continue
 
                     # Resolve user
-                    user = self.bot.s_users.get(message.author)
+                    user = await self.s_users.get(message.author)
                     if user is None and self.bot.config.keep_absent_users:
-                        user = self.bot.s_users.add_user(message.author)
+                        user = await self.s_users.add_user(message.author)
 
                     # Skip users not in db
                     if user is None:
                         continue
 
                     # Insert new message event
-                    self.bot.s_events.create_new_message_event(user, message)
+                    await self.s_events.create_new_message_event(user, message)
 
                 log.info(f'Done')
         except Exception:

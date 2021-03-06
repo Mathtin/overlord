@@ -36,6 +36,7 @@ import discord
 
 import db as DB
 from overlord.types import OverlordMember, OverlordMessageDelete, OverlordMessageEdit, OverlordMessage
+from services import UserService
 from services.role import RoleService
 from services.stat import StatService
 from util import ConfigView, FORMATTERS
@@ -86,7 +87,6 @@ class RankingRootConfig(ConfigView):
 #####################
 
 class RankingExtension(BotExtension):
-
     __extname__ = '🎖 Ranking Extension'
     __description__ = 'Member ranking system based on stats (check Stats Extension)'
     __color__ = 0xc84e3f
@@ -98,12 +98,16 @@ class RankingExtension(BotExtension):
     #########
 
     @property
+    def s_users(self) -> UserService:
+        return self.bot.services.user
+
+    @property
     def s_stats(self) -> StatService:
-        return self.bot.s_stats
+        return self.bot.services.stat
 
     @property
     def s_roles(self) -> RoleService:
-        return self.bot.s_roles
+        return self.bot.services.role
 
     @property
     def ranks(self) -> Dict[str, RankConfig]:
@@ -121,15 +125,16 @@ class RankingExtension(BotExtension):
     # Methods #
     ###########
 
-    def find_user_rank_name(self, user: DB.User) -> Optional[str]:
+    async def find_user_rank_name(self, user: DB.User) -> Optional[str]:
 
         # Gather stat values
-        exact_weight = self.s_stats.get(user, "exact_weight")
-        min_weight = self.s_stats.get(user, "min_weight")
-        max_weight = self.s_stats.get(user, "max_weight")
-        membership = self.s_stats.get(user, "membership")
-        messages = self.s_stats.get(user, "new_message_count") - self.s_stats.get(user, "delete_message_count")
-        vc_time = self.s_stats.get(user, "vc_time")
+        exact_weight = await self.s_stats.get(user, "exact_weight")
+        min_weight = await self.s_stats.get(user, "min_weight")
+        max_weight = await self.s_stats.get(user, "max_weight")
+        membership = await self.s_stats.get(user, "membership")
+        messages = (await self.s_stats.get(user, "new_message_count")) - \
+                   (await self.s_stats.get(user, "delete_message_count"))
+        vc_time = await self.s_stats.get(user, "vc_time")
         ranks = self.ranks.items()
 
         # Search exact
@@ -153,15 +158,15 @@ class RankingExtension(BotExtension):
     def ignore_member(self, member: discord.Member) -> bool:
         return len(filter_roles(member, self.ignored_roles)) > 0 or len(filter_roles(member, self.required_roles)) == 0
 
-    def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> \
+    async def roles_to_add_and_remove(self, member: discord.Member, user: DB.User) -> \
             Tuple[List[discord.Role], List[discord.Role]]:
-        rank_roles = [self.s_roles.get(r) for r in self.ranks]
+        rank_roles = [self.s_roles.get_d_role(r) for r in self.ranks]
         applied_rank_roles = filter_roles(member, rank_roles)
-        effective_rank_name = self.find_user_rank_name(user)
+        effective_rank_name = await self.find_user_rank_name(user)
         ranks_to_remove = [r for r in applied_rank_roles if r.name != effective_rank_name]
         ranks_to_apply = []
         if effective_rank_name is not None and not is_role_applied(member, effective_rank_name):
-            ranks_to_apply.append(self.s_roles.get(effective_rank_name))
+            ranks_to_apply.append(self.s_roles.get_d_role(effective_rank_name))
         return ranks_to_apply, ranks_to_remove
 
     #################
@@ -172,7 +177,7 @@ class RankingExtension(BotExtension):
         # Resolve user
         if member.bot:
             return
-        user = self.bot.s_users.get(member)
+        user = await self.s_users.get(member)
         # Skip non-existing users
         if user is None:
             log.warning(f'{qualified_name(member)} does not exist in db! Skipping user rank update!')
@@ -181,7 +186,7 @@ class RankingExtension(BotExtension):
         if self.ignore_member(member):
             return
         # Resolve roles to move
-        roles_add, roles_del = self.roles_to_add_and_remove(member, user)
+        roles_add, roles_del = await self.roles_to_add_and_remove(member, user)
         # Remove old roles
         if roles_del:
             log.info(f"Removing {qualified_name(member)}'s rank roles: {roles_del}")
@@ -191,7 +196,7 @@ class RankingExtension(BotExtension):
             log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
             await member.add_roles(*roles_add)
         # Update user in db
-        self.bot.s_users.update_member(member)
+        await self.s_users.merge_member(member)
 
     async def update_all_ranks(self) -> None:
         log.info(f'Updating user ranks')
@@ -211,15 +216,15 @@ class RankingExtension(BotExtension):
             raise InvalidConfigException("RankingRootConfig section not found", "root")
         # Check rank roles
         for i, role_name in enumerate(self.ignored_roles):
-            if self.s_roles.get(role_name) is None:
+            if self.s_roles.get_d_role(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", self.config.path(f"ignored[{i}]"))
         for i, role_name in enumerate(self.required_roles):
-            if self.s_roles.get(role_name) is None:
+            if self.s_roles.get_d_role(role_name) is None:
                 raise InvalidConfigException(f"No such role: '{role_name}'", self.config.path(f"required[{i}]"))
         # Check rank weights
         ranks_weights = {}
         for name, props in self.ranks.items():
-            if self.s_roles.get(name) is None:
+            if self.s_roles.get_d_role(name) is None:
                 raise InvalidConfigException(f"No such role: '{name}'", self.config.path("role"))
             if props.weight in ranks_weights:
                 dup_rank = ranks_weights[props.weight]
@@ -233,14 +238,14 @@ class RankingExtension(BotExtension):
 
     async def on_message_edit(self, msg: OverlordMessageEdit) -> None:
         async with self.sync():
-            if self.bot.s_users.is_absent(msg.db.user):
+            if self.s_users.is_absent(msg.db.user):
                 return
             member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)
 
     async def on_message_delete(self, msg: OverlordMessageDelete) -> None:
         async with self.sync():
-            if self.bot.s_users.is_absent(msg.db.user):
+            if self.s_users.is_absent(msg.db.user):
                 return
             member = await self.bot.guild.fetch_member(msg.db.user.did)
             await self.update_rank(member)

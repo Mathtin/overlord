@@ -48,16 +48,16 @@ log = logging.getLogger('stats-extension')
 # Utility funcs #
 #################
 
-def _build_stat_line(s_stats: StatService, user: DB.User, stat: str) -> str:
+async def _build_stat_line(s_stats: StatService, user: DB.User, stat: str) -> str:
     stat_name = R.NAME.USER_STAT.get(stat.replace('_', '-'))
-    stat_val = s_stats.get(user, stat)
+    stat_val = await s_stats.get(user, stat)
     stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
     return f'{stat_name}: {stat_val_f}'
 
 
-def _add_stat_field(embed: discord.Embed, s_stats: StatService, user: DB.User, stat: str) -> None:
+async def _add_stat_field(embed: discord.Embed, s_stats: StatService, user: DB.User, stat: str) -> None:
     stat_name = R.NAME.USER_STAT.get(stat.replace('_', '-'))
-    stat_val = s_stats.get(user, stat)
+    stat_val = await s_stats.get(user, stat)
     stat_val_f = FORMATTERS[stat](stat_val) if stat in FORMATTERS else str(stat_val)
     embed.add_field(name=stat_name, value=stat_val_f, inline=False)
 
@@ -77,11 +77,11 @@ class StatsExtension(BotExtension):
 
     @property
     def s_users(self):
-        return self.bot.s_users
+        return self.bot.services.user
 
     @property
     def s_stats(self):
-        return self.bot.s_stats
+        return self.bot.services.stat
 
     #########
     # Hooks #
@@ -89,35 +89,29 @@ class StatsExtension(BotExtension):
 
     async def on_message(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            user = msg.db.user
-            inc_value = self.s_stats.get(user, 'new_message_count') + 1
-            self.s_stats.set(user, 'new_message_count', inc_value)
+            await self.s_stats.inc(msg.db.user, 'new_message_count')
 
     async def on_message_edit(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            inc_value = self.s_stats.get(msg.db.user, 'edit_message_count') + 1
-            self.s_stats.set(msg.db.user, 'edit_message_count', inc_value)
+            await self.s_stats.inc(msg.db.user, 'edit_message_count')
 
     async def on_message_delete(self, msg: OverlordMessage) -> None:
         async with self.sync():
-            inc_value = self.s_stats.get(msg.db.user, 'delete_message_count') + 1
-            self.s_stats.set(msg.db.user, 'delete_message_count', inc_value)
+            await self.s_stats.inc(msg.db.user, 'delete_message_count')
 
     async def on_vc_leave(self, user: OverlordMember, join: OverlordVCState, leave: OverlordVCState) -> None:
         async with self.sync():
-            stat_val = self.s_stats.get(user.db, 'vc_time')
+            stat_val = await self.s_stats.get(user.db, 'vc_time')
             stat_val += (leave.db.created_at - join.db.created_at).total_seconds()
-            self.s_stats.set(user.db, 'vc_time', stat_val)
+            await self.s_stats.set(user.db, 'vc_time', stat_val)
 
     async def on_reaction_add(self, member: OverlordMember, _, __) -> None:
         async with self.sync():
-            inc_value = self.s_stats.get(member.db, 'new_reaction_count') + 1
-            self.s_stats.set(member.db, 'new_reaction_count', inc_value)
+            await self.s_stats.inc(member.db, 'new_reaction_count')
 
     async def on_reaction_remove(self, member: OverlordMember, _, __) -> None:
         async with self.sync():
-            inc_value = self.s_stats.get(member.db, 'delete_reaction_count') + 1
-            self.s_stats.set(member.db, 'delete_reaction_count', inc_value)
+            await self.s_stats.inc(member.db, 'delete_reaction_count')
 
     #########
     # Tasks #
@@ -128,7 +122,7 @@ class StatsExtension(BotExtension):
         log.info("Scheduled stat update")
         async with self.sync():
             for stat_name in self.s_stats.user_stat_type_map:
-                self.s_stats.reload_stat(stat_name)
+                await self.s_stats.reload_stat(stat_name)
         log.info("Done scheduled stat update")
 
     ############
@@ -142,9 +136,9 @@ class StatsExtension(BotExtension):
             log.info(f"Recalculating all stats")
             await msg.channel.send(R.MESSAGE.STATUS.CALC_STATS)
             for stat_type in self.s_stats.user_stat_type_map:
-                self.s_stats.reload_stat(stat_type)
+                await self.s_stats.reload_stat(stat_type)
             log.info(f'Done')
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
 
     @BotExtension.command("get_user_stats", description="Fetches user stats from db")
     async def cmd_get_user_stats(self, msg: discord.Message, ov_user: OverlordMember):
@@ -155,20 +149,20 @@ class StatsExtension(BotExtension):
         embed = self.bot.new_embed(f"📊 {qualified_name(member)} stats", desc, header="Overlord Stats",
                                    color=self.__color__)
 
-        _add_stat_field(embed, self.s_stats, user, "membership")
-        _add_stat_field(embed, self.s_stats, user, "new_message_count")
-        _add_stat_field(embed, self.s_stats, user, "delete_message_count")
-        _add_stat_field(embed, self.s_stats, user, "edit_message_count")
-        _add_stat_field(embed, self.s_stats, user, "new_reaction_count")
-        _add_stat_field(embed, self.s_stats, user, "delete_reaction_count")
-        _add_stat_field(embed, self.s_stats, user, "vc_time")
+        await _add_stat_field(embed, self.s_stats, user, "membership")
+        await _add_stat_field(embed, self.s_stats, user, "new_message_count")
+        await _add_stat_field(embed, self.s_stats, user, "delete_message_count")
+        await _add_stat_field(embed, self.s_stats, user, "edit_message_count")
+        await _add_stat_field(embed, self.s_stats, user, "new_reaction_count")
+        await _add_stat_field(embed, self.s_stats, user, "delete_reaction_count")
+        await _add_stat_field(embed, self.s_stats, user, "vc_time")
 
-        if self.s_stats.get(user, "min_weight") > 0:
-            _add_stat_field(embed, self.s_stats, user, "min_weight")
-        if self.s_stats.get(user, "max_weight") > 0:
-            _add_stat_field(embed, self.s_stats, user, "max_weight")
-        if self.s_stats.get(user, "exact_weight") > 0:
-            _add_stat_field(embed, self.s_stats, user, "exact_weight")
+        if (await self.s_stats.get(user, "min_weight")) > 0:
+            await _add_stat_field(embed, self.s_stats, user, "min_weight")
+        if (await self.s_stats.get(user, "max_weight")) > 0:
+            await _add_stat_field(embed, self.s_stats, user, "max_weight")
+        if (await self.s_stats.get(user, "exact_weight")) > 0:
+            await _add_stat_field(embed, self.s_stats, user, "exact_weight")
 
         await msg.channel.send(embed=embed)
 
@@ -184,7 +178,7 @@ class StatsExtension(BotExtension):
     @BotExtension.command("get_user_stat", description="Fetches user stats from db (for specified user)")
     async def cmd_get_user_stat(self, msg: discord.Message, user: DB.User, stat_name: str):
         try:
-            answer = _build_stat_line(self.s_stats, user, stat_name)
+            answer = await _build_stat_line(self.s_stats, user, stat_name)
             await msg.channel.send(answer)
         except NameError:
             embed = self.bot.new_error_report(R.MESSAGE.ERROR_OTHER.UNKNOWN_STAT, '')
@@ -197,7 +191,7 @@ class StatsExtension(BotExtension):
             embed = self.bot.new_error_report(R.MESSAGE.ERROR_OTHER.NEGATIVE_STAT_VALUE, '')
             await msg.channel.send(embed=embed)
         try:
-            self.s_stats.set(user, stat_name, value)
+            await self.s_stats.set(user, stat_name, value)
             await msg.channel.send(R.MESSAGE.SUCCESS)
         except NameError:
             embed = self.bot.new_error_report(R.MESSAGE.ERROR_OTHER.UNKNOWN_STAT, '')
