@@ -114,8 +114,11 @@ class DBSyncSession(object):
               value: Dict[str, Any] = None,
               pk_col: str = 'id') -> BaseModel:
         if model is None:
-            model = self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col) or model_type(**value)
-        self._session.merge(model)
+            model = self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col)
+            for k, v in value.items():
+                setattr(model, k, v)
+        else:
+            self._session.merge(model)
         return model
 
     def delete(self, *, model: Optional[BaseModel] = None,
@@ -226,7 +229,7 @@ class DBAsyncWrappedSession(object):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, self._session.rollback)
 
-    async def begin(self) -> AsyncSessionTransaction:
+    def begin(self) -> AsyncSessionTransaction:
         return AsyncSessionTransaction(self)
 
     async def refresh(self, instance, attribute_names=None, with_for_update=None):
@@ -266,9 +269,12 @@ class DBAsyncWrappedSession(object):
                     value: Dict[str, Any] = None,
                     pk_col: str = 'id') -> BaseModel:
         if model is None:
-            model = await self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col) or model_type(**value)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(self._executor, self._session.merge, model)
+            model = await self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col)
+            for k, v in value.items():
+                setattr(model, k, v)
+        else:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(self._executor, self._session.merge, model)
         return model
 
     async def delete(self, *, model: Optional[BaseModel] = None,
@@ -365,8 +371,8 @@ class DBAsyncSession(object):
     async def rollback(self) -> None:
         await self._session.rollback()
 
-    async def begin(self) -> AsyncSessionTransaction:
-        return await self._session.begin()
+    def begin(self) -> AsyncSessionTransaction:
+        return self._session.begin()
 
     async def refresh(self, instance, attribute_names=None, with_for_update=None):
         await self._session.refresh(instance, attribute_names, with_for_update)
@@ -401,8 +407,11 @@ class DBAsyncSession(object):
                     value: Dict[str, Any] = None,
                     pk_col: str = 'id') -> BaseModel:
         if model is None:
-            model = await self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col) or model_type(**value)
-        await self._session.merge(model)
+            model = await self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col)
+            for k, v in value.items():
+                setattr(model, k, v)
+        else:
+            await self._session.merge(model)
         return model
 
     async def delete(self, *, model: BaseModel = None,
@@ -502,11 +511,9 @@ class DBConnection(object):
         self._sync_session = None
         self._async_session = None
 
-    @property
     def sync_session(self):
         return DBSyncSession(self._session_sync_factory())
 
-    @property
     def async_session(self):
         if self._wrap_sync:
             return DBAsyncWrappedSession(self._session_sync_factory(), self._single_thread_pool)
