@@ -347,22 +347,27 @@ class Overlord(discord.Client):
         await self.maintainer.send(embed=warn_report)
         return
 
-    async def sync_users(self) -> None:
+    async def _sync_users(self):
+        log.info('Syncing roles')
+        await self.services.role.load(self.guild.roles)
+        log.info(f'Syncing users')
+        await self.services.user.mark_everyone_absent()
+        async for member in self.guild.fetch_members(limit=None):
+            if member.bot:
+                continue
+            # Update and repair
+            user = await self.services.user.merge_member(member)
+            await self.services.event.repair_member_joined_event(member, user)
+        # Remove effectively absent
+        if not self.config.keep_absent_users:
+            await self.services.user.remove_absent()
+        log.info(f'Syncing is done')
+
+    async def sync_users(self, no_lock: bool = False) -> None:
+        if no_lock:
+            return await self._sync_users()
         async with self.sync():
-            log.info('Syncing roles')
-            await self.services.role.load(self.guild.roles)
-            log.info(f'Syncing users')
-            await self.services.user.mark_everyone_absent()
-            async for member in self.guild.fetch_members(limit=None):
-                if member.bot:
-                    continue
-                # Update and repair
-                user = await self.services.user.merge_member(member)
-                await self.services.event.repair_member_joined_event(member, user)
-            # Remove effectively absent
-            if not self.config.keep_absent_users:
-                await self.services.user.remove_absent()
-            log.info(f'Syncing is done')
+            await self._sync_users()
 
     async def alter_config(self, config: str) -> None:
         log.info(f'Altering configuration')
@@ -530,7 +535,9 @@ class Overlord(discord.Client):
                 log.warning(f'{qualified_name(message.author)} does not exist in db! Skipping new message event!')
                 return
             # Save event
-            msg = await self.services.event.create_new_message_event(user, message)
+            msg = await self.services.event.get_new_message_event_by_did(message.id)
+            if msg is None:
+                msg = await self.services.event.create_new_message_event(user, message)
         # Call extension 'on_message' handlers
         await self._run_call_plan('on_message', OverlordMessage(message, msg))
 
@@ -567,7 +574,7 @@ class Overlord(discord.Client):
             return
         async with self.sync():
             # ignore absent
-            msg = await self.services.event.get_message_by_did(payload.message_id)
+            msg = await self.services.event.get_new_message_event_by_did(payload.message_id)
             if msg is None:
                 return
             # Save event
@@ -585,8 +592,10 @@ class Overlord(discord.Client):
         if self.is_special_channel_id(payload.channel_id):
             return
         async with self.sync():
-            # ignore absent
-            msg = await self.services.event.get_message_by_did(payload.message_id)
+            msg_delete = await self.services.event.get_message_delete_event_by_did(payload.message_id)
+            if msg_delete is not None:
+                return
+            msg = await self.services.event.get_new_message_event_by_did(payload.message_id)
             if msg is None:
                 return
             # Save event
@@ -779,7 +788,7 @@ class Overlord(discord.Client):
         if not self.is_guild_member_message(message):
             return
         async with self.sync():
-            msg = await self.services.event.get_message_by_did(message.id)
+            msg = await self.services.event.get_new_message_event_by_did(message.id)
             # ignore absent
             if msg is None:
                 return
@@ -829,7 +838,7 @@ class Overlord(discord.Client):
         if not self.is_guild_member_message(message):
             return
         async with self.sync():
-            msg = await self.services.event.get_message_by_did(message.id)
+            msg = await self.services.event.get_new_message_event_by_did(message.id)
             # ignore absent
             if msg is None:
                 return
