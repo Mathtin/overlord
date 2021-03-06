@@ -131,3 +131,9 @@ class UserService(DBService):
 
     async def remove_absent(self) -> None:
         await self.execute(q.delete_absent_users())
+
+    def clear_all_sync(self):
+        self.execute_sync(q.delete_all(DB.User))
+
+    async def clear_all(self):
+        await self.execute(q.delete_all(DB.User))

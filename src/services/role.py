@@ -65,13 +65,15 @@ class RoleService(DBService):
         role_rows = self._load_state(roles)
         # Sync table
         with self.sync_session() as session:
-            session.sync_table(DB.Role, 'did', role_rows)
+            with session.begin():
+                session.sync_table(DB.Role, 'did', role_rows)
 
     async def load(self, roles: List[discord.Role]) -> None:
         role_rows = self._load_state(roles)
         # Sync table
         async with self.session() as session:
-            await session.sync_table(DB.Role, role_rows, pk_col='did')
+            async with session.begin():
+                await session.sync_table(DB.Role, role_rows, pk_col='did')
 
     def get_d_role(self, role_name: str) -> Optional[discord.Role]:
         if role_name in self.role_map:
@@ -83,3 +85,9 @@ class RoleService(DBService):
 
     async def get_role(self, role_name: str) -> Optional[DB.Role]:
         return await self.get_optional(q.select_role(role_name))
+
+    def clear_all_sync(self):
+        self.execute_sync(q.delete_all(DB.Role))
+
+    async def clear_all(self):
+        await self.execute(q.delete_all(DB.Role))

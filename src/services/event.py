@@ -55,6 +55,7 @@ class EventService(DBService):
         super().__init__(db)
         with self.sync_session() as session:
             session.sync_table(model_type=DB.EventType, values=EVENT_TYPES, pk_col='name')
+            session.commit()
             self.event_type_map = {row.name: row.id for row in
                                    session.execute(q.select_event_types()).scalars().all()}
 
@@ -93,11 +94,17 @@ class EventService(DBService):
     async def get_last_member_event_for_db_user(self, user: DB.User) -> Optional[DB.MemberEvent]:
         return await self.get_optional(q.select_last_member_event_by_user_id(user.id))
 
-    def get_message_by_did_sync(self, did: int) -> Optional[DB.MessageEvent]:
-        return self.get_optional_sync(q.select_msg_by_did(did))
+    def get_new_message_event_by_did_sync(self, did: int) -> Optional[DB.MessageEvent]:
+        return self.get_optional_sync(q.select_message_event_by_did(self.type_id('new_message'), did))
 
-    async def get_message_by_did(self, did: int) -> Optional[DB.MessageEvent]:
-        return await self.get_optional(q.select_msg_by_did(did))
+    async def get_new_message_event_by_did(self, did: int) -> Optional[DB.MessageEvent]:
+        return await self.get_optional(q.select_message_event_by_did(self.type_id('new_message'), did))
+
+    def get_message_delete_event_by_did_sync(self, did: int) -> Optional[DB.MessageEvent]:
+        return self.get_optional_sync(q.select_message_event_by_did(self.type_id('message_delete'), did))
+
+    async def get_message_delete_event_by_did(self, did: int) -> Optional[DB.MessageEvent]:
+        return await self.get_optional(q.select_message_event_by_did(self.type_id('message_delete'), did))
 
     ################
     # CONSTRUCTORS #
@@ -116,7 +123,7 @@ class EventService(DBService):
         return await self.create(DB.MemberEvent, conv.user_leave_row(user, self.event_type_map))
 
     def create_new_message_event_sync(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
-        return self.create_sync(DB.MessageEvent, conv.new_message_to_row(user.id, message, self.event_type_map))
+        return self.merge_sync(DB.MessageEvent, conv.new_message_to_row(user.id, message, self.event_type_map))
 
     async def create_new_message_event(self, user: DB.User, message: discord.Message) -> DB.MessageEvent:
         return await self.create(DB.MessageEvent, conv.new_message_to_row(user.id, message, self.event_type_map))
@@ -243,3 +250,19 @@ class EventService(DBService):
                     log.warning(f'Closing VC leave event not found for {user} in <{channel.name} (removing vc_join '
                                 f'event)')
                     await session.delete(model=last_event)
+
+    def clear_all_sync(self):
+        with self.sync_session() as session:
+            with session.begin():
+                session.execute(q.delete_all(DB.VoiceChatEvent))
+                session.execute(q.delete_all(DB.ReactionEvent))
+                session.execute(q.delete_all(DB.MessageEvent))
+                session.execute(q.delete_all(DB.MemberEvent))
+
+    async def clear_all(self):
+        async with self.session() as session:
+            async with session.begin():
+                await session.execute(q.delete_all(DB.VoiceChatEvent))
+                await session.execute(q.delete_all(DB.ReactionEvent))
+                await session.execute(q.delete_all(DB.MessageEvent))
+                await session.execute(q.delete_all(DB.MemberEvent))

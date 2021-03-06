@@ -60,6 +60,7 @@ class StatService(DBService):
         self.events = events
         with self.sync_session() as session:
             session.sync_table(model_type=DB.UserStatType, values=USER_STAT_TYPES, pk_col='name')
+            session.commit()
             self.user_stat_type_map = {row.name: row.id for row in
                                        session.execute(q.select_stat_types()).scalars().all()}
 
@@ -97,6 +98,12 @@ class StatService(DBService):
                     empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
                     stat = await session.add(model_type=DB.UserStat, value=empty_stat_row)
                 stat.value = value
+
+    def clear_all_sync(self):
+        self.execute_sync(q.delete_all(DB.UserStat))
+
+    async def clear_all(self):
+        await self.execute(q.delete_all(DB.UserStat))
 
     def inc_sync(self, user: DB.User, stat_name: str) -> None:
         self.execute_sync(q.update_inc_user_member_stat(user.id, self.type_id(stat_name)))
