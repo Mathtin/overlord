@@ -65,7 +65,7 @@ class Event(object):
 
     @declared_attr
     def user(cls):
-        return relationship("User", lazy="select", primaryjoin=cls.__tablename__ + ".c.user_id == users.c.id")
+        return relationship("User", lazy="joined", primaryjoin=cls.__tablename__ + ".c.user_id == users.c.id")
 
     def __repr__(self):
         s = super().__repr__()[:-2]
