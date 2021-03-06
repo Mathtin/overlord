@@ -247,7 +247,7 @@ class ProgressEmbed(object):
     _embed: discord.Embed
     _msg: Optional[discord.Message]
     _date: Optional[datetime]
-    _steps: List[Tuple[str, int]]
+    _steps: List[List[Tuple[str, int]]]
     _current_step: int
     _name: str
     _state: int
@@ -261,15 +261,38 @@ class ProgressEmbed(object):
         self._current_step = 0
         self._state = ProgressEmbed.NOT_STARTED
 
-    def add_step(self, name: str) -> None:
-        self._steps.append((name, ProgressEmbed.NOT_STARTED))
-
     def _format_embed(self) -> None:
         self._embed.title = self._format_step(self._name, self._state)
-        self._embed.description = '\n'.join([self._format_step(*s) for s in self._steps])
+        self._embed.description = '\n'.join(['\n'.join(self._format_step(*s) for s in step) for step in self._steps])
         elapsed = int((datetime.now() - self._date).total_seconds())
         self._embed.description += f'\n\n{R.NAME.COMMON.STATE}: **{self.state}**\n'
         self._embed.description += f'{R.MESSAGE.STATUS.ELAPSED}: {pretty_seconds(elapsed)}'
+
+    def _set_step_status(self, i: int, status: int):
+        self._steps[i] = [(n, status) for n, _ in self._steps[i]]
+
+    def _next_step(self, status: int) -> None:
+        if self._current_step >= len(self._steps):
+            raise ValueError("No more steps")
+        self._set_step_status(self._current_step, status)
+        self._current_step += 1
+        if self._current_step < len(self._steps):
+            self._set_step_status(self._current_step, ProgressEmbed.IN_PROGRESS)
+
+    def add_step(self, names: Union[str, List[str]]) -> None:
+        if isinstance(names, str):
+            return self.add_step([names])
+        self._steps.append([(name, ProgressEmbed.NOT_STARTED) for name in names])
+
+    async def start(self, channel: discord.TextChannel) -> None:
+        if not self._steps:
+            raise ValueError("No steps provided")
+        self._date = datetime.now()
+        self._current_step = 0
+        self._state = ProgressEmbed.IN_PROGRESS
+        self._format_embed()
+        self._set_step_status(0, ProgressEmbed.IN_PROGRESS)
+        self._msg = await channel.send(embed=self._embed)
 
     async def update(self) -> None:
         if self._msg is None:
@@ -277,45 +300,23 @@ class ProgressEmbed(object):
         self._format_embed()
         await self._msg.edit(embed=self._embed)
 
-    async def start(self, channel: discord.TextChannel) -> None:
-        if not self._steps:
-            raise ValueError("No steps provided")
-        self._date = datetime.now()
-        self._steps[0] = (self._steps[0][0], ProgressEmbed.IN_PROGRESS)
-        self._current_step = 0
-        self._state = ProgressEmbed.IN_PROGRESS
-        self._format_embed()
-        self._msg = await channel.send(embed=self._embed)
-
-    async def _next_step(self, status: int) -> None:
-        if self._current_step >= len(self._steps):
-            raise ValueError("No more steps")
-        c_step = self._current_step
-        self._steps[c_step] = (self._steps[c_step][0], status)
-        self._current_step = c_step + 1
-        if self._current_step < len(self._steps):
-            c_step = self._current_step
-            self._steps[c_step] = (self._steps[c_step][0], ProgressEmbed.IN_PROGRESS)
-
     async def skip_step(self, update: bool = False) -> None:
-        await self._next_step(ProgressEmbed.SKIPPED)
+        self._next_step(ProgressEmbed.SKIPPED)
         if update:
             await self.update()
 
     async def next_step(self, failed: bool = False, update: bool = True) -> None:
-        status = ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED
-        await self._next_step(status)
+        self._next_step(ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED)
         if update:
             await self.update()
 
-    async def finish(self, failed: bool = False) -> None:
-        status = ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED
-        c_step = self._current_step
-        self._steps[c_step] = (self._steps[c_step][0], status)
-        for step in range(c_step + 1, len(self._steps)):
-            self._steps[step] = (self._steps[step][0], ProgressEmbed.SKIPPED)
-        self._state = status
-        await self.update()
+    async def finish(self, failed: bool = False, update: bool = True) -> None:
+        self._state = ProgressEmbed.FINISHED if not failed else ProgressEmbed.FAILED
+        self._set_step_status(self._current_step, self._state)
+        for step in range(self._current_step + 1, len(self._steps)):
+            self._set_step_status(step, ProgressEmbed.SKIPPED)
+        if update:
+            await self.update()
 
     @property
     def state(self) -> str:
