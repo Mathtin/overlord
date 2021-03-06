@@ -165,7 +165,11 @@ class IBotExtension(object):
         raise NotImplementedError()
 
     @property
-    def name(self):
+    def name(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def bot(self) -> Any:
         raise NotImplementedError()
 
     def start(self) -> None:
