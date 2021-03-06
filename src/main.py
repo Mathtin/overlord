@@ -29,17 +29,18 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
+import argparse
 import os
 import sys
-import argparse
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from util import ConfigView, ConfigManager
 from util.logger import LoggerRootConfig, update_config as update_logger
-from db import DBPersistSession, EventType, UserStatType
-from db.predefined import EVENT_TYPES, USER_STAT_TYPES
+from db import DBConnection
+from services.provider import ServiceProvider
 from overlord import OverlordRootConfig
 from overlord.bot import Overlord
 from extensions import UtilityExtension, RankingExtension, ConfigExtension, StatsExtension, InviteExtension
@@ -91,12 +92,11 @@ def main(argv):
     if 'sqlite' in url:
         import db.queries as q
         q.MODE = q.MODE_SQLITE
-    session = DBPersistSession(url)
-    session.sync_table(EventType, 'name', EVENT_TYPES)
-    session.sync_table(UserStatType, 'name', USER_STAT_TYPES)
+    connection = DBConnection(url)
+    services = ServiceProvider(connection)
 
     # Init bot
-    discord_bot = Overlord(cnf_manager, session)
+    discord_bot = Overlord(cnf_manager, services)
 
     # Init extensions
     extras_ext = UtilityExtension(bot=discord_bot)
