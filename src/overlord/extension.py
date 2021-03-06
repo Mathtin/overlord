@@ -64,7 +64,7 @@ class BotExtension(IBotExtension):
     _skip_init_lock = ['on_config_update', 'on_ready', 'on_error']
 
     # Members passed via constructor
-    bot: Overlord
+    _bot: Overlord
 
     # State members
     _enabled: bool
@@ -76,7 +76,7 @@ class BotExtension(IBotExtension):
 
     def __init__(self, bot: Overlord, priority=None) -> None:
         super().__init__()
-        self.bot = bot
+        self._bot = bot
         self._enabled = False
         self._async_lock = asyncio.Lock()
 
@@ -148,6 +148,10 @@ class BotExtension(IBotExtension):
     @property
     def name(self):
         return self.__extname__
+
+    @property
+    def bot(self) -> Overlord:
+        return self._bot
 
     def start(self) -> None:
         if self._enabled:
