@@ -178,7 +178,7 @@ class DBSyncSession(object):
         for row in self.execute(select(model_type)).scalars().all():
             # Remove not in values
             if getattr(row, pk_col) not in index:
-                row.delete()
+                self.delete(model=row)
                 continue
             # Update those are in values
             new_values = index[getattr(row, pk_col)]
@@ -242,8 +242,8 @@ class DBAsyncWrappedSession(object):
     async def refresh(self, instance, attribute_names=None, with_for_update=None) -> None:
         await self._run_in_executor(self._session.refresh, instance, attribute_names, with_for_update)
 
-    async def expunge(self, model: BaseModel) -> None:
-        await self._run_in_executor(self._session.expunge, model)
+    def expunge(self, model: BaseModel) -> None:
+        self._session.expunge(model)
 
     async def detach(self, model: BaseModel) -> None:
         await self._run_in_executor(self._session.detach, model)
@@ -356,13 +356,13 @@ class DBAsyncSession(object):
     async def refresh(self, instance, attribute_names=None, with_for_update=None):
         await self._session.refresh(instance, attribute_names, with_for_update)
 
-    async def expunge(self, model: BaseModel) -> None:
-        await self._session.expunge(model)
+    def expunge(self, model: BaseModel) -> None:
+        self._session.expunge(model)
 
     async def detach(self, model: BaseModel) -> None:
         try:
             await self.refresh(model)
-            await self.expunge(model)
+            self.expunge(model)
         except InvalidRequestError:
             pass
 
@@ -448,9 +448,10 @@ class DBAsyncSession(object):
             index[v[pk_col]] = v
         # Sync existing rows
         async for row in await self.stream(select(model_type)):
+            row = row[0]
             # Remove not in values
             if getattr(row, pk_col) not in index:
-                row.delete()
+                await self.delete(model=row)
                 continue
             # Update those are in values
             new_values = index[getattr(row, pk_col)]
@@ -479,8 +480,9 @@ class DBConnection(object):
     def __init__(self, engine_url: str) -> None:
         if 'sqlite' in engine_url:
             engine_url += '?check_same_thread=False'
+        sync_engine_url = engine_url.replace('+asyncpg', '')
         # Create sync backend
-        self._db_sync_engine = create_engine(engine_url)
+        self._db_sync_engine = create_engine(sync_engine_url)
         Base.metadata.create_all(self._db_sync_engine)
         self._session_sync_factory = sessionmaker(bind=self._db_sync_engine,
                                                   autocommit=False,

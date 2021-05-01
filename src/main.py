@@ -92,6 +92,9 @@ def main(argv):
     if 'sqlite' in url:
         import db.queries as q
         q.MODE = q.MODE_SQLITE
+    if 'postgresql' in url:
+        import db.queries as q
+        q.MODE = q.MODE_POSTGRESQL
     connection = DBConnection(url)
     services = ServiceProvider(connection)
 
@@ -103,14 +106,14 @@ def main(argv):
     stats_ext = StatsExtension(bot=discord_bot)
     ranking_ext = RankingExtension(bot=discord_bot, priority=1)
     conf_ext = ConfigExtension(bot=discord_bot)
-    invite_ext = InviteExtension(bot=discord_bot)
+    # invite_ext = InviteExtension(bot=discord_bot)
 
     # Attach extensions
     discord_bot.extend(extras_ext)
     discord_bot.extend(conf_ext)
     discord_bot.extend(stats_ext)
     discord_bot.extend(ranking_ext)
-    discord_bot.extend(invite_ext)
+    # discord_bot.extend(invite_ext)
 
     # Start bot
     discord_bot.run()

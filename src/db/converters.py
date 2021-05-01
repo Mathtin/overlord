@@ -73,7 +73,7 @@ def user_row(user: d.User) -> Dict[str, Any]:
     return {
         'did': user.id,
         'name': user.name,
-        'disc': user.discriminator,
+        'disc': int(user.discriminator),
         'display_name': None,
         'roles': None
     }
@@ -83,7 +83,7 @@ def member_row(user: d.Member, role_map: Dict[int, Dict[str, Any]]) -> Dict[str,
     return {
         'did': user.id,
         'name': user.name,
-        'disc': user.discriminator,
+        'disc': int(user.discriminator),
         'display_name': user.display_name,
         'roles': role_mask(user, role_map),
         'created_at': user.joined_at

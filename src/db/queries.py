@@ -32,9 +32,9 @@ __author__ = "Mathtin"
 from datetime import datetime
 from typing import Any, Tuple, List, Type
 
-from sqlalchemy import func, and_, literal_column
+from sqlalchemy import func, and_, literal_column, Column
 from sqlalchemy.sql import Select, Insert, Update, Delete
-from sqlalchemy.sql.expression import cast, delete
+from sqlalchemy.sql.expression import cast, delete, text, extract
 from sqlalchemy.sql.expression import insert, select, update
 from sqlalchemy.sql.sqltypes import Integer
 
@@ -42,24 +42,31 @@ from .models import *
 from .models.base import BaseModel
 
 
-def date_to_secs_sqlite(col):
+def date_to_secs_sqlite(col: Column):
     return cast(func.strftime('%s', col), Integer)
 
 
-def date_to_secs_mysql(col):
+def date_to_secs_mysql(col: Column):
     return func.unix_timestamp(col)
+
+
+def date_to_secs_postgresql(col: Column):
+    return extract('epoch', col)
 
 
 MODE_SQLITE = 'sqlite'
 MODE_MYSQL = 'mysql'
+MODE_POSTGRESQL = 'postgresql'
 MODE = MODE_MYSQL
 
 
-def date_to_secs(col):
+def date_to_secs(col: Column):
     if MODE == MODE_SQLITE:
         return date_to_secs_sqlite(col)
     if MODE == MODE_MYSQL:
         return date_to_secs_mysql(col)
+    if MODE == MODE_POSTGRESQL:
+        return date_to_secs_postgresql(col)
 
 
 ##################
