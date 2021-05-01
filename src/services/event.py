@@ -226,6 +226,8 @@ class EventService(DBService):
                 # Save event + update previous
                 leave_event_row = conv.vc_leave_row(user, channel, self.event_type_map)
                 leave_event = session.add(model_type=DB.VoiceChatEvent, value=leave_event_row)
+                await session.flush([leave_event])
+                await session.refresh(leave_event)
                 join_event.updated_at = leave_event.created_at
             await session.detach(join_event)
             await session.detach(leave_event)

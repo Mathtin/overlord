@@ -81,6 +81,9 @@ class DBSyncSession(object):
     def begin(self) -> SessionTransaction:
         return self._session.begin()
 
+    def flush(self, objects=None) -> None:
+        self._session.flush(objects)
+
     def refresh(self, instance, attribute_names=None, with_for_update=None) -> None:
         self._session.refresh(instance, attribute_names, with_for_update)
 
@@ -233,6 +236,9 @@ class DBAsyncWrappedSession(object):
     async def commit(self) -> None:
         await self._run_in_executor(self._session.commit)
 
+    async def flush(self, objects=None) -> None:
+        return await self._run_in_executor(self._session.flush, objects)
+
     async def rollback(self) -> None:
         return await self._run_in_executor(self._session.rollback)
 
@@ -352,6 +358,9 @@ class DBAsyncSession(object):
 
     def begin(self) -> AsyncSessionTransaction:
         return self._session.begin()
+
+    async def flush(self, objects=None) -> None:
+        await self._session.flush(objects)
 
     async def refresh(self, instance, attribute_names=None, with_for_update=None):
         await self._session.refresh(instance, attribute_names, with_for_update)

@@ -40,8 +40,8 @@ class BaseModel(Base):
     __abstract__ = True
 
     id = Column(Integer, nullable=False, unique=True, primary_key=True, autoincrement=True)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=now())
-    updated_at = Column(TIMESTAMP, nullable=False, server_default=now(), onupdate=now())
+    created_at = Column(TIMESTAMP(True), nullable=False, server_default=now())
+    updated_at = Column(TIMESTAMP(True), nullable=False, server_default=now(), onupdate=now())
 
     def __repr__(self):
         return "<{0.__class__.__name__}(id={0.id!r},created_at={0.created_at!r},updated_at={0.updated_at!r})>"\
