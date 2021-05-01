@@ -41,7 +41,7 @@ from services.role import RoleService
 from services.stat import StatService
 from util import ConfigView, FORMATTERS
 from util.exceptions import InvalidConfigException
-from util.extbot import filter_roles, is_role_applied, qualified_name
+from util.extbot import filter_roles, is_role_applied, qualified_name, is_text_channel
 from util.resources import STRINGS as R
 from overlord.extension import BotExtension
 
@@ -72,6 +72,7 @@ class RankingRootConfig(ConfigView):
     rank {
         ignored = [...]
         required = [...]
+        log_channel = ...
         role {
             ... : RankConfig
         }
@@ -79,6 +80,7 @@ class RankingRootConfig(ConfigView):
     """
     ignored: List[str] = []
     required: List[str] = []
+    log_channel: int = 0
     role: Dict[str, RankConfig] = {}
 
 
@@ -92,6 +94,7 @@ class RankingExtension(BotExtension):
     __color__ = 0xc84e3f
 
     config: RankingRootConfig = RankingRootConfig()
+    log_channel: discord.TextChannel
 
     #########
     # Props #
@@ -187,14 +190,20 @@ class RankingExtension(BotExtension):
             return
         # Resolve roles to move
         roles_add, roles_del = await self.roles_to_add_and_remove(member, user)
+        report = f'Updating {member.mention} rank:\n'
         # Remove old roles
         if roles_del:
             log.info(f"Removing {qualified_name(member)}'s rank roles: {roles_del}")
+            report += f"Removing rank role {roles_del[0].mention}\n"
             await member.remove_roles(*roles_del)
         # Add new roles
         if roles_add:
             log.info(f"Adding {qualified_name(member)}'s rank roles: {roles_add}")
+            report += f"Adding rank role {roles_add[0].mention}\n"
             await member.add_roles(*roles_add)
+        if (roles_del or roles_add) and self.config.log_channel:
+            info_report = self.bot.new_info_report(self.__extname__, report)
+            await self.log_channel.send(embed=info_report)
         # Update user in db
         await self.s_users.merge_member(member)
 
@@ -214,6 +223,16 @@ class RankingExtension(BotExtension):
         self.config = self.bot.get_config_section(RankingRootConfig)
         if self.config is None:
             raise InvalidConfigException("RankingRootConfig section not found", "root")
+        # Check log_channel
+        if self.config.log_channel != 0:
+            channel = self.bot.get_channel(self.config.log_channel)
+            if channel is None:
+                raise InvalidConfigException(f'Error channel id is invalid', self.config.path('log_channel'))
+            if not is_text_channel(channel):
+                raise InvalidConfigException(f"{channel.name}({channel.id}) is not text channel",
+                                             self.config.path('log_channel'))
+            log.info(f'Attached to {channel.name} as rank logging channel ({channel.id})')
+            self.log_channel = channel
         # Check rank roles
         for i, role_name in enumerate(self.ignored_roles):
             if self.s_roles.get_d_role(role_name) is None:
@@ -263,14 +282,14 @@ class RankingExtension(BotExtension):
         async with self.sync():
             await msg.channel.send(R.MESSAGE.STATUS.UPDATING_RANKS)
             await self.update_all_ranks()
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
 
     @BotExtension.command("update_rank", description="Update specified user rank")
     async def cmd_update_rank(self, msg: discord.Message, member: discord.Member):
         async with self.sync():
             await msg.channel.send(f'{R.MESSAGE.STATUS.UPDATING_RANK}: {member.mention}')
             await self.update_rank(member)
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
 
     @BotExtension.command("list_ranks", description="List all configured ranks")
     async def cmd_list_ranks(self, msg: discord.Message):
@@ -304,7 +323,7 @@ class RankingExtension(BotExtension):
         # Update config properly
         err = await self.bot.safe_update_config()
         if not err:
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
         else:
             details = str(err) + '\n' + 'Config reverted'
             embed = self.bot.new_error_report(err.__class__.__name__, details)
@@ -319,7 +338,7 @@ class RankingExtension(BotExtension):
         # Update config properly
         err = await self.bot.safe_update_config()
         if not err:
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
         else:
             details = str(err) + '\n' + 'Config reverted'
             embed = self.bot.new_error_report(err.__class__.__name__, details)
@@ -345,7 +364,7 @@ class RankingExtension(BotExtension):
         # Update config properly
         err = await self.bot.safe_update_config()
         if not err:
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
         else:
             details = str(err) + '\n' + 'Config reverted'
             embed = self.bot.new_error_report(err.__class__.__name__, details)

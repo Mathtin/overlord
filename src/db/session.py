@@ -261,10 +261,10 @@ class DBAsyncWrappedSession(object):
     async def get(self, model_type: Type[BaseModel], pk: Any, pk_col: str = 'id') -> Optional[BaseModel]:
         return await self._run_in_executor(self._session.get, model_type, pk, pk_col)
 
-    async def add(self, *, model: Optional[BaseModel] = None,
+    def add(self, *, model: Optional[BaseModel] = None,
                   model_type: Type[BaseModel] = None,
                   value: Dict[str, Any] = None) -> BaseModel:
-        return await self._run_in_executor(self._session.add, model=model, model_type=model_type, value=value)
+        return self._session.add(model=model, model_type=model_type, value=value)
 
     async def merge(self, *, model: Optional[BaseModel] = None,
                     model_type: Type[BaseModel] = None,
@@ -379,12 +379,12 @@ class DBAsyncSession(object):
     async def get(self, model_type: Type[BaseModel], pk: int, pk_col: str = 'id') -> BaseModel:
         return (await self.execute(select(model_type).filter_by(**{pk_col: pk}))).scalar_one_or_none()
 
-    async def add(self, *, model: BaseModel = None,
+    def add(self, *, model: BaseModel = None,
                   model_type: Type[BaseModel] = None,
                   value: Dict[str, Any] = None) -> BaseModel:
         if model is None:
             model = model_type(**value)
-        await self._session.add(model)
+        self._session.add(model)
         return model
 
     async def merge(self, *, model: BaseModel = None,
@@ -398,7 +398,7 @@ class DBAsyncSession(object):
                     setattr(model, k, v)
             else:
                 model = model_type(**value)
-                await self._session.add(model)
+                self._session.add(model)
         else:
             await self._session.merge(model)
         return model
@@ -462,7 +462,7 @@ class DBAsyncSession(object):
         # Add absent
         for pk in index:
             new_value = index[pk]
-            await self.add(model_type=model_type, value=new_value)
+            self.add(model_type=model_type, value=new_value)
 
 
 class DBConnection(object):

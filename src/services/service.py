@@ -88,7 +88,7 @@ class DBService(object):
     async def create(self, model_type: Type[BaseModel], value: Dict[str, Any]) -> BaseModel:
         async with self.session() as session:
             async with session.begin():
-                obj = await session.add(model_type=model_type, value=value)
+                obj = session.add(model_type=model_type, value=value)
             await session.detach(obj)
         return obj
 

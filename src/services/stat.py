@@ -96,7 +96,7 @@ class StatService(DBService):
                 stat = (await session.execute(q.select_user_stat_by_user_id(stat_name, user.id))).scalar_one_or_none()
                 if stat is None:
                     empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
-                    stat = await session.add(model_type=DB.UserStat, value=empty_stat_row)
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
                 stat.value = value
 
     def clear_all_sync(self):

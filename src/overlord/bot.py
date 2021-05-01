@@ -347,6 +347,13 @@ class Overlord(discord.Client):
         await self.maintainer.send(embed=warn_report)
         return
 
+    async def send_info(self, from_: str, msg: str) -> None:
+        info_report = self.new_info_report(from_, msg)
+        if self.log_channel is not None:
+            await self.log_channel.send(embed=info_report)
+        await self.maintainer.send(embed=info_report)
+        return
+
     async def _sync_users(self):
         log.info('Syncing roles')
         await self.services.role.load(self.guild.roles)

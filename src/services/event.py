@@ -191,7 +191,7 @@ class EventService(DBService):
                 last_event = (await session.execute(last_event_stmt)).scalar_one_or_none()
                 if last_event is None or last_event.type_id != self.type_id("member_join"):
                     member_join_row = conv.member_join_row(user, member.joined_at, self.event_type_map)
-                    last_event = await session.add(model_type=DB.MemberEvent, value=member_join_row)
+                    last_event = session.add(model_type=DB.MemberEvent, value=member_join_row)
                 last_event.created_at = member.joined_at
 
     def close_vc_join_event_sync(self,
@@ -225,7 +225,7 @@ class EventService(DBService):
                     return None
                 # Save event + update previous
                 leave_event_row = conv.vc_leave_row(user, channel, self.event_type_map)
-                leave_event = await session.add(model_type=DB.VoiceChatEvent, value=leave_event_row)
+                leave_event = session.add(model_type=DB.VoiceChatEvent, value=leave_event_row)
                 join_event.updated_at = leave_event.created_at
             await session.detach(join_event)
             await session.detach(leave_event)

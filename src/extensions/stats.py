@@ -192,7 +192,7 @@ class StatsExtension(BotExtension):
             await msg.channel.send(embed=embed)
         try:
             await self.s_stats.set(user, stat_name, value)
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
         except NameError:
             embed = self.bot.new_error_report(R.MESSAGE.ERROR_OTHER.UNKNOWN_STAT, '')
             await msg.channel.send(embed=embed)

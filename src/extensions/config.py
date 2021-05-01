@@ -117,7 +117,7 @@ class ConfigExtension(BotExtension):
         # Update config properly
         err = await self.bot.safe_update_config()
         if not err:
-            await msg.channel.send(R.MESSAGE.SUCCESS)
+            await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
         else:
             details = str(err) + '\n' + 'Config reverted'
             embed = self.bot.new_error_report(err.__class__.__name__, details)
