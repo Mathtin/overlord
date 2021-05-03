@@ -10,7 +10,7 @@
 #   This file is released under the MIT license.  #
 ###################################################
 
-FROM python:3.8-alpine
+FROM python:3.8.7
 
 WORKDIR /app
 
