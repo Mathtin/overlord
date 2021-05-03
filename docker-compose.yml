@@ -1,0 +1,25 @@
+version: '3.7'
+services:
+    postgres:
+        container_name: postgres_container
+        image: postgres:13.1
+        restart: unless-stopped
+        env_file:
+            - ./database.env
+        volumes:
+            - ./db/data/:/var/lib/postgresql/data/
+            - ./scripts/01_users.sql:/docker-entrypoint-initdb.d/01_users.sql
+        networks:
+            - overlord-net
+    overlord:
+        container_name: overlord_container
+        image: mathtin/overlord:latest
+        restart: unless-stopped
+        env_file:
+            - ./overlord.env
+        volumes:
+            - ./overlord.cfg:/app/overlord.cfg
+        networks:
+            - overlord-net
+networks:
+  overlord-net: {}

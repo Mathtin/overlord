@@ -18,6 +18,13 @@ Each extension provides a set of commands and background tasks useful for managi
 
 ### Usage
 
+Clone repository
+
+```sh
+git clone https://github.com/Mathtin/overlord.git
+cd overlord
+```
+
 Install the dependencies via pip
 
 ```sh
@@ -46,7 +53,42 @@ $ python3 src/main.py
 
 ### Docker
 
-in development...
+Pull latest image from hub
+
+```sh
+docker pull mathtin/overlord:latest
+```
+
+Create overlord.env and configuration files
+
+```sh
+wget -O overlord.env https://raw.githubusercontent.com/Mathtin/overlord/master/.env.template
+nano overlord.env
+wget -O overlord.cfg https://raw.githubusercontent.com/Mathtin/overlord/master/overlord_example.cfg
+nano overlord.cfg
+```
+
+Run container (attach to network where your db is reachable)
+
+```sh
+docker run -d --name overlord-bot \ 
+           -e $(pwd)/.env \
+           -v $(pwd)/overlord.cfg:/app/overlord.cfg \
+           --network=multi-host-network \
+           mathtin/overlord:latest
+```
+
+Or you can use docker compose, download required files
+
+```sh
+wget https://raw.githubusercontent.com/Mathtin/overlord/master/docker-compose.yml
+mkdir scripts && wget -P scripts https://raw.githubusercontent.com/Mathtin/overlord/master/scripts/01_users.sql
+wget https://raw.githubusercontent.com/Mathtin/overlord/master/database.env
+```
+
+Set password in database.env
+
+Note: DATABASE_ACCESS_URL=postgresql+asyncpg://root:PASTE_PASSWORD_HERE@postgres_container/overlord
 
 ### Development
 
