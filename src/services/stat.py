@@ -106,16 +106,40 @@ class StatService(DBService):
         await self.execute(q.delete_all(DB.UserStat))
 
     def inc_sync(self, user: DB.User, stat_name: str) -> None:
-        self.execute_sync(q.update_inc_user_member_stat(user.id, self.type_id(stat_name)))
+        with self.sync_session() as session:
+            with session.begin():
+                stat = session.execute(q.select_user_stat_by_user_id(stat_name, user.id)).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value += 1
 
     async def inc(self, user: DB.User, stat_name: str) -> None:
-        await self.execute(q.update_inc_user_member_stat(user.id, self.type_id(stat_name)))
+        async with self.session() as session:
+            async with session.begin():
+                stat = (await session.execute(q.select_user_stat_by_user_id(stat_name, user.id))).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value += 1
 
     def dec_sync(self, user: DB.User, stat_name: str) -> None:
-        self.execute_sync(q.update_dec_user_member_stat(user.id, self.type_id(stat_name)))
+        with self.sync_session() as session:
+            with session.begin():
+                stat = session.execute(q.select_user_stat_by_user_id(stat_name, user.id)).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value -= 1
 
     async def dec(self, user: DB.User, stat_name: str) -> None:
-        await self.execute(q.update_dec_user_member_stat(user.id, self.type_id(stat_name)))
+        async with self.session() as session:
+            async with session.begin():
+                stat = (await session.execute(q.select_user_stat_by_user_id(stat_name, user.id))).scalar_one_or_none()
+                if stat is None:
+                    empty_stat_row = conv.empty_user_stat_row(user.id, self.type_id(stat_name))
+                    stat = session.add(model_type=DB.UserStat, value=empty_stat_row)
+                stat.value -= 1
 
     def _reload_stat_sync(self, query, stat_name: str, event: str) -> None:
         stat_id = self.type_id(stat_name)
