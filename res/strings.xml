@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+   <names>
+      <!-- Common terms -->
+      <string type="common" lang="en" name="traceback">Traceback</string>
+      <string type="common" lang="en" name="extension">Extension</string>
+      <string type="common" lang="en" name="guild">Discord Server</string>
+      <string type="common" lang="en" name="channel">Channel</string>
+      <string type="common" lang="en" name="error">Error</string>
+      <string type="common" lang="en" name="info">Information</string>
+      <string type="common" lang="en" name="log-channel">Logging channel</string>
+      <string type="common" lang="en" name="control-channel">Control channel</string>
+      <string type="common" lang="en" name="maintainer">Maintainer</string>
+      <string type="common" lang="en" name="state">State</string>
+      <string type="common" lang="en" name="progress">Progress</string>
+      <!-- User stat names -->
+      <string type="user-stat" lang="en" name="membership">Membership period</string>
+      <string type="user-stat" lang="en" name="new-message-count">New message count</string>
+      <string type="user-stat" lang="en" name="delete-message-count">Message deleted count</string>
+      <string type="user-stat" lang="en" name="edit-message-count">Message edited count</string>
+      <string type="user-stat" lang="en" name="new-reaction-count">Reactions count</string>
+      <string type="user-stat" lang="en" name="delete-reaction-count">Reaction remove count</string>
+      <string type="user-stat" lang="en" name="vc-time">VC time</string>
+      <string type="user-stat" lang="en" name="min-weight">Minimal weight (rank)</string>
+      <string type="user-stat" lang="en" name="max-weight">Maximal weight (rank)</string>
+      <string type="user-stat" lang="en" name="exact-weight">Exact weight (rank)</string>
+   </names>
+
+   <embeds>
+      <!-- Defaults header/footer -->
+      <string type="header" lang="en" name="default">Overlord Discord Bot</string>
+      <string type="footer" lang="en" name="default">Overlord by Daniel [Mathtin] Shiko. Special for Eclipse Co. comms</string>
+
+      <!-- Custom headers -->
+      <string type="header" lang="en" name="error-report">Overlord Error report</string>
+      <string type="header" lang="en" name="warn-report">Overlord Warning</string>
+      <string type="header" lang="en" name="info-report">Overlord Information</string>
+      <string type="header" lang="en" name="log-report">Overlord Logging</string>
+
+      <!-- report titles -->
+      <string type="title" lang="en" name="success">Done</string>
+      <string type="title" lang="en" name="error">Error</string>
+      <string type="title" lang="en" name="warning">Attention</string>
+      <string type="title" lang="en" name="info">FYI</string>
+      <string type="title" lang="en" name="traceback">Traceback</string>
+
+      <!-- other titles -->
+      <string type="title" lang="en" name="summary">Overlord Summary</string>
+      <string type="title" lang="en" name="call-args">Event call arguments</string>
+      <string type="title" lang="en" name="commands-list">Available commands</string>
+      <string type="title" lang="en" name="stat-type-list">Available stat names</string>
+      <string type="title" lang="en" name="stats-list">Available stats</string>
+      <string type="title" lang="en" name="rank-table">Rank table</string>
+      <string type="title" lang="en" name="config-value">Config value</string>
+      <string type="title" lang="en" name="extension-status-list">Attached extensions status</string>
+   </embeds>
+
+   <messages>
+
+      <!-- status messages -->
+      <string type="status" lang="en" name="committing">Committing changes...</string>
+      <string type="status" lang="en" name="busy">Sorry, I'm very busy right now</string>
+      <string type="status" lang="en" name="ping">Pong!</string>
+      <string type="status" lang="en" name="sync-users">Synchronizing users</string>
+      <string type="status" lang="en" name="updating-ranks">Updating user ranks</string>
+      <string type="status" lang="en" name="updating-rank">Updating rank</string>
+      <string type="status" lang="en" name="db-clear-channel">Clearing message history from database</string>
+      <string type="status" lang="en" name="db-load-channel">Loading message history</string>
+      <string type="status" lang="en" name="db-drop-table">Clearing table</string>
+      <string type="status" lang="en" name="db-drop">Clearing database</string>
+      <string type="status" lang="en" name="clear-stats">Clearing stats</string>
+      <string type="status" lang="en" name="calc-stats">Calculating stats</string>
+      <string type="status" lang="en" name="stop-extension">Disabling extension</string>
+      <string type="status" lang="en" name="reported-to">Reported to</string>
+      <string type="status" lang="en" name="started">Bot started successfully</string>
+      <string type="status" lang="en" name="success">Operation completed successfully</string>
+      <string type="status" lang="en" name="elapsed">Elapsed time</string>
+
+      <string type="state" lang="en" name="finished">Done</string>
+      <string type="state" lang="en" name="in-progress">In progress</string>
+      <string type="state" lang="en" name="failed">Failed</string>
+      <string type="state" lang="en" name="success">Done</string>
+      <string type="state" lang="en" name="not-started">Not started</string>
+      <string type="state" lang="en" name="unknown">Unknown state</string>
+      <string type="state" lang="en" name="skipped">Skipped</string>
+
+      <!-- basic error messages -->
+      <string type="error" lang="en" name="internal">Internal error</string>
+      <string type="error" lang="en" name="no-access">Missing access</string>
+      <string type="error" lang="en" name="invalid-argument">Can't parse argument</string>
+      <string type="error" lang="en" name="unknown-command">No such command</string>
+
+      <!-- discord error messages -->
+      <string type="d-error" lang="en" name="unknown-user">No such user</string>
+      <string type="d-error" lang="en" name="invalid-user">Bad user</string>
+      <string type="d-error" lang="en" name="invalid-user-mention">Mention user properly</string>
+      <string type="d-error" lang="en" name="unknown-member">There is no such user in this guild</string>
+      <string type="d-error" lang="en" name="invalid-member">Bad guild member</string>
+      <string type="d-error" lang="en" name="invalid-member-mention">Mention guild member properly</string>
+      <string type="d-error" lang="en" name="user-not-member">User is not member of this guild</string>
+      <string type="d-error" lang="en" name="unknown-channel">No such channel</string>
+      <string type="d-error" lang="en" name="invalid-channel">Bad channel</string>
+      <string type="d-error" lang="en" name="channel-not-text">Not a text channel</string>
+      <string type="d-error" lang="en" name="channel-not-voice">Not a voice channel</string>
+      <string type="d-error" lang="en" name="unknown-role">No such role</string>
+      <string type="d-error" lang="en" name="invalid-role">Invalid role</string>
+
+      <!-- db error messages -->
+      <string type="db-error" lang="en" name="unknown-user">No such user in database</string>
+      <string type="db-error" lang="en" name="invalid-user">Invalid user in database</string>
+      
+      <!-- config error messages -->
+      <string type="config-error" lang="en" name="invalid-path">Invalid config path</string>
+      <string type="config-error" lang="en" name="parse-fail">Failed to parse config value</string>
+      
+      <!-- rank error messages -->
+      <string type="error-other" lang="en" name="invalid-rank">Invalid rank</string>
+      <string type="error-other" lang="en" name="unknown-rank">No such rank</string>
+      <string type="error-other" lang="en" name="duplicate-rank">Rank already exists</string>
+      <string type="error-other" lang="en" name="duplicate-weight">Rank with same weight already exists</string>
+      <string type="error-other" lang="en" name="unknown-stat">No such stat</string>
+      <string type="error-other" lang="en" name="negative-stat-value">Stat value should be positive</string>
+   </messages>
+   
+</resources>

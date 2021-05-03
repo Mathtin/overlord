@@ -1,103 +1,73 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-###################################################
-#........../\./\...___......|\.|..../...\.........#
-#........./..|..\/\.|.|_|._.|.\|....|.c.|.........#
-#......../....../--\|.|.|.|i|..|....\.../.........#
-#        Mathtin (c)                              #
-###################################################
-#   Author: Daniel [Mathtin] Shiko                #
-#   Copyright (c) 2020 <wdaniil@mail.ru>          #
-#   This file is released under the MIT license.  #
-###################################################
 
-__author__ = 'Mathtin'
+"""
+MIT License
 
-import os
+Copyright (c) 2020-present Daniel [Mathtin] Shiko <wdaniil@mail.ru>
+Project: Overlord discord bot
+Contributors: Danila [DeadBlasoul] Popov <dead.blasoul@gmail.com>
 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+__author__ = "Mathtin"
+
+import asyncio
+from concurrent.futures.thread import ThreadPoolExecutor
 from logging import getLogger
-from datetime import datetime
+from typing import Type, Optional, Any, Dict, List
 
-from sqlalchemy import create_engine, update
-from sqlalchemy.exc import IntegrityError, DataError
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.event import listens_for as event_listens_for
+from sqlalchemy import engine as SyncEngine, create_engine, select, update, delete
+from sqlalchemy.engine import Result
+from sqlalchemy.exc import IntegrityError, DataError, InvalidRequestError
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, AsyncResult, AsyncSessionTransaction
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import sessionmaker, Session, SessionTransaction
 
-from db.models.base import Base, BaseModel
-from db.models import *
+from .models.base import Base, BaseModel
 
-log = getLogger('db')  
+log = getLogger('db')
 
 
-class DBSession(object):
+class DBSyncSession(object):
+    _session: Session
 
-    __session: Session
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
-    # Main DB Connection Ref Obj
-    db_engine = None
-    session_factory = None
+    def __enter__(self):
+        return self
 
-    def __init__(self, engine_url, autocommit=True, autoflush=True):
-        self.engine_url = engine_url
-        log.info(f'Connecting to database')
-        self.db_engine = create_engine(self.engine_url, pool_recycle=60)
-        Base.metadata.create_all(self.db_engine)
-        self.session_factory = sessionmaker(bind=self.db_engine, autocommit=autocommit, autoflush=autoflush)
-        self.__last_connection = None
-        self.__session = None
-        self.__check_connection()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._session.__exit__(exc_type, exc_val, exc_tb)
 
-    def __check_connection(self):
-        now = datetime.now()
-        if self.__last_connection is None or (now - self.__last_connection).total_seconds() > 10:
-            if self.__session is not None:
-                self.__session.close()
-            self.__session = self.session_factory()
-            self.__last_connection = now
+    ########################
+    # Base session methods #
+    ########################
 
-    def query(self, *entities, **kwargs):
-        self.__check_connection()
-        return self.__session.query(*entities, **kwargs)
+    def execute(self, statement: Any) -> Result:
+        return self._session.execute(statement)
 
-    def execute(self, *entities, **kwargs):
-        self.__check_connection()
-        return self.__session.execute(*entities, **kwargs)
-
-    def add(self, model: BaseModel, value: dict, need_flush: bool = False):
-        row = model(**value)
-        self.add_model(row, need_flush=need_flush)
-        return row
-
-    def add_model(self, model: BaseModel, need_flush: bool = False):
-        self.__check_connection()
-        self.__session.add(model)
-        if need_flush:
-            self.__session.flush([model])
-
-    def add_all(self, models: list):
-        self.__check_connection()
-        self.__session.add_all(models)
-
-    def delete(self, model: BaseModel, pk: str, value: dict):
-        row = self.query(model).filter_by(**{pk:value[pk]}).first()
-        if row is None:
-            return None
-        self.delete_model(row)
-        return row
-
-    def delete_model(self, model: BaseModel):
-        self.__check_connection()
+    def commit(self) -> None:
         try:
-            self.__session.delete(model)
-        except IntegrityError as e:
-            log.error(f'`{__name__}` {e}')
-        except DataError as e:
-            log.error(f'`{__name__}` {e}')
-
-    def commit(self, need_close: bool = False):
-        self.__check_connection()
-        try:
-            self.__session.commit()
+            self._session.commit()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
@@ -105,41 +75,90 @@ class DBSession(object):
             log.error(f'`{__name__}` {e}')
             raise
 
-        if need_close:
-            self.close_session()
+    def rollback(self) -> None:
+        self._session.rollback()
 
-    def sync_table(self, model: BaseModel, pk: str, values: list):
-        self.__check_connection()
-        index = {}
-        for v in values:
-            index[v[pk]] = v
+    def begin(self) -> SessionTransaction:
+        return self._session.begin()
 
-        for row in self.query(model):
-            p = getattr(row, pk)
-            if p not in index:
-                self.delete_model(row)
-                continue
-            new_values = index[p]
-            for col in new_values:
-                if getattr(row, col) != new_values[col]:
-                    setattr(row, col, new_values[col])
-            del index[p]
-        self.commit()
+    def flush(self, objects=None) -> None:
+        self._session.flush(objects)
 
-        for id in index:
-            new_values = index[id]
-            self.add(model, new_values)
-        self.commit()
+    def refresh(self, instance, attribute_names=None, with_for_update=None) -> None:
+        self._session.refresh(instance, attribute_names, with_for_update)
 
-    def update_or_add(self, model: BaseModel, pk: str, value: dict):
-        res = self.update(model, pk, value)
-        if res is None:
-            return self.add(model, value)
-        return res
+    def expunge(self, model: BaseModel) -> None:
+        self._session.expunge(model)
 
-    def update(self, model: BaseModel, pk: str, value: dict):
-        self.__check_connection()
-        row = self.query(model).filter_by(**{pk:value[pk]}).first()
+    def detach(self, model: BaseModel) -> None:
+        try:
+            self.refresh(model)
+            self.expunge(model)
+        except InvalidRequestError:
+            pass
+
+    def close(self) -> None:
+        self._session.close()
+
+    def close_all(self) -> None:
+        self._session.close_all()
+
+    ##############################
+    # Dict based session methods #
+    ##############################
+
+    def get(self, model_type: Type[BaseModel], pk: Any, pk_col: str = 'id') -> BaseModel:
+        return self.execute(select(model_type).filter_by(**{pk_col: pk})).scalar_one_or_none()
+
+    def add(self, *, model: Optional[BaseModel] = None,
+            model_type: Type[BaseModel] = None,
+            value: Dict[str, Any] = None) -> BaseModel:
+        if model is None:
+            model = model_type(**value)
+        self._session.add(model)
+        return model
+
+    def merge(self, *, model: Optional[BaseModel] = None,
+              model_type: Type[BaseModel] = None,
+              value: Dict[str, Any] = None,
+              pk_col: str = 'id') -> BaseModel:
+        if model is None:
+            model = self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col)
+            if model is not None:
+                for k, v in value.items():
+                    setattr(model, k, v)
+            else:
+                model = model_type(**value)
+                self._session.add(model)
+        else:
+            self._session.merge(model)
+        return model
+
+    def delete(self, *, model: Optional[BaseModel] = None,
+               model_type: Type[BaseModel] = None,
+               pk: int = None,
+               pk_col: str = 'id') -> Optional[BaseModel]:
+        if model is None:
+            model = self.get(model_type, pk, pk_col)
+            if model is None:
+                return None
+            self.detach(model)
+        self.execute(delete(type(model)).where(type(model).id == model.id))
+        return model
+
+    def touch(self, *, model: BaseModel = None,
+              model_type: Type[BaseModel] = None,
+              pk: int = None,
+              pk_col: str = 'id') -> None:
+        if model is None:
+            self.execute(update(model_type).filter_by(**{pk_col: pk}))
+        else:
+            self.execute(update(model_type).where(model_type.id == model.id))
+
+    def update(self, model_type: Type[BaseModel],
+               value: Dict[str, Any],
+               pk_col: str = 'id') -> Optional[BaseModel]:
+        row = self.get(model_type, value[pk_col], pk_col)
         if row is None:
             return None
         for col in value:
@@ -147,17 +166,356 @@ class DBSession(object):
                 setattr(row, col, value[col])
         return row
 
-    def touch(self, model: BaseModel, id: int):
-        self.__check_connection()
-        stmt = update(model).where(model.id == id)
-        self.execute(stmt)
+    ###################
+    # Special methods #
+    ###################
 
-    def close(self):
+    def sync_table(self, model_type: Type[BaseModel],
+                   values: List[Dict[str, Any]],
+                   pk_col: str = 'id') -> None:
+        # In-memory table index
+        index = {}
+        for v in values:
+            index[v[pk_col]] = v
+        # Sync existing rows
+        for row in self.execute(select(model_type)).scalars().all():
+            # Remove not in values
+            if getattr(row, pk_col) not in index:
+                self.delete(model=row)
+                continue
+            # Update those are in values
+            new_values = index[getattr(row, pk_col)]
+            for col in new_values:
+                if getattr(row, col) != new_values[col]:
+                    setattr(row, col, new_values[col])
+            del index[getattr(row, pk_col)]
+        # Add absent
+        for pk in index:
+            new_value = index[pk]
+            self.add(model_type=model_type, value=new_value)
+
+
+class DBAsyncWrappedSession(object):
+    _session: DBSyncSession
+    _executor: ThreadPoolExecutor
+    sync_session: Session
+
+    def __init__(self, session: Session, executor: ThreadPoolExecutor) -> None:
+        self._session = DBSyncSession(session)
+        self._executor = executor
+        self.sync_session = session
+
+    async def _run_in_executor(self, func, *args, **kwargs) -> Any:
+        loop = asyncio.get_running_loop()
+
+        def wrapped():
+            return func(*args, **kwargs)
+
+        return await loop.run_in_executor(self._executor, wrapped)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self._run_in_executor(self._session.__exit__, exc_type, exc_val, exc_tb)
+
+    ########################
+    # Base session methods #
+    ########################
+
+    async def execute(self, statement: Any) -> Result:
+        return await self._run_in_executor(self._session.execute, statement)
+
+    async def scalar(self, statement: Any) -> Result:
+        result = await self.execute(statement)
+        return result.scalar()
+
+    async def stream(self, statement: Any) -> AsyncResult:
+        return AsyncResult(await self.execute(statement))
+
+    async def commit(self) -> None:
+        await self._run_in_executor(self._session.commit)
+
+    async def flush(self, objects=None) -> None:
+        return await self._run_in_executor(self._session.flush, objects)
+
+    async def rollback(self) -> None:
+        return await self._run_in_executor(self._session.rollback)
+
+    def begin(self) -> AsyncSessionTransaction:
+        return AsyncSessionTransaction(self)
+
+    async def refresh(self, instance, attribute_names=None, with_for_update=None) -> None:
+        await self._run_in_executor(self._session.refresh, instance, attribute_names, with_for_update)
+
+    def expunge(self, model: BaseModel) -> None:
+        self._session.expunge(model)
+
+    async def detach(self, model: BaseModel) -> None:
+        await self._run_in_executor(self._session.detach, model)
+
+    async def close(self):
+        await self._run_in_executor(self._session.close)
+
+    async def close_all(self):
+        await self._run_in_executor(self._session.close_all)
+
+    ##############################
+    # Dict based session methods #
+    ##############################
+
+    async def get(self, model_type: Type[BaseModel], pk: Any, pk_col: str = 'id') -> Optional[BaseModel]:
+        return await self._run_in_executor(self._session.get, model_type, pk, pk_col)
+
+    def add(self, *, model: Optional[BaseModel] = None,
+                  model_type: Type[BaseModel] = None,
+                  value: Dict[str, Any] = None) -> BaseModel:
+        return self._session.add(model=model, model_type=model_type, value=value)
+
+    async def merge(self, *, model: Optional[BaseModel] = None,
+                    model_type: Type[BaseModel] = None,
+                    value: Dict[str, Any] = None,
+                    pk_col: str = 'id') -> BaseModel:
+        return await self._run_in_executor(self._session.merge,
+                                           model=model,
+                                           model_type=model_type,
+                                           value=value,
+                                           pk_col=pk_col)
+
+    async def delete(self, *, model: Optional[BaseModel] = None,
+                     model_type: Type[BaseModel] = None,
+                     pk: int = None,
+                     pk_col: str = 'id') -> Optional[BaseModel]:
+        return await self._run_in_executor(self._session.delete,
+                                           model=model,
+                                           model_type=model_type,
+                                           pk=pk,
+                                           pk_col=pk_col)
+
+    async def touch(self, *, model: BaseModel = None,
+                    model_type: Type[BaseModel] = None,
+                    pk: int = None,
+                    pk_col: str = 'id') -> None:
+        return await self._run_in_executor(self._session.touch,
+                                           model=model,
+                                           model_type=model_type,
+                                           pk=pk,
+                                           pk_col=pk_col)
+
+    async def update(self, model_type: Type[BaseModel],
+                     value: Dict[str, Any],
+                     pk_col: str = 'id') -> Optional[BaseModel]:
+        return await self._run_in_executor(self._session.update,
+                                           model_type=model_type,
+                                           value=value,
+                                           pk_col=pk_col)
+
+    ###################
+    # Special methods #
+    ###################
+
+    async def sync_table(self, model_type: Type[BaseModel], values: List[Dict[str, Any]], pk_col: str = 'id'):
+        return await self._run_in_executor(self._session.sync_table,
+                                           model_type=model_type,
+                                           values=values,
+                                           pk_col=pk_col)
+
+
+class DBAsyncSession(object):
+    _session: AsyncSession
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._session.__aexit__(exc_type, exc_val, exc_tb)
+
+    ########################
+    # Base session methods #
+    ########################
+
+    async def execute(self, statement: Any) -> Result:
+        return await self._session.execute(statement)
+
+    async def stream(self, statement: Any) -> AsyncResult:
+        return await self._session.stream(statement)
+
+    async def commit(self) -> None:
         try:
-            self.__session.close()
+            await self._session.commit()
         except IntegrityError as e:
             log.error(f'`{__name__}` {e}')
             raise
         except DataError as e:
             log.error(f'`{__name__}` {e}')
             raise
+
+    async def rollback(self) -> None:
+        await self._session.rollback()
+
+    def begin(self) -> AsyncSessionTransaction:
+        return self._session.begin()
+
+    async def flush(self, objects=None) -> None:
+        await self._session.flush(objects)
+
+    async def refresh(self, instance, attribute_names=None, with_for_update=None):
+        await self._session.refresh(instance, attribute_names, with_for_update)
+
+    def expunge(self, model: BaseModel) -> None:
+        self._session.expunge(model)
+
+    async def detach(self, model: BaseModel) -> None:
+        try:
+            await self.refresh(model)
+            self.expunge(model)
+        except InvalidRequestError:
+            pass
+
+    async def close(self):
+        await self._session.close()
+
+    async def close_all(self):
+        await self._session.close_all()
+
+    ##############################
+    # Dict based session methods #
+    ##############################
+
+    async def get(self, model_type: Type[BaseModel], pk: int, pk_col: str = 'id') -> BaseModel:
+        return (await self.execute(select(model_type).filter_by(**{pk_col: pk}))).scalar_one_or_none()
+
+    def add(self, *, model: BaseModel = None,
+                  model_type: Type[BaseModel] = None,
+                  value: Dict[str, Any] = None) -> BaseModel:
+        if model is None:
+            model = model_type(**value)
+        self._session.add(model)
+        return model
+
+    async def merge(self, *, model: BaseModel = None,
+                    model_type: Type[BaseModel] = None,
+                    value: Dict[str, Any] = None,
+                    pk_col: str = 'id') -> BaseModel:
+        if model is None:
+            model = await self.get(model_type=model_type, pk=value[pk_col], pk_col=pk_col)
+            if model is not None:
+                for k, v in value.items():
+                    setattr(model, k, v)
+            else:
+                model = model_type(**value)
+                self._session.add(model)
+        else:
+            await self._session.merge(model)
+        return model
+
+    async def delete(self, *, model: BaseModel = None,
+                     model_type: Type[BaseModel] = None,
+                     pk: int = None,
+                     pk_col: str = 'id') -> Optional[BaseModel]:
+        if model is None:
+            model = await self.get(model_type, pk, pk_col)
+            if model is None:
+                return None
+            await self.detach(model)
+        await self.execute(delete(type(model)).where(type(model).id == model.id))
+        return model
+
+    async def touch(self, *, model: BaseModel = None,
+                    model_type: Type[BaseModel] = None,
+                    pk: int = None,
+                    pk_col: str = 'id') -> None:
+        if model is None:
+            await self.execute(update(model_type).filter_by(**{pk_col: pk}))
+        else:
+            await self.execute(update(model_type).where(model_type.id == model.id))
+
+    async def update(self, model_type: Type[BaseModel],
+                     value: Dict[str, Any],
+                     pk_col: str = 'id') -> Optional[BaseModel]:
+        row = await self.get(model_type, value[pk_col], pk_col)
+        if row is None:
+            return None
+        for col in value:
+            if getattr(row, col) != value[col]:
+                setattr(row, col, value[col])
+        return row
+
+    ###################
+    # Special methods #
+    ###################
+
+    async def sync_table(self, model_type: Type[BaseModel],
+                         values: List[Dict[str, Any]],
+                         pk_col: str = 'id') -> None:
+        # In-memory table index
+        index = {}
+        for v in values:
+            index[v[pk_col]] = v
+        # Sync existing rows
+        async for row in await self.stream(select(model_type)):
+            row = row[0]
+            # Remove not in values
+            if getattr(row, pk_col) not in index:
+                await self.delete(model=row)
+                continue
+            # Update those are in values
+            new_values = index[getattr(row, pk_col)]
+            for col in new_values:
+                if getattr(row, col) != new_values[col]:
+                    setattr(row, col, new_values[col])
+            del index[getattr(row, pk_col)]
+        # Add absent
+        for pk in index:
+            new_value = index[pk]
+            self.add(model_type=model_type, value=new_value)
+
+
+class DBConnection(object):
+    _db_async_engine: AsyncEngine
+    _db_sync_engine: SyncEngine
+    _session_sync_factory: sessionmaker
+    _session_async_factory: sessionmaker
+
+    _sync_session: Optional[DBSyncSession]
+    _async_session: Optional[DBAsyncSession]
+
+    _wrap_sync: bool
+    _single_thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='DB_CONNECTION_THREAD_')
+
+    def __init__(self, engine_url: str) -> None:
+        if 'sqlite' in engine_url:
+            engine_url += '?check_same_thread=False'
+        sync_engine_url = engine_url.replace('+asyncpg', '')
+        # Create sync backend
+        self._db_sync_engine = create_engine(sync_engine_url)
+        Base.metadata.create_all(self._db_sync_engine)
+        self._session_sync_factory = sessionmaker(bind=self._db_sync_engine,
+                                                  autocommit=False,
+                                                  autoflush=True,
+                                                  expire_on_commit=False)
+        # Create async backend
+        if 'sqlite' in engine_url:
+            self._wrap_sync = True
+        else:
+            self._db_async_engine = create_async_engine(engine_url)
+            self._session_async_factory = sessionmaker(bind=self._db_async_engine,
+                                                       autocommit=False,
+                                                       autoflush=True,
+                                                       class_=AsyncSession,
+                                                       expire_on_commit=False)
+            self._wrap_sync = False
+        self._sync_session = None
+        self._async_session = None
+
+    def sync_session(self):
+        return DBSyncSession(self._session_sync_factory())
+
+    def async_session(self):
+        if self._wrap_sync:
+            return DBAsyncWrappedSession(self._session_sync_factory(), self._single_thread_pool)
+        else:
+            return DBAsyncSession(self._session_async_factory())

@@ -29,21 +29,12 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from sqlalchemy import Column, Integer, VARCHAR, BigInteger, Unicode
-from .base import BaseModel
+from .types import OverlordVCState
+from .types import OverlordGenericObject, OverlordMember, OverlordMessage
+from .types import OverlordMessageDelete, OverlordMessageEdit, OverlordRole
+from .types import OverlordUser, OverlordReaction
+from .types import OverlordControlConfig, OverlordRootConfig
+from .task import OverlordTask
+from .command import OverlordCommand
+from .bot import Overlord
 
-
-class User(BaseModel):
-    __tablename__ = 'users'
-
-    did = Column(BigInteger, nullable=False, unique=True)
-    name = Column(Unicode(127), nullable=False)
-    disc = Column(Integer, nullable=False)
-    display_name = Column(Unicode(127), nullable=True)
-    roles = Column(VARCHAR(127), nullable=True)
-
-    def __repr__(self):
-        s = super().__repr__()[:-2]
-        f = ",did={0.did!r},name={0.name!r},disc={0.disc!r},display_name={0.display_name!r},roles={0.roles!r}".format(
-            self)
-        return s + f + ")>"

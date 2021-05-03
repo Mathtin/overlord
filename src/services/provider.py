@@ -29,21 +29,42 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from sqlalchemy import Column, Integer, VARCHAR, BigInteger, Unicode
-from .base import BaseModel
+from db import DBConnection
+
+from .role import RoleService
+from .user import UserService
+from .event import EventService
+from .stat import StatService
 
 
-class User(BaseModel):
-    __tablename__ = 'users'
+class ServiceProvider(object):
+    _db: DBConnection
 
-    did = Column(BigInteger, nullable=False, unique=True)
-    name = Column(Unicode(127), nullable=False)
-    disc = Column(Integer, nullable=False)
-    display_name = Column(Unicode(127), nullable=True)
-    roles = Column(VARCHAR(127), nullable=True)
+    _s_roles:  RoleService
+    _s_users:  UserService
+    _s_events: EventService
+    _s_stats:  StatService
 
-    def __repr__(self):
-        s = super().__repr__()[:-2]
-        f = ",did={0.did!r},name={0.name!r},disc={0.disc!r},display_name={0.display_name!r},roles={0.roles!r}".format(
-            self)
-        return s + f + ")>"
+    def __init__(self, db: DBConnection):
+        self._db = db
+
+        self._s_roles = RoleService(self._db)
+        self._s_users = UserService(self._db, self._s_roles)
+        self._s_events = EventService(self._db)
+        self._s_stats = StatService(self._db, self._s_events)
+
+    @property
+    def role(self) -> RoleService:
+        return self._s_roles
+
+    @property
+    def user(self) -> UserService:
+        return self._s_users
+
+    @property
+    def event(self) -> EventService:
+        return self._s_events
+
+    @property
+    def stat(self) -> StatService:
+        return self._s_stats

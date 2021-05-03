@@ -29,21 +29,45 @@ SOFTWARE.
 
 __author__ = "Mathtin"
 
-from sqlalchemy import Column, Integer, VARCHAR, BigInteger, Unicode
-from .base import BaseModel
+import asyncio
+from typing import Callable, Awaitable, Dict, Optional, Union
+
+from discord.ext import tasks
+from discord.ext.tasks import Loop
+
+from overlord.types import IOverlordTask
 
 
-class User(BaseModel):
-    __tablename__ = 'users'
+class OverlordTask(IOverlordTask):
 
-    did = Column(BigInteger, nullable=False, unique=True)
-    name = Column(Unicode(127), nullable=False)
-    disc = Column(Integer, nullable=False)
-    display_name = Column(Unicode(127), nullable=True)
-    roles = Column(VARCHAR(127), nullable=True)
+    func: Callable[..., Awaitable[None]]
+    kwargs: Dict[str, Union[Optional[int], asyncio.AbstractEventLoop]]
 
-    def __repr__(self):
-        s = super().__repr__()[:-2]
-        f = ",did={0.did!r},name={0.name!r},disc={0.disc!r},display_name={0.display_name!r},roles={0.roles!r}".format(
-            self)
-        return s + f + ")>"
+    def __init__(self, func: Callable[..., Awaitable[None]],
+                 seconds: int = 0,
+                 minutes: int = 0,
+                 hours: int = 0,
+                 count: Optional[int] = None,
+                 reconnect: bool = True) -> None:
+        super().__init__()
+        self.func = func
+        self.kwargs = {
+            'seconds': seconds,
+            'minutes': minutes,
+            'hours': hours,
+            'count': count,
+            'reconnect': reconnect
+        }
+
+    def task(self, ext) -> Loop:
+        self.kwargs['loop'] = asyncio.get_running_loop()
+
+        async def method(*args, **kwargs):
+            try:
+                await self.func(ext, *args, **kwargs)
+            except KeyboardInterrupt:
+                raise
+            except:
+                await ext.on_error(self.func.__name__, *args, **kwargs)
+
+        return tasks.loop(**self.kwargs)(method)
