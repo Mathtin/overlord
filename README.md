@@ -28,27 +28,27 @@ cd overlord
 Install the dependencies via pip
 
 ```sh
-$ python3 -m pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 Create .env file  
 
 ```sh
-$ cp .env.template .env
-$ nano .env
+cp .env.template .env
+nano .env
 ```
 
 Create configuration file  
 
 ```sh
-$ cp overlord_example.cfg overlord.cfg
-$ nano overlord.cfg
+cp overlord_example.cfg overlord.cfg
+nano overlord.cfg
 ```
 
 Start app
 
 ```sh
-$ python3 src/main.py
+python3 src/main.py
 ```
 
 ### Docker
@@ -88,7 +88,7 @@ wget https://raw.githubusercontent.com/Mathtin/overlord/master/database.env
 
 Set password in database.env
 
-Note: DATABASE_ACCESS_URL=postgresql+asyncpg://root:PASTE_PASSWORD_HERE@postgres_container/overlord
+Note: `DATABASE_ACCESS_URL=postgresql+asyncpg://root:PASTE_PASSWORD_HERE@postgres_container/overlord`
 
 ### Development
 
