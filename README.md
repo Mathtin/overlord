@@ -59,7 +59,7 @@ Pull latest image from hub
 docker pull mathtin/overlord:latest
 ```
 
-Create overlord.env and configuration files
+Create env and configuration files
 
 ```sh
 wget -O overlord.env https://raw.githubusercontent.com/Mathtin/overlord/master/.env.template
@@ -72,13 +72,13 @@ Run container (attach to network where your db is reachable)
 
 ```sh
 docker run -d --name overlord-bot \ 
-           -e $(pwd)/.env \
+           -e $(pwd)/overlord.env \
            -v $(pwd)/overlord.cfg:/app/overlord.cfg \
            --network=multi-host-network \
            mathtin/overlord:latest
 ```
 
-Or you can use docker compose, download required files
+Or you can use docker compose (postgres+overlord) using files from repository
 
 ```sh
 wget https://raw.githubusercontent.com/Mathtin/overlord/master/docker-compose.yml
