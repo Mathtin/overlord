@@ -161,12 +161,12 @@ class UtilityExtension(BotExtension):
         await progress.finish()
 
     @BotExtension.command("switch_lang", description="Switch bot language")
-    async def switch_lang(self, msg: discord.Message, lang: str):
+    async def cmd_switch_lang(self, msg: discord.Message, lang: str):
         R.switch_lang(lang)
         await msg.channel.send(R.MESSAGE.STATUS.SUCCESS)
 
     @BotExtension.command("clear_all", description="Clears db data")
-    async def clear_data(self, msg: discord.Message):
+    async def cmd_clear_data(self, msg: discord.Message):
         log.warning("Clearing database")
         progress = self.new_progress(f'{R.MESSAGE.STATUS.DB_DROP}')
         progress.add_step(f'{R.MESSAGE.STATUS.DB_DROP_TABLE}: {DB.UserStat.table_name()}')

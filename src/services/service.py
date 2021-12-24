@@ -30,7 +30,7 @@ SOFTWARE.
 __author__ = "Mathtin"
 
 import logging
-from typing import Any, Type, Dict, Optional
+from typing import Any, Type, Dict, Optional, List
 
 import db as DB
 from db.models.base import BaseModel
@@ -78,6 +78,21 @@ class DBService(object):
             await session.detach(obj)
             return obj
 
+    def get_list_sync(self, stmt: Any) -> List[Any]:
+        with self.sync_session() as session:
+            obj = [r for r, in session.execute(stmt)]
+            for r in obj:
+                session.detach(r)
+            return obj
+
+    async def get_list(self, stmt: Any) -> List[Any]:
+        async with self.session() as session:
+            obj = []
+            async for r, in await session.stream(stmt):
+                await session.detach(r)
+                obj.append(r)
+            return obj
+
     def create_sync(self, model_type: Type[BaseModel], value: Dict[str, Any]) -> BaseModel:
         with self.sync_session() as session:
             with session.begin():
@@ -107,6 +122,20 @@ class DBService(object):
         async with self.session() as session:
             async with session.begin():
                 obj = await session.merge(model_type=model_type, value=value, pk_col=pk_col)
+            await session.detach(obj)
+        return obj
+
+    def save_sync(self, model: BaseModel) -> BaseModel:
+        with self.sync_session() as session:
+            with session.begin():
+                obj = session.merge(model=model)
+            session.detach(obj)
+        return obj
+
+    async def save(self, model: BaseModel) -> BaseModel:
+        async with self.session() as session:
+            async with session.begin():
+                obj = await session.merge(model=model)
             await session.detach(obj)
         return obj
 

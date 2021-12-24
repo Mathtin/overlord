@@ -32,6 +32,7 @@ __author__ = "Mathtin"
 import asyncio
 import logging
 import os
+import re
 import sys
 import traceback
 from typing import Dict, List, Callable, Awaitable, Optional, Union, Any, Tuple
@@ -242,13 +243,15 @@ class Overlord(discord.Client):
             if '#' in user_mention:
                 return await self.services.user.get_by_qualified_name(user_mention)
             elif user_mention.startswith('<@'):
-                d_user = await self.fetch_user(int(user_mention[2:-1]))
+                d_user = await self.fetch_user(int(re.findall(r'\d+', user_mention)[0]))
                 return await self.services.user.get(d_user)
             else:
                 return await self.services.user.get_by_display_name(user_mention)
         except discord.NotFound:
             return None
         except ValueError:
+            return None
+        except IndexError:
             return None
 
     async def resolve_text_channel(self, channel_mention: str) -> Optional[discord.TextChannel]:
@@ -555,7 +558,7 @@ class Overlord(discord.Client):
             Calls appropriate control callback
         """
         # Filter non-admins
-        if not self.is_admin(message.author):
+        if not is_dm_message(message) and not self.is_admin(message.author):
             return
         # Parse argv
         argv = parse_control_message(self.prefix, message)

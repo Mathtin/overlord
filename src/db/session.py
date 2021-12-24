@@ -131,7 +131,7 @@ class DBSyncSession(object):
                 model = model_type(**value)
                 self._session.add(model)
         else:
-            self._session.merge(model)
+            return self._session.merge(model)
         return model
 
     def delete(self, *, model: Optional[BaseModel] = None,
@@ -409,7 +409,7 @@ class DBAsyncSession(object):
                 model = model_type(**value)
                 self._session.add(model)
         else:
-            await self._session.merge(model)
+            return await self._session.merge(model)
         return model
 
     async def delete(self, *, model: BaseModel = None,
@@ -455,20 +455,22 @@ class DBAsyncSession(object):
         index = {}
         for v in values:
             index[v[pk_col]] = v
-        # Sync existing rows
+        # Remove old rows
         async for row in await self.stream(select(model_type)):
             row = row[0]
-            # Remove not in values
-            if getattr(row, pk_col) not in index:
-                await self.delete(model=row)
+            if getattr(row, pk_col) in index:
                 continue
+            await self.delete(model=row)
+        # Update actual rows
+        async for row in await self.stream(select(model_type)):
+            row = row[0]
             # Update those are in values
             new_values = index[getattr(row, pk_col)]
             for col in new_values:
                 if getattr(row, col) != new_values[col]:
                     setattr(row, col, new_values[col])
             del index[getattr(row, pk_col)]
-        # Add absent
+        # Add new rows
         for pk in index:
             new_value = index[pk]
             self.add(model_type=model_type, value=new_value)

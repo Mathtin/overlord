@@ -128,7 +128,8 @@ class OverlordCommand(IOverlordCommand):
         return res
 
     @staticmethod
-    async def _convert_arg(msg: DIS.Message, ext: IBotExtension, name: str, arg: str, type_: Type[Any]) -> Optional[Any]:
+    async def _convert_arg(msg: DIS.Message, ext: IBotExtension, name: str, arg: str, type_: Type[Any]) \
+            -> Optional[Any]:
         if type_ in _type_arg_converter_map:
             return await _type_arg_converter_map[type_](msg, ext, arg)
         try:
